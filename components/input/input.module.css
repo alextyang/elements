@@ -1,0 +1,27 @@
+.input {
+    width: 100%;
+    height: calc(var(--font-size-lg) + var(--inner-padding-sm));
+
+    border: 0;
+    border-bottom: var(--border-weight) solid var(--foreground);
+
+    outline: none;
+
+    background: transparent;
+    background-color: transparent;
+    color: transparent;
+    text-shadow: 0 0 0 var(--foreground);
+    opacity: var(--light-opacity);
+
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-lg);
+    text-align: center;
+
+    mix-blend-mode: screen;
+    transition: var(--default-transition);
+}
+
+
+.input:focus {
+    border-color: var(--foreground-hidden);
+}
