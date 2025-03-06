@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 
 import { isValidURL } from "./domain/search";
 import { Bookmarks } from "@/components/bookmarks/bookmarks";
+import { Background } from "@/components/backgrounds/background";
 
 export default function Home() {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function Home() {
 
   return (
     <div className={styles.content}>
-      <div className={styles.background}></div>
+      <Background />
       <Input text={inputText} setText={setInputText} submitInput={submitInput}></Input>
       <Bookmarks searchText={inputText} setSelectedBookmark={setSelectedBookmark} />
     </div>

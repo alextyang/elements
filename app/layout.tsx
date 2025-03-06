@@ -25,6 +25,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="theme-color" content="" id="theme-color"></meta>
+      </head>
+
       <body>
         {children}
       </body>
