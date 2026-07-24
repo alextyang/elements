@@ -40,6 +40,10 @@
     --celestial-size: 18vmax;
     --edge-opacity-low: 0.31;
     --edge-opacity-high: 0.41;
+    --palette-saturation-low: 1.04;
+    --palette-saturation-high: 1.12;
+    --airglow-opacity-low: 0.13;
+    --airglow-opacity-high: 0.22;
 
     position: fixed;
     inset: 0;
@@ -75,7 +79,7 @@
             var(--sky-low) 100%
         );
     transform-origin: 50% 55%;
-    filter: saturate(1.08);
+    filter: saturate(var(--palette-saturation-low));
     will-change: transform, filter;
     animation: baseBreathe var(--base-duration) ease-in-out infinite alternate;
     animation-delay: var(--animation-delay);
@@ -320,6 +324,25 @@
     --edge-opacity-high: 0.35;
 }
 
+.soft {
+    --edge-opacity-low: 0.23;
+    --edge-opacity-high: 0.33;
+}
+
+.soft .edgeColor {
+    filter: saturate(1.16) blur(8px);
+}
+
+.soft .cloudsHigh,
+.soft .cloudsLow {
+    filter: blur(16px) saturate(0.72);
+}
+
+.soft .mistLayer {
+    inset: 2% -19% -20%;
+    filter: blur(30px) saturate(0.82);
+}
+
 .atmosphere {
     inset: 0;
     background:
@@ -432,26 +455,26 @@
 @keyframes baseBreathe {
     from {
         transform: translate3d(-0.15%, -0.2%, 0) scale(1.012);
-        filter: saturate(1.06) brightness(0.995);
+        filter: saturate(var(--palette-saturation-low)) brightness(0.995);
     }
     to {
         transform: translate3d(0.18%, 0.24%, 0) scale(1.026);
-        filter: saturate(1.11) brightness(1.012);
+        filter: saturate(var(--palette-saturation-high)) brightness(1.012);
     }
 }
 
 @keyframes baseBloom {
     0% {
         transform: translate3d(0, -0.25%, 0) scale(1.01);
-        filter: saturate(1.05) brightness(0.992);
+        filter: saturate(var(--palette-saturation-low)) brightness(0.992);
     }
     58% {
         transform: translate3d(0.12%, 0.1%, 0) scale(1.03);
-        filter: saturate(1.12) brightness(1.014);
+        filter: saturate(var(--palette-saturation-high)) brightness(1.014);
     }
     100% {
         transform: translate3d(-0.1%, 0.24%, 0) scale(1.018);
-        filter: saturate(1.09) brightness(1.004);
+        filter: saturate(var(--palette-saturation-low)) brightness(1.004);
     }
 }
 
@@ -589,22 +612,22 @@
 @keyframes airglowCrossing {
     from {
         transform: translate3d(calc(0px - var(--motion-x)), 0.4vmax, 0) scale(1.01);
-        opacity: 0.13;
+        opacity: var(--airglow-opacity-low);
     }
     to {
         transform: translate3d(var(--motion-x), -0.45vmax, 0) scale(1.055);
-        opacity: 0.22;
+        opacity: var(--airglow-opacity-high);
     }
 }
 
 @keyframes airglowCrosswind {
     from {
         transform: translate3d(calc(0px - var(--motion-x)), 0, 0) skewX(-0.5deg);
-        opacity: 0.12;
+        opacity: var(--airglow-opacity-low);
     }
     to {
         transform: translate3d(var(--motion-x), -0.25vmax, 0) skewX(0.5deg);
-        opacity: 0.2;
+        opacity: var(--airglow-opacity-high);
     }
 }
 

@@ -6,9 +6,14 @@ import SunCalc from "suncalc";
 import styles from "./sky.module.css";
 import {
     PHASE_ORDER,
+    SKY_FAMILIES,
     SKY_PALETTES,
+    SkyAtmosphere,
+    SkyFamily,
     SkyPalette,
     SkyPhase,
+    SkyRegion,
+    SkySeason,
 } from "./sky-palettes";
 
 const PALETTE_KEYS: (keyof SkyPalette)[] = [
@@ -57,9 +62,42 @@ const TIMEZONE_COORDINATES: Record<string, [number, number]> = {
     "Pacific/Honolulu": [21.3099, -157.8581],
 };
 
+const TIMEZONE_REGIONS: Partial<Record<string, SkyRegion>> = {
+    "America/Los_Angeles": "marine",
+    "America/Vancouver": "marine",
+    "America/Denver": "continental",
+    "America/Phoenix": "dry",
+    "America/Chicago": "continental",
+    "America/New_York": "humid",
+    "America/Toronto": "continental",
+    "America/Halifax": "marine",
+    "America/Mexico_City": "dry",
+    "America/Sao_Paulo": "humid",
+    "Europe/London": "marine",
+    "Europe/Paris": "continental",
+    "Europe/Berlin": "continental",
+    "Europe/Rome": "marine",
+    "Europe/Madrid": "dry",
+    "Europe/Athens": "marine",
+    "Africa/Cairo": "dry",
+    "Africa/Johannesburg": "dry",
+    "Asia/Dubai": "dry",
+    "Asia/Kolkata": "tropical",
+    "Asia/Bangkok": "tropical",
+    "Asia/Shanghai": "humid",
+    "Asia/Hong_Kong": "tropical",
+    "Asia/Tokyo": "humid",
+    "Asia/Seoul": "continental",
+    "Australia/Perth": "dry",
+    "Australia/Sydney": "marine",
+    "Pacific/Auckland": "marine",
+    "Pacific/Honolulu": "tropical",
+};
+
 interface SkyVisual {
     palette: SkyPalette;
-    atmosphereStyle: "crystal" | "haze" | "cirrus" | "mist" | "soft";
+    familyId: string;
+    atmosphereStyle: SkyAtmosphere;
     motionStyle: "drift" | "bloom" | "tide" | "crosswind" | "thermal";
     sunX: number;
     sunY: number;
@@ -86,6 +124,13 @@ interface SkyVisual {
     motionX: number;
     motionY: number;
     animationDelay: number;
+    saturationLow: number;
+    saturationHigh: number;
+    edgeOpacityLow: number;
+    edgeOpacityHigh: number;
+    airglowOpacityLow: number;
+    airglowOpacityHigh: number;
+    horizonStrength: number;
 }
 
 interface Keyframe {
@@ -101,22 +146,92 @@ const smoothstep = (value: number) => {
     return t * t * (3 - 2 * t);
 };
 
-const hexToRgb = (hex: string) => {
-    const value = hex.replace("#", "");
+interface OklabColor {
+    l: number;
+    a: number;
+    b: number;
+}
+
+const parseRgb = (color: string) => {
+    if (color.startsWith("#")) {
+        const value = color.slice(1);
+        return [0, 2, 4].map((offset) =>
+            Number.parseInt(value.slice(offset, offset + 2), 16),
+        );
+    }
+
+    return (color.match(/[\d.]+/g) ?? ["0", "0", "0"])
+        .slice(0, 3)
+        .map(Number);
+};
+
+const srgbToLinear = (value: number) => {
+    const channel = value / 255;
+    return channel <= 0.04045
+        ? channel / 12.92
+        : ((channel + 0.055) / 1.055) ** 2.4;
+};
+
+const linearToSrgb = (value: number) => {
+    const channel = clamp(value);
+    return Math.round(
+        255 *
+            (channel <= 0.0031308
+                ? channel * 12.92
+                : 1.055 * channel ** (1 / 2.4) - 0.055),
+    );
+};
+
+const toOklab = (color: string): OklabColor => {
+    const [r, g, b] = parseRgb(color).map(srgbToLinear);
+    const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+    const lRoot = Math.cbrt(l);
+    const mRoot = Math.cbrt(m);
+    const sRoot = Math.cbrt(s);
+
     return {
-        r: Number.parseInt(value.slice(0, 2), 16),
-        g: Number.parseInt(value.slice(2, 4), 16),
-        b: Number.parseInt(value.slice(4, 6), 16),
+        l: 0.2104542553 * lRoot + 0.793617785 * mRoot - 0.0040720468 * sRoot,
+        a: 1.9779984951 * lRoot - 2.428592205 * mRoot + 0.4505937099 * sRoot,
+        b: 0.0259040371 * lRoot + 0.7827717662 * mRoot - 0.808675766 * sRoot,
     };
 };
 
-const mixColor = (from: string, to: string, amount: number) => {
-    const a = hexToRgb(from);
-    const b = hexToRgb(to);
-    const mix = (start: number, end: number) =>
-        Math.round(start + (end - start) * amount);
+const fromOklab = ({ l, a, b }: OklabColor) => {
+    const lRoot = l + 0.3963377774 * a + 0.2158037573 * b;
+    const mRoot = l - 0.1055613458 * a - 0.0638541728 * b;
+    const sRoot = l - 0.0894841775 * a - 1.291485548 * b;
+    const linearL = lRoot ** 3;
+    const linearM = mRoot ** 3;
+    const linearS = sRoot ** 3;
+    const r =
+        4.0767416621 * linearL -
+        3.3077115913 * linearM +
+        0.2309699292 * linearS;
+    const g =
+        -1.2684380046 * linearL +
+        2.6097574011 * linearM -
+        0.3413193965 * linearS;
+    const blue =
+        -0.0041960863 * linearL -
+        0.7034186147 * linearM +
+        1.707614701 * linearS;
 
-    return `rgb(${mix(a.r, b.r)}, ${mix(a.g, b.g)}, ${mix(a.b, b.b)})`;
+    return `rgb(${linearToSrgb(r)}, ${linearToSrgb(g)}, ${linearToSrgb(blue)})`;
+};
+
+const mixColor = (from: string, to: string, amount: number) => {
+    const a = toOklab(from);
+    const b = toOklab(to);
+    const mix = (start: number, end: number) =>
+        start + (end - start) * amount;
+
+    return fromOklab({
+        l: mix(a.l, b.l),
+        a: mix(a.a, b.a),
+        b: mix(a.b, b.b),
+    });
 };
 
 const mixPalette = (
@@ -128,6 +243,40 @@ const mixPalette = (
     PALETTE_KEYS.forEach((key) => {
         result[key] = mixColor(from[key], to[key], amount);
     });
+    return result;
+};
+
+const gradePalette = (
+    source: SkyPalette,
+    family: SkyFamily,
+    hueJitter: number,
+    chromaJitter: number,
+    lightnessJitter: number,
+) => {
+    const result = {} as SkyPalette;
+    const hueShift = ((family.grade.hueShift + hueJitter) * Math.PI) / 180;
+    const chromaScale = family.grade.chroma * chromaJitter;
+
+    PALETTE_KEYS.forEach((key) => {
+        const color = toOklab(source[key]);
+        const chroma = Math.hypot(color.a, color.b);
+        const hue = Math.atan2(color.b, color.a) + hueShift;
+        const gradedChroma = chroma * chromaScale;
+        const contrastedLightness =
+            0.62 + (color.l - 0.62) * family.intensity.contrast;
+        result[key] = fromOklab({
+            l: clamp(
+                contrastedLightness +
+                    family.grade.lightness +
+                    lightnessJitter,
+                0.025,
+                0.985,
+            ),
+            a: gradedChroma * Math.cos(hue),
+            b: gradedChroma * Math.sin(hue),
+        });
+    });
+
     return result;
 };
 
@@ -168,37 +317,108 @@ const getCoordinates = (date: Date, timezone: string): [number, number] => {
     return [35, -date.getTimezoneOffset() / 4];
 };
 
+const getSeason = (date: Date, latitude: number): SkySeason => {
+    const northernMonth =
+        (date.getMonth() + (latitude < 0 ? 6 : 0)) % 12;
+    if (northernMonth === 11 || northernMonth <= 1) return "winter";
+    if (northernMonth <= 4) return "spring";
+    if (northernMonth <= 7) return "summer";
+    return "autumn";
+};
+
+const getRegion = (timezone: string, latitude: number): SkyRegion => {
+    const known = TIMEZONE_REGIONS[timezone];
+    if (known) return known;
+    const absoluteLatitude = Math.abs(latitude);
+    if (absoluteLatitude < 24) return "tropical";
+    if (absoluteLatitude > 58) return "polar";
+    return "continental";
+};
+
+const weightedFamily = (
+    randomValue: number,
+    season: SkySeason,
+    region: SkyRegion,
+) => {
+    const weights = SKY_FAMILIES.map(
+        (family) =>
+            family.seasonWeights[season] *
+            (family.regionWeights[region] ?? 1),
+    );
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    let cursor = randomValue * total;
+
+    for (let index = 0; index < SKY_FAMILIES.length; index += 1) {
+        cursor -= weights[index];
+        if (cursor <= 0) return SKY_FAMILIES[index];
+    }
+
+    return SKY_FAMILIES[SKY_FAMILIES.length - 1];
+};
+
 const chooseDailyPalettes = (
     date: Date,
     timezone: string,
+    latitude: number,
 ): {
     palettes: Record<SkyPhase, SkyPalette>;
+    family: SkyFamily;
     randomValues: number[];
 } => {
     const random = seededRandom(hashString(`${localDateKey(date)}:${timezone}`));
+    const family = weightedFamily(
+        random(),
+        getSeason(date, latitude),
+        getRegion(timezone, latitude),
+    );
     const palettes = {} as Record<SkyPhase, SkyPalette>;
+    const variantShift = Math.floor(random() * 3) - 1;
+    const hueJitter =
+        (random() * 2 - 1) * family.grade.hueJitter;
+    const chromaJitter =
+        1 + (random() * 2 - 1) * family.grade.chromaJitter;
+    const lightnessJitter =
+        (random() * 2 - 1) * family.grade.lightnessJitter;
+    const flipEdges = random() > 0.5;
 
     PHASE_ORDER.forEach((phase) => {
         const choices = SKY_PALETTES[phase];
-        palettes[phase] = choices[Math.floor(random() * choices.length)];
+        const familyIndex = family.phaseIndices[phase];
+        const index =
+            (familyIndex + variantShift + choices.length) % choices.length;
+        const graded = gradePalette(
+            choices[index],
+            family,
+            hueJitter,
+            chromaJitter,
+            lightnessJitter,
+        );
+        palettes[phase] = flipEdges
+            ? { ...graded, left: graded.right, right: graded.left }
+            : graded;
     });
 
     return {
         palettes,
-        randomValues: Array.from({ length: 16 }, () => random()),
+        family,
+        randomValues: Array.from({ length: 20 }, () => random()),
     };
 };
 
 const timestamp = (date: Date | undefined, fallback: number) => {
     const value = date?.getTime();
-    return Number.isFinite(value) ? value as number : fallback;
+    return Number.isFinite(value) ? (value as number) : fallback;
 };
+
+const between = (from: number, to: number, amount: number) =>
+    from + (to - from) * amount;
 
 const buildKeyframes = (
     date: Date,
     latitude: number,
     longitude: number,
     palettes: Record<SkyPhase, SkyPalette>,
+    previousNight: SkyPalette,
 ): Keyframe[] => {
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
@@ -207,29 +427,57 @@ const buildKeyframes = (
 
     const times = SunCalc.getTimes(date, latitude, longitude);
     const fallback = (hour: number) => start.getTime() + hour * 60 * 60 * 1000;
+    const nauticalDawn = timestamp(times.nauticalDawn, fallback(5));
+    const dawn = timestamp(times.dawn, fallback(5.75));
+    const sunrise = timestamp(times.sunrise, fallback(6.2));
+    const solarNoon = timestamp(times.solarNoon, fallback(12));
+    const goldenHour = timestamp(times.goldenHour, fallback(17));
+    const sunset = timestamp(times.sunset, fallback(18.75));
+    const dusk = timestamp(times.dusk, fallback(19.35));
+    const night = timestamp(times.night, fallback(20.4));
 
     return [
-        { at: start.getTime(), palette: palettes.night },
+        // Carry yesterday's nocturne through midnight, then let it hand off
+        // gradually to today's family before dawn. Tomorrow starts from this
+        // day's night palette, so the date boundary can never flash or snap.
+        { at: start.getTime(), palette: previousNight },
         {
-            at: timestamp(times.nauticalDawn, fallback(5)),
+            at: nauticalDawn,
+            palette: palettes.blueHourMorning,
+        },
+        {
+            at: between(nauticalDawn, dawn, 0.58),
             palette: palettes.preDawn,
         },
-        { at: timestamp(times.dawn, fallback(6)), palette: palettes.sunrise },
+        { at: dawn, palette: palettes.beltOfVenus },
+        { at: sunrise, palette: palettes.sunrise },
         {
             at: timestamp(times.goldenHourEnd, fallback(7.5)),
             palette: palettes.morning,
         },
-        { at: timestamp(times.solarNoon, fallback(12)), palette: palettes.day },
+        { at: solarNoon, palette: palettes.solarNoon },
         {
-            at: timestamp(times.goldenHour, fallback(17)),
+            at: between(solarNoon, goldenHour, 0.58),
+            palette: palettes.day,
+        },
+        {
+            at: goldenHour,
             palette: palettes.golden,
         },
         {
             at: timestamp(times.sunsetStart, fallback(18.5)),
             palette: palettes.sunset,
         },
-        { at: timestamp(times.dusk, fallback(19.5)), palette: palettes.dusk },
-        { at: timestamp(times.night, fallback(21)), palette: palettes.night },
+        {
+            at: sunset + 12 * 60 * 1000,
+            palette: palettes.afterglow,
+        },
+        { at: dusk, palette: palettes.dusk },
+        {
+            at: between(dusk, night, 0.54),
+            palette: palettes.blueHourEvening,
+        },
+        { at: night, palette: palettes.night },
         { at: end.getTime(), palette: palettes.night },
     ].sort((a, b) => a.at - b.at);
 };
@@ -247,9 +495,22 @@ const interpolateKeyframes = (keyframes: Keyframe[], time: number) => {
 const calculateSky = (date: Date): SkyVisual => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
     const [latitude, longitude] = getCoordinates(date, timezone);
-    const daily = chooseDailyPalettes(date, timezone);
+    const daily = chooseDailyPalettes(date, timezone, latitude);
+    const previousDate = new Date(date);
+    previousDate.setDate(previousDate.getDate() - 1);
+    const previousDaily = chooseDailyPalettes(
+        previousDate,
+        timezone,
+        latitude,
+    );
     const palette = interpolateKeyframes(
-        buildKeyframes(date, latitude, longitude, daily.palettes),
+        buildKeyframes(
+            date,
+            latitude,
+            longitude,
+            daily.palettes,
+            previousDaily.palettes.night,
+        ),
         date.getTime(),
     );
     const sun = SunCalc.getPosition(date, latitude, longitude);
@@ -259,16 +520,11 @@ const calculateSky = (date: Date): SkyVisual => {
     const moonAltitude = moon.altitude * (180 / Math.PI);
     const daylight = clamp((altitude + 8) / 11);
     const nearHorizon = 1 - clamp(Math.abs(altitude) / 24);
-    const atmosphereStyles: SkyVisual["atmosphereStyle"][] = [
-        "crystal",
-        "haze",
-        "cirrus",
-        "mist",
-        "soft",
-    ];
     const atmosphereStyle =
-        atmosphereStyles[
-            Math.floor(daily.randomValues[4] * atmosphereStyles.length)
+        daily.family.atmospheres[
+            Math.floor(
+                daily.randomValues[4] * daily.family.atmospheres.length,
+            )
         ];
     const textureStrength = 0.72 + daily.randomValues[0] * 0.55;
     const textureByStyle = {
@@ -296,24 +552,39 @@ const calculateSky = (date: Date): SkyVisual => {
     const celestialOpacity = useSun
         ? daylight * (0.12 + nearHorizon * 0.5)
         : (1 - daylight) * moonVisibility * 0.15;
+    const edgeOpacityByAtmosphere: Record<SkyAtmosphere, [number, number]> = {
+        crystal: [0.44, 0.54],
+        haze: [0.2, 0.29],
+        cirrus: [0.31, 0.42],
+        mist: [0.25, 0.35],
+        soft: [0.23, 0.33],
+    };
+    const [edgeLow, edgeHigh] = edgeOpacityByAtmosphere[atmosphereStyle];
+    const intensity = daily.family.intensity;
 
     return {
         palette,
+        familyId: daily.family.id,
         atmosphereStyle,
         motionStyle,
         sunX: clamp(50 + Math.sin(celestial.azimuth) * 47, 2, 98),
         sunY: clamp(78 - Math.sin(celestial.altitude) * 69, 8, 84),
-        sunOpacity: celestialOpacity,
+        sunOpacity: celestialOpacity * intensity.glow,
         celestialSize: useSun
             ? 17 + nearHorizon * 5
             : 9 + moonIllumination.fraction * 6,
-        starsOpacity: clamp((-altitude - 7) / 14) * 0.34,
+        starsOpacity:
+            clamp((-altitude - 7) / 14) *
+            0.34 *
+            clamp(1.12 - intensity.haze * 0.14, 0.72, 1.04),
         highCloudOpacity:
             textureByStyle.high * textureStrength * (0.76 + daylight * 0.24),
         lowCloudOpacity:
             textureByStyle.low * textureStrength * (0.76 + daylight * 0.24),
         mistOpacity:
-            textureByStyle.mist * (0.8 + daily.randomValues[5] * 0.4),
+            textureByStyle.mist *
+            (0.8 + daily.randomValues[5] * 0.4) *
+            intensity.haze,
         cloudOffset: daily.randomValues[1] * 700,
         cloudHeight: 8 + daily.randomValues[2] * 24,
         horizonGlow: clamp((18 - Math.abs(altitude)) / 18),
@@ -334,6 +605,13 @@ const calculateSky = (date: Date): SkyVisual => {
             (0.55 + daily.randomValues[10] * 1.5) *
             (0.78 + clamp((18 - Math.abs(celestialAltitude)) / 18) * 0.3),
         animationDelay: -(12 + daily.randomValues[8] * 64),
+        saturationLow: intensity.saturation * 0.96,
+        saturationHigh: intensity.saturation * 1.04,
+        edgeOpacityLow: clamp(edgeLow * intensity.edge, 0.12, 0.66),
+        edgeOpacityHigh: clamp(edgeHigh * intensity.edge, 0.18, 0.72),
+        airglowOpacityLow: clamp(0.13 * intensity.edge, 0.08, 0.2),
+        airglowOpacityHigh: clamp(0.22 * intensity.edge, 0.14, 0.32),
+        horizonStrength: intensity.glow,
     };
 };
 
@@ -410,7 +688,9 @@ export function Sky() {
         "--cloud-low-offset": `${(visual?.cloudOffset ?? 0) * -0.6}px`,
         "--cloud-height": `${visual?.cloudHeight ?? 18}%`,
         "--horizon-glow": visual?.horizonGlow ?? 0.4,
-        "--horizon-opacity": 0.5 + (visual?.horizonGlow ?? 0.4) * 0.42,
+        "--horizon-opacity":
+            (0.5 + (visual?.horizonGlow ?? 0.4) * 0.42) *
+            (visual?.horizonStrength ?? 1),
         "--night-depth": visual?.nightDepth ?? 0,
         "--night-vignette": 0.05 + (visual?.nightDepth ?? 0) * 0.12,
         "--star-rotation": `${visual?.starRotation ?? 0}deg`,
@@ -426,6 +706,12 @@ export function Sky() {
         "--motion-x": `${visual?.motionX ?? 2.2}vmax`,
         "--motion-y": `${visual?.motionY ?? 1.1}vmax`,
         "--animation-delay": `${visual?.animationDelay ?? -24}s`,
+        "--palette-saturation-low": visual?.saturationLow ?? 1.04,
+        "--palette-saturation-high": visual?.saturationHigh ?? 1.12,
+        "--edge-opacity-low": visual?.edgeOpacityLow ?? 0.31,
+        "--edge-opacity-high": visual?.edgeOpacityHigh ?? 0.41,
+        "--airglow-opacity-low": visual?.airglowOpacityLow ?? 0.13,
+        "--airglow-opacity-high": visual?.airglowOpacityHigh ?? 0.22,
     } as CSSProperties & Record<`--${string}`, string | number | undefined>;
 
     return (
@@ -433,6 +719,7 @@ export function Sky() {
             id="sky"
             className={`${styles.background} ${styles[visual?.atmosphereStyle ?? "crystal"]} ${styles[`motion${(visual?.motionStyle ?? "drift").replace(/^./, (letter) => letter.toUpperCase())}`]}`}
             style={customProperties}
+            data-sky-family={visual?.familyId ?? "loading"}
             aria-hidden="true"
         >
             <div className={styles.base} />
