@@ -25,6 +25,21 @@
     --night-depth: 0;
     --night-vignette: 0.05;
     --star-rotation: 0deg;
+    --motion-direction: alternate;
+    --base-duration: 34s;
+    --edge-duration: 74s;
+    --horizon-duration: 92s;
+    --celestial-duration: 14s;
+    --mist-duration: 124s;
+    --star-duration: 240s;
+    --cloud-high-duration: 150s;
+    --cloud-low-duration: 210s;
+    --motion-x: 2.2vmax;
+    --motion-y: 1.1vmax;
+    --animation-delay: -24s;
+    --celestial-size: 18vmax;
+    --edge-opacity-low: 0.31;
+    --edge-opacity-high: 0.41;
 
     position: fixed;
     inset: 0;
@@ -59,7 +74,11 @@
             var(--sky-horizon) 77%,
             var(--sky-low) 100%
         );
+    transform-origin: 50% 55%;
     filter: saturate(1.08);
+    will-change: transform, filter;
+    animation: baseBreathe var(--base-duration) ease-in-out infinite alternate;
+    animation-delay: var(--animation-delay);
 }
 
 .edgeColor {
@@ -85,7 +104,11 @@
     opacity: 0.36;
     mix-blend-mode: screen;
     filter: saturate(1.4) blur(5px);
-    transform: translateZ(0);
+    transform-origin: 50% 68%;
+    will-change: transform, opacity;
+    animation: edgeDrift var(--edge-duration) ease-in-out infinite alternate;
+    animation-direction: var(--motion-direction);
+    animation-delay: var(--animation-delay);
 }
 
 .horizon {
@@ -107,16 +130,19 @@
         );
     mix-blend-mode: screen;
     filter: blur(8px) saturate(1.16);
+    transform-origin: 50% 72%;
+    will-change: transform, filter;
+    animation: horizonWander var(--horizon-duration) ease-in-out infinite alternate;
+    animation-delay: calc(var(--animation-delay) - 7s);
 }
 
 .sun {
     left: var(--sun-x);
     top: var(--sun-y);
-    width: clamp(160px, 18vmax, 420px);
+    width: clamp(120px, var(--celestial-size), 460px);
     aspect-ratio: 1;
     border-radius: 50%;
     opacity: var(--sun-opacity);
-    transform: translate(-50%, -50%);
     background:
         radial-gradient(
             circle,
@@ -130,14 +156,20 @@
         0 0 clamp(120px, 16vmax, 330px) color-mix(in srgb, var(--sky-glow) 40%, transparent);
     mix-blend-mode: screen;
     filter: blur(8px);
+    will-change: transform, filter;
+    animation: celestialBreathe var(--celestial-duration) ease-in-out infinite alternate;
+    animation-delay: calc(var(--animation-delay) - 3s);
 }
 
 .stars {
     inset: -10%;
     opacity: var(--stars-opacity);
-    transform: rotate(var(--star-rotation)) scale(1.12);
     transform-origin: 50% 42%;
     mix-blend-mode: screen;
+    will-change: transform;
+    animation: starParallax var(--star-duration) ease-in-out infinite alternate;
+    animation-direction: var(--motion-direction);
+    animation-delay: var(--animation-delay);
 }
 
 .starFieldFar,
@@ -155,6 +187,8 @@
     background-size: 71px 83px, 113px 127px, 157px 139px;
     background-position: 13px 19px, 49px 63px, 91px 27px;
     mask-image: linear-gradient(to bottom, black 0%, black 57%, transparent 86%);
+    animation: starsBreatheFar 17s ease-in-out infinite alternate;
+    animation-delay: calc(var(--animation-delay) - 11s);
 }
 
 .starFieldNear {
@@ -165,7 +199,8 @@
     background-size: 223px 211px, 281px 257px;
     background-position: 31px 47px, 137px 91px;
     mask-image: linear-gradient(to bottom, black 0%, black 48%, transparent 78%);
-    animation: starsBreathe 8s ease-in-out infinite alternate;
+    animation: starsBreathe 9s ease-in-out infinite alternate;
+    animation-delay: calc(var(--animation-delay) - 17s);
 }
 
 .clouds {
@@ -187,7 +222,9 @@
         radial-gradient(ellipse 17% 37% at 52% 61%, color-mix(in srgb, var(--sky-cloud) 46%, transparent), transparent 75%),
         radial-gradient(ellipse 22% 34% at 78% 43%, color-mix(in srgb, var(--sky-cloud) 55%, transparent), transparent 74%),
         radial-gradient(ellipse 13% 30% at 96% 66%, color-mix(in srgb, var(--sky-cloud) 48%, transparent), transparent 72%);
-    animation: cloudDriftHigh 150s linear infinite alternate;
+    animation: cloudDriftHigh var(--cloud-high-duration) linear infinite alternate;
+    animation-direction: var(--motion-direction);
+    animation-delay: var(--animation-delay);
 }
 
 .cirrus .cloudsHigh {
@@ -210,7 +247,9 @@
         radial-gradient(ellipse 18% 27% at 47% 78%, color-mix(in srgb, var(--sky-cloud-warm) 51%, transparent), transparent 73%),
         radial-gradient(ellipse 27% 36% at 72% 64%, color-mix(in srgb, var(--sky-cloud-warm) 58%, transparent), transparent 76%),
         radial-gradient(ellipse 19% 30% at 98% 76%, color-mix(in srgb, var(--sky-cloud-warm) 62%, transparent), transparent 72%);
-    animation: cloudDriftLow 210s linear infinite alternate-reverse;
+    animation: cloudDriftLow var(--cloud-low-duration) linear infinite alternate-reverse;
+    animation-direction: var(--motion-direction);
+    animation-delay: calc(var(--animation-delay) - 23s);
 }
 
 .mist .cloudsLow {
@@ -241,6 +280,11 @@
         );
     filter: blur(22px);
     mix-blend-mode: screen;
+    transform-origin: 50% 76%;
+    will-change: transform, opacity;
+    animation: mistWander var(--mist-duration) ease-in-out infinite alternate;
+    animation-direction: var(--motion-direction);
+    animation-delay: calc(var(--animation-delay) - 31s);
 }
 
 .haze .mistLayer {
@@ -253,12 +297,27 @@
     filter: saturate(1.54) blur(5px);
 }
 
+.crystal {
+    --edge-opacity-low: 0.44;
+    --edge-opacity-high: 0.54;
+}
+
 .haze .edgeColor {
     opacity: 0.26;
 }
 
+.haze {
+    --edge-opacity-low: 0.2;
+    --edge-opacity-high: 0.29;
+}
+
 .mist .edgeColor {
     opacity: 0.31;
+}
+
+.mist {
+    --edge-opacity-low: 0.25;
+    --edge-opacity-high: 0.35;
 }
 
 .atmosphere {
@@ -278,6 +337,33 @@
             rgba(255, 255, 255, 0.025) 100%
         );
     mix-blend-mode: soft-light;
+    overflow: hidden;
+    animation: atmosphereBreathe var(--base-duration) ease-in-out infinite alternate;
+    animation-delay: calc(var(--animation-delay) - 13s);
+}
+
+.atmosphere::before {
+    content: "";
+    position: absolute;
+    inset: -24%;
+    opacity: 0.18;
+    background:
+        radial-gradient(
+            ellipse 32% 58% at 22% 62%,
+            color-mix(in srgb, var(--sky-edge-left) 42%, transparent),
+            transparent 72%
+        ),
+        radial-gradient(
+            ellipse 34% 54% at 78% 56%,
+            color-mix(in srgb, var(--sky-edge-right) 38%, transparent),
+            transparent 74%
+        );
+    mix-blend-mode: screen;
+    filter: blur(18px) saturate(1.2);
+    will-change: transform, opacity;
+    animation: airglowCrossing var(--horizon-duration) ease-in-out infinite alternate;
+    animation-direction: var(--motion-direction);
+    animation-delay: var(--animation-delay);
 }
 
 .grain {
@@ -291,7 +377,235 @@
         );
     background-size: 5px 5px;
     mix-blend-mode: overlay;
-    animation: grainDance 1.1s steps(2, jump-none) infinite;
+    animation: grainDance 1.7s steps(2, jump-none) infinite;
+    animation-delay: -1.1s;
+}
+
+.motionDrift .edgeColor {
+    animation-name: edgeDrift;
+}
+
+.motionBloom .base {
+    animation-name: baseBloom;
+}
+
+.motionBloom .edgeColor {
+    animation-name: edgeBloom;
+}
+
+.motionBloom .horizon {
+    animation-name: horizonBloom;
+}
+
+.motionTide .edgeColor {
+    animation-name: edgeTide;
+}
+
+.motionTide .mistLayer {
+    animation-name: mistTide;
+}
+
+.motionCrosswind .cloudsHigh {
+    animation-name: cloudCrossHigh;
+}
+
+.motionCrosswind .cloudsLow {
+    animation-name: cloudCrossLow;
+}
+
+.motionCrosswind .atmosphere::before {
+    animation-name: airglowCrosswind;
+}
+
+.motionThermal .horizon {
+    animation-name: horizonLift;
+}
+
+.motionThermal .cloudsLow {
+    animation-name: cloudThermal;
+}
+
+.motionThermal .mistLayer {
+    animation-name: mistLift;
+}
+
+@keyframes baseBreathe {
+    from {
+        transform: translate3d(-0.15%, -0.2%, 0) scale(1.012);
+        filter: saturate(1.06) brightness(0.995);
+    }
+    to {
+        transform: translate3d(0.18%, 0.24%, 0) scale(1.026);
+        filter: saturate(1.11) brightness(1.012);
+    }
+}
+
+@keyframes baseBloom {
+    0% {
+        transform: translate3d(0, -0.25%, 0) scale(1.01);
+        filter: saturate(1.05) brightness(0.992);
+    }
+    58% {
+        transform: translate3d(0.12%, 0.1%, 0) scale(1.03);
+        filter: saturate(1.12) brightness(1.014);
+    }
+    100% {
+        transform: translate3d(-0.1%, 0.24%, 0) scale(1.018);
+        filter: saturate(1.09) brightness(1.004);
+    }
+}
+
+@keyframes edgeDrift {
+    from {
+        transform: translate3d(calc(0px - var(--motion-x)), 0.35vmax, 0) scale(1.02) rotate(-0.12deg);
+        opacity: var(--edge-opacity-low);
+    }
+    to {
+        transform: translate3d(var(--motion-x), -0.28vmax, 0) scale(1.055) rotate(0.12deg);
+        opacity: var(--edge-opacity-high);
+    }
+}
+
+@keyframes edgeBloom {
+    from {
+        transform: translate3d(-0.4vmax, var(--motion-y), 0) scale(1.01);
+        opacity: var(--edge-opacity-low);
+    }
+    to {
+        transform: translate3d(0.4vmax, calc(0px - var(--motion-y)), 0) scale(1.085);
+        opacity: var(--edge-opacity-high);
+    }
+}
+
+@keyframes edgeTide {
+    0% {
+        transform: translate3d(calc(0px - var(--motion-x)), 0, 0) scaleX(1.035) scaleY(1.015);
+        opacity: var(--edge-opacity-low);
+    }
+    52% {
+        transform: translate3d(0.8vmax, calc(0px - var(--motion-y)), 0) scaleX(1.07) scaleY(1.035);
+        opacity: var(--edge-opacity-high);
+    }
+    100% {
+        transform: translate3d(var(--motion-x), 0.45vmax, 0) scaleX(1.025) scaleY(1.055);
+        opacity: var(--edge-opacity-low);
+    }
+}
+
+@keyframes horizonWander {
+    from {
+        transform: translate3d(calc(0px - var(--motion-x)), 0.28vmax, 0) scale(1.015);
+        filter: blur(8px) saturate(1.12) brightness(0.98);
+    }
+    to {
+        transform: translate3d(var(--motion-x), -0.22vmax, 0) scale(1.04);
+        filter: blur(9px) saturate(1.2) brightness(1.04);
+    }
+}
+
+@keyframes horizonBloom {
+    from {
+        transform: translate3d(0, var(--motion-y), 0) scaleX(1.01) scaleY(0.96);
+        filter: blur(9px) saturate(1.1) brightness(0.97);
+    }
+    to {
+        transform: translate3d(0, calc(0px - var(--motion-y)), 0) scaleX(1.055) scaleY(1.08);
+        filter: blur(11px) saturate(1.22) brightness(1.05);
+    }
+}
+
+@keyframes horizonLift {
+    from {
+        transform: translate3d(-0.4vmax, var(--motion-y), 0) scale(1.01);
+    }
+    to {
+        transform: translate3d(0.5vmax, calc(0px - var(--motion-y)), 0) scale(1.045);
+    }
+}
+
+@keyframes celestialBreathe {
+    from {
+        transform: translate(-50%, -50%) scale(0.96);
+        filter: blur(9px) brightness(0.96);
+    }
+    to {
+        transform: translate(-50%, -50%) scale(1.045);
+        filter: blur(7px) brightness(1.06);
+    }
+}
+
+@keyframes starParallax {
+    from {
+        transform: translate3d(calc(0px - var(--motion-x)), -0.2vmax, 0) rotate(var(--star-rotation)) scale(1.12);
+    }
+    to {
+        transform: translate3d(var(--motion-x), 0.2vmax, 0) rotate(calc(var(--star-rotation) + 0.4deg)) scale(1.125);
+    }
+}
+
+@keyframes mistWander {
+    from {
+        transform: translate3d(calc(0px - var(--motion-x)), 0.45vmax, 0) scale(1.015);
+        opacity: var(--mist-opacity);
+    }
+    to {
+        transform: translate3d(var(--motion-x), -0.4vmax, 0) scale(1.05);
+        opacity: var(--mist-opacity);
+    }
+}
+
+@keyframes mistTide {
+    0% {
+        transform: translate3d(calc(0px - var(--motion-x)), 0.35vmax, 0) scaleX(1.02);
+    }
+    50% {
+        transform: translate3d(0, calc(0px - var(--motion-y)), 0) scaleX(1.075) scaleY(1.03);
+    }
+    100% {
+        transform: translate3d(var(--motion-x), 0.2vmax, 0) scaleX(1.025);
+    }
+}
+
+@keyframes mistLift {
+    from {
+        transform: translate3d(-0.5vmax, var(--motion-y), 0) scale(1.015);
+    }
+    to {
+        transform: translate3d(0.6vmax, calc(0px - var(--motion-y)), 0) scale(1.06);
+    }
+}
+
+@keyframes atmosphereBreathe {
+    from {
+        opacity: 0.88;
+        transform: scale(1.004);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1.012);
+    }
+}
+
+@keyframes airglowCrossing {
+    from {
+        transform: translate3d(calc(0px - var(--motion-x)), 0.4vmax, 0) scale(1.01);
+        opacity: 0.13;
+    }
+    to {
+        transform: translate3d(var(--motion-x), -0.45vmax, 0) scale(1.055);
+        opacity: 0.22;
+    }
+}
+
+@keyframes airglowCrosswind {
+    from {
+        transform: translate3d(calc(0px - var(--motion-x)), 0, 0) skewX(-0.5deg);
+        opacity: 0.12;
+    }
+    to {
+        transform: translate3d(var(--motion-x), -0.25vmax, 0) skewX(0.5deg);
+        opacity: 0.2;
+    }
 }
 
 @keyframes cloudDriftHigh {
@@ -300,6 +614,33 @@
     }
     to {
         transform: translate3d(calc(var(--cloud-offset) + 100px), 1.5%, 0);
+    }
+}
+
+@keyframes cloudCrossHigh {
+    from {
+        transform: translate3d(calc(var(--cloud-offset) - 900px), 0.3vmax, 0) skewX(-0.8deg);
+    }
+    to {
+        transform: translate3d(calc(var(--cloud-offset) + 180px), -0.35vmax, 0) skewX(0.6deg);
+    }
+}
+
+@keyframes cloudCrossLow {
+    from {
+        transform: translate3d(calc(var(--cloud-low-offset) + 260px), -0.25vmax, 0) skewX(0.5deg);
+    }
+    to {
+        transform: translate3d(calc(var(--cloud-low-offset) - 680px), 0.3vmax, 0) skewX(-0.55deg);
+    }
+}
+
+@keyframes cloudThermal {
+    from {
+        transform: translate3d(calc(var(--cloud-low-offset) - 440px), var(--motion-y), 0) scale(1.01);
+    }
+    to {
+        transform: translate3d(calc(var(--cloud-low-offset) + 120px), calc(0px - var(--motion-y)), 0) scale(1.055);
     }
 }
 
@@ -323,6 +664,17 @@
     }
 }
 
+@keyframes starsBreatheFar {
+    from {
+        opacity: 0.72;
+        filter: brightness(0.94);
+    }
+    to {
+        opacity: 0.94;
+        filter: brightness(1.08);
+    }
+}
+
 @keyframes grainDance {
     0% {
         transform: translate3d(-1%, -1%, 0);
@@ -342,11 +694,20 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .base,
+    .edgeColor,
+    .horizon,
+    .stars,
+    .sun,
     .cloudsHigh,
     .cloudsLow,
+    .mistLayer,
+    .atmosphere,
+    .atmosphere::before,
+    .starFieldFar,
     .starFieldNear,
     .grain {
-        animation: none;
+        animation: none !important;
     }
 }
 

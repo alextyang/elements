@@ -60,9 +60,11 @@ const TIMEZONE_COORDINATES: Record<string, [number, number]> = {
 interface SkyVisual {
     palette: SkyPalette;
     atmosphereStyle: "crystal" | "haze" | "cirrus" | "mist" | "soft";
+    motionStyle: "drift" | "bloom" | "tide" | "crosswind" | "thermal";
     sunX: number;
     sunY: number;
     sunOpacity: number;
+    celestialSize: number;
     starsOpacity: number;
     highCloudOpacity: number;
     lowCloudOpacity: number;
@@ -72,6 +74,18 @@ interface SkyVisual {
     horizonGlow: number;
     nightDepth: number;
     starRotation: number;
+    motionDirection: "alternate" | "alternate-reverse";
+    baseDuration: number;
+    edgeDuration: number;
+    horizonDuration: number;
+    celestialDuration: number;
+    mistDuration: number;
+    starDuration: number;
+    highCloudDuration: number;
+    lowCloudDuration: number;
+    motionX: number;
+    motionY: number;
+    animationDelay: number;
 }
 
 interface Keyframe {
@@ -171,7 +185,7 @@ const chooseDailyPalettes = (
 
     return {
         palettes,
-        randomValues: Array.from({ length: 8 }, () => random()),
+        randomValues: Array.from({ length: 16 }, () => random()),
     };
 };
 
@@ -240,6 +254,9 @@ const calculateSky = (date: Date): SkyVisual => {
     );
     const sun = SunCalc.getPosition(date, latitude, longitude);
     const altitude = sun.altitude * (180 / Math.PI);
+    const moon = SunCalc.getMoonPosition(date, latitude, longitude);
+    const moonIllumination = SunCalc.getMoonIllumination(date);
+    const moonAltitude = moon.altitude * (180 / Math.PI);
     const daylight = clamp((altitude + 8) / 11);
     const nearHorizon = 1 - clamp(Math.abs(altitude) / 24);
     const atmosphereStyles: SkyVisual["atmosphereStyle"][] = [
@@ -255,19 +272,41 @@ const calculateSky = (date: Date): SkyVisual => {
         ];
     const textureStrength = 0.72 + daily.randomValues[0] * 0.55;
     const textureByStyle = {
-        crystal: { high: 0.018, low: 0.008, mist: 0.018 },
-        haze: { high: 0.02, low: 0.014, mist: 0.2 },
+        crystal: { high: 0.03, low: 0.014, mist: 0.025 },
+        haze: { high: 0.03, low: 0.018, mist: 0.2 },
         cirrus: { high: 0.16, low: 0.018, mist: 0.035 },
         mist: { high: 0.025, low: 0.13, mist: 0.14 },
         soft: { high: 0.12, low: 0.095, mist: 0.045 },
     }[atmosphereStyle];
+    const motionStyles: SkyVisual["motionStyle"][] = [
+        "drift",
+        "bloom",
+        "tide",
+        "crosswind",
+        "thermal",
+    ];
+    const motionStyle =
+        motionStyles[Math.floor(daily.randomValues[6] * motionStyles.length)];
+    const useSun = daylight > 0.05 || moonAltitude < -5;
+    const celestial = useSun ? sun : moon;
+    const celestialAltitude = useSun ? altitude : moonAltitude;
+    const moonVisibility =
+        clamp((moonAltitude + 5) / 14) *
+        (0.35 + moonIllumination.fraction * 0.65);
+    const celestialOpacity = useSun
+        ? daylight * (0.12 + nearHorizon * 0.5)
+        : (1 - daylight) * moonVisibility * 0.15;
 
     return {
         palette,
         atmosphereStyle,
-        sunX: clamp(50 + Math.sin(sun.azimuth) * 47, 2, 98),
-        sunY: clamp(78 - Math.sin(sun.altitude) * 69, 8, 84),
-        sunOpacity: daylight * (0.12 + nearHorizon * 0.5),
+        motionStyle,
+        sunX: clamp(50 + Math.sin(celestial.azimuth) * 47, 2, 98),
+        sunY: clamp(78 - Math.sin(celestial.altitude) * 69, 8, 84),
+        sunOpacity: celestialOpacity,
+        celestialSize: useSun
+            ? 17 + nearHorizon * 5
+            : 9 + moonIllumination.fraction * 6,
         starsOpacity: clamp((-altitude - 7) / 14) * 0.34,
         highCloudOpacity:
             textureByStyle.high * textureStrength * (0.76 + daylight * 0.24),
@@ -280,6 +319,21 @@ const calculateSky = (date: Date): SkyVisual => {
         horizonGlow: clamp((18 - Math.abs(altitude)) / 18),
         nightDepth: 1 - daylight,
         starRotation: daily.randomValues[3] * 18 - 9,
+        motionDirection:
+            daily.randomValues[7] > 0.5 ? "alternate" : "alternate-reverse",
+        baseDuration: 26 + daily.randomValues[8] * 20,
+        edgeDuration: 54 + daily.randomValues[9] * 48,
+        horizonDuration: 64 + daily.randomValues[10] * 58,
+        celestialDuration: 10 + daily.randomValues[11] * 9,
+        mistDuration: 88 + daily.randomValues[12] * 76,
+        starDuration: 180 + daily.randomValues[13] * 160,
+        highCloudDuration: 118 + daily.randomValues[14] * 86,
+        lowCloudDuration: 172 + daily.randomValues[15] * 118,
+        motionX: 1.2 + daily.randomValues[9] * 2.8,
+        motionY:
+            (0.55 + daily.randomValues[10] * 1.5) *
+            (0.78 + clamp((18 - Math.abs(celestialAltitude)) / 18) * 0.3),
+        animationDelay: -(12 + daily.randomValues[8] * 64),
     };
 };
 
@@ -291,11 +345,23 @@ export function Sky() {
             const date = new Date();
 
             // Local-only art direction hook: `?sky-time=06:15` previews a
-            // moment without allowing production visitors to override nature.
+            // moment and `?sky-date=2026-07-24` previews a daily character,
+            // without allowing production visitors to override nature.
             if (process.env.NODE_ENV === "development") {
-                const preview = new URLSearchParams(window.location.search).get(
-                    "sky-time",
+                const search = new URLSearchParams(window.location.search);
+                const previewDate = search.get("sky-date");
+                const dateMatch = previewDate?.match(
+                    /^(\d{4})-(\d{2})-(\d{2})$/,
                 );
+                if (dateMatch) {
+                    date.setFullYear(
+                        Number(dateMatch[1]),
+                        Number(dateMatch[2]) - 1,
+                        Number(dateMatch[3]),
+                    );
+                }
+
+                const preview = search.get("sky-time");
                 const match = preview?.match(/^(\d{1,2}):(\d{2})$/);
                 if (match) {
                     date.setHours(
@@ -335,6 +401,7 @@ export function Sky() {
         "--sun-x": `${visual?.sunX ?? 50}%`,
         "--sun-y": `${visual?.sunY ?? 74}%`,
         "--sun-opacity": visual?.sunOpacity ?? 0,
+        "--celestial-size": `${visual?.celestialSize ?? 18}vmax`,
         "--stars-opacity": visual?.starsOpacity ?? 0,
         "--cloud-opacity": visual?.highCloudOpacity ?? 0.04,
         "--cloud-low-opacity": visual?.lowCloudOpacity ?? 0.02,
@@ -347,12 +414,24 @@ export function Sky() {
         "--night-depth": visual?.nightDepth ?? 0,
         "--night-vignette": 0.05 + (visual?.nightDepth ?? 0) * 0.12,
         "--star-rotation": `${visual?.starRotation ?? 0}deg`,
+        "--motion-direction": visual?.motionDirection ?? "alternate",
+        "--base-duration": `${visual?.baseDuration ?? 34}s`,
+        "--edge-duration": `${visual?.edgeDuration ?? 74}s`,
+        "--horizon-duration": `${visual?.horizonDuration ?? 92}s`,
+        "--celestial-duration": `${visual?.celestialDuration ?? 14}s`,
+        "--mist-duration": `${visual?.mistDuration ?? 124}s`,
+        "--star-duration": `${visual?.starDuration ?? 240}s`,
+        "--cloud-high-duration": `${visual?.highCloudDuration ?? 150}s`,
+        "--cloud-low-duration": `${visual?.lowCloudDuration ?? 210}s`,
+        "--motion-x": `${visual?.motionX ?? 2.2}vmax`,
+        "--motion-y": `${visual?.motionY ?? 1.1}vmax`,
+        "--animation-delay": `${visual?.animationDelay ?? -24}s`,
     } as CSSProperties & Record<`--${string}`, string | number | undefined>;
 
     return (
         <div
             id="sky"
-            className={`${styles.background} ${styles[visual?.atmosphereStyle ?? "crystal"]}`}
+            className={`${styles.background} ${styles[visual?.atmosphereStyle ?? "crystal"]} ${styles[`motion${(visual?.motionStyle ?? "drift").replace(/^./, (letter) => letter.toUpperCase())}`]}`}
             style={customProperties}
             aria-hidden="true"
         >
