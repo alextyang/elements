@@ -1,8 +1,365 @@
 .background {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    --sky-top: #277fc5;
+    --sky-upper: #4daae0;
+    --sky-middle: #8fd1ef;
+    --sky-horizon: #c5e8f4;
+    --sky-low: #dceef0;
+    --sky-edge-left: #38b9e8;
+    --sky-edge-right: #9ddff1;
+    --sky-glow: #f7fdff;
+    --sky-haze: #c7e8ed;
+    --sky-cloud: #f5fbfc;
+    --sky-cloud-warm: #e8f2f2;
+    --sun-x: 50%;
+    --sun-y: 74%;
+    --sun-opacity: 0;
+    --stars-opacity: 0;
+    --cloud-opacity: 0.04;
+    --cloud-low-opacity: 0.02;
+    --mist-opacity: 0.03;
+    --cloud-offset: 0px;
+    --cloud-low-offset: 0px;
+    --cloud-height: 18%;
+    --horizon-glow: 0.4;
+    --horizon-opacity: 0.67;
+    --night-depth: 0;
+    --night-vignette: 0.05;
+    --star-rotation: 0deg;
+
+    position: fixed;
+    inset: 0;
     z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    isolation: isolate;
+    background: var(--sky-top);
+}
+
+.base,
+.edgeColor,
+.horizon,
+.stars,
+.sun,
+.clouds,
+.mistLayer,
+.atmosphere,
+.grain {
+    position: absolute;
+    pointer-events: none;
+}
+
+.base {
+    inset: -2px;
+    background:
+        linear-gradient(
+            180deg,
+            var(--sky-top) 0%,
+            var(--sky-upper) 23%,
+            var(--sky-middle) 51%,
+            var(--sky-horizon) 77%,
+            var(--sky-low) 100%
+        );
+    filter: saturate(1.08);
+}
+
+.edgeColor {
+    inset: -14vmax;
+    background:
+        radial-gradient(
+            ellipse 58% 78% at 4% 71%,
+            color-mix(in srgb, var(--sky-edge-left) 95%, transparent) 0%,
+            color-mix(in srgb, var(--sky-edge-left) 54%, transparent) 27%,
+            transparent 67%
+        ),
+        radial-gradient(
+            ellipse 62% 82% at 96% 65%,
+            color-mix(in srgb, var(--sky-edge-right) 94%, transparent) 0%,
+            color-mix(in srgb, var(--sky-edge-right) 50%, transparent) 30%,
+            transparent 68%
+        ),
+        radial-gradient(
+            ellipse 52% 34% at 50% 94%,
+            color-mix(in srgb, var(--sky-haze) 82%, transparent) 0%,
+            transparent 72%
+        );
+    opacity: 0.36;
+    mix-blend-mode: screen;
+    filter: saturate(1.4) blur(5px);
+    transform: translateZ(0);
+}
+
+.horizon {
+    inset: 38% -14% -18%;
+    opacity: var(--horizon-opacity);
+    background:
+        radial-gradient(
+            ellipse 22% 34% at var(--sun-x) 66%,
+            color-mix(in srgb, var(--sky-glow) 94%, transparent) 0%,
+            color-mix(in srgb, var(--sky-glow) 44%, transparent) 36%,
+            transparent 75%
+        ),
+        linear-gradient(
+            180deg,
+            transparent 0%,
+            color-mix(in srgb, var(--sky-haze) 42%, transparent) 48%,
+            color-mix(in srgb, var(--sky-glow) 38%, transparent) 68%,
+            transparent 100%
+        );
+    mix-blend-mode: screen;
+    filter: blur(8px) saturate(1.16);
+}
+
+.sun {
+    left: var(--sun-x);
+    top: var(--sun-y);
+    width: clamp(160px, 18vmax, 420px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    opacity: var(--sun-opacity);
+    transform: translate(-50%, -50%);
+    background:
+        radial-gradient(
+            circle,
+            color-mix(in srgb, var(--sky-glow) 82%, white) 0%,
+            color-mix(in srgb, var(--sky-glow) 48%, transparent) 22%,
+            color-mix(in srgb, var(--sky-glow) 20%, transparent) 49%,
+            transparent 76%
+        );
+    box-shadow:
+        0 0 clamp(45px, 6vmax, 120px) color-mix(in srgb, var(--sky-glow) 70%, transparent),
+        0 0 clamp(120px, 16vmax, 330px) color-mix(in srgb, var(--sky-glow) 40%, transparent);
+    mix-blend-mode: screen;
+    filter: blur(8px);
+}
+
+.stars {
+    inset: -10%;
+    opacity: var(--stars-opacity);
+    transform: rotate(var(--star-rotation)) scale(1.12);
+    transform-origin: 50% 42%;
+    mix-blend-mode: screen;
+}
+
+.starFieldFar,
+.starFieldNear {
+    position: absolute;
+    inset: 0;
+    background-repeat: repeat;
+}
+
+.starFieldFar {
+    background-image:
+        radial-gradient(circle, rgba(255, 255, 255, 0.74) 0 0.65px, transparent 0.95px),
+        radial-gradient(circle, rgba(194, 218, 255, 0.62) 0 0.55px, transparent 0.85px),
+        radial-gradient(circle, rgba(255, 220, 205, 0.55) 0 0.55px, transparent 0.85px);
+    background-size: 71px 83px, 113px 127px, 157px 139px;
+    background-position: 13px 19px, 49px 63px, 91px 27px;
+    mask-image: linear-gradient(to bottom, black 0%, black 57%, transparent 86%);
+}
+
+.starFieldNear {
+    opacity: 0.78;
+    background-image:
+        radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 0.9px, transparent 1.35px),
+        radial-gradient(circle, rgba(213, 228, 255, 0.85) 0 0.75px, transparent 1.15px);
+    background-size: 223px 211px, 281px 257px;
+    background-position: 31px 47px, 137px 91px;
+    mask-image: linear-gradient(to bottom, black 0%, black 48%, transparent 78%);
+    animation: starsBreathe 8s ease-in-out infinite alternate;
+}
+
+.clouds {
+    left: -22%;
+    width: 144%;
+    will-change: transform;
+    opacity: var(--cloud-opacity);
+    mix-blend-mode: screen;
+    filter: blur(10px) saturate(0.85);
+    transform: translate3d(var(--cloud-offset), 0, 0);
+}
+
+.cloudsHigh {
+    top: var(--cloud-height);
+    height: 29%;
+    background-image:
+        radial-gradient(ellipse 15% 34% at 8% 56%, color-mix(in srgb, var(--sky-cloud) 58%, transparent), transparent 72%),
+        radial-gradient(ellipse 19% 30% at 27% 42%, color-mix(in srgb, var(--sky-cloud) 52%, transparent), transparent 74%),
+        radial-gradient(ellipse 17% 37% at 52% 61%, color-mix(in srgb, var(--sky-cloud) 46%, transparent), transparent 75%),
+        radial-gradient(ellipse 22% 34% at 78% 43%, color-mix(in srgb, var(--sky-cloud) 55%, transparent), transparent 74%),
+        radial-gradient(ellipse 13% 30% at 96% 66%, color-mix(in srgb, var(--sky-cloud) 48%, transparent), transparent 72%);
+    animation: cloudDriftHigh 150s linear infinite alternate;
+}
+
+.cirrus .cloudsHigh {
+    height: 34%;
+    background-image:
+        linear-gradient(166deg, transparent 0 18%, color-mix(in srgb, var(--sky-cloud) 34%, transparent) 20%, transparent 23% 36%, color-mix(in srgb, var(--sky-cloud) 28%, transparent) 39%, transparent 43%),
+        radial-gradient(ellipse 29% 12% at 14% 58%, color-mix(in srgb, var(--sky-cloud) 48%, transparent), transparent 74%),
+        radial-gradient(ellipse 36% 10% at 53% 42%, color-mix(in srgb, var(--sky-cloud) 42%, transparent), transparent 76%),
+        radial-gradient(ellipse 30% 11% at 91% 64%, color-mix(in srgb, var(--sky-cloud) 44%, transparent), transparent 75%);
+    filter: blur(13px) saturate(0.78);
+}
+
+.cloudsLow {
+    bottom: 7%;
+    height: 28%;
+    opacity: var(--cloud-low-opacity);
+    background-image:
+        radial-gradient(ellipse 20% 31% at 4% 73%, color-mix(in srgb, var(--sky-cloud-warm) 64%, transparent), transparent 72%),
+        radial-gradient(ellipse 24% 34% at 25% 66%, color-mix(in srgb, var(--sky-cloud-warm) 56%, transparent), transparent 75%),
+        radial-gradient(ellipse 18% 27% at 47% 78%, color-mix(in srgb, var(--sky-cloud-warm) 51%, transparent), transparent 73%),
+        radial-gradient(ellipse 27% 36% at 72% 64%, color-mix(in srgb, var(--sky-cloud-warm) 58%, transparent), transparent 76%),
+        radial-gradient(ellipse 19% 30% at 98% 76%, color-mix(in srgb, var(--sky-cloud-warm) 62%, transparent), transparent 72%);
+    animation: cloudDriftLow 210s linear infinite alternate-reverse;
+}
+
+.mist .cloudsLow {
+    bottom: 11%;
+    height: 34%;
+    background-image:
+        radial-gradient(ellipse 42% 24% at 8% 72%, color-mix(in srgb, var(--sky-cloud-warm) 54%, transparent), transparent 75%),
+        radial-gradient(ellipse 48% 22% at 52% 76%, color-mix(in srgb, var(--sky-cloud-warm) 46%, transparent), transparent 78%),
+        radial-gradient(ellipse 39% 23% at 94% 69%, color-mix(in srgb, var(--sky-cloud-warm) 52%, transparent), transparent 75%);
+    filter: blur(18px) saturate(0.72);
+}
+
+.mistLayer {
+    inset: 18% -12% -14%;
+    opacity: var(--mist-opacity);
+    background:
+        radial-gradient(
+            ellipse 72% 36% at 48% 64%,
+            var(--sky-cloud) 0%,
+            color-mix(in srgb, var(--sky-cloud) 56%, transparent) 32%,
+            transparent 74%
+        ),
+        linear-gradient(
+            180deg,
+            transparent 7%,
+            color-mix(in srgb, var(--sky-haze) 74%, transparent) 72%,
+            transparent 100%
+        );
+    filter: blur(22px);
+    mix-blend-mode: screen;
+}
+
+.haze .mistLayer {
+    inset: 5% -18% -18%;
+    filter: blur(34px);
+}
+
+.crystal .edgeColor {
+    opacity: 0.52;
+    filter: saturate(1.54) blur(5px);
+}
+
+.haze .edgeColor {
+    opacity: 0.26;
+}
+
+.mist .edgeColor {
+    opacity: 0.31;
+}
+
+.atmosphere {
+    inset: 0;
+    background:
+        radial-gradient(
+            ellipse 52% 78% at 50% 43%,
+            transparent 0%,
+            transparent 46%,
+            rgba(8, 14, 30, var(--night-vignette)) 100%
+        ),
+        linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.025) 0%,
+            rgba(255, 255, 255, 0.105) 47%,
+            rgba(255, 255, 255, 0.105) 53%,
+            rgba(255, 255, 255, 0.025) 100%
+        );
+    mix-blend-mode: soft-light;
+}
+
+.grain {
+    inset: -50%;
+    opacity: 0.055;
+    background-image:
+        repeating-radial-gradient(
+            circle at 17% 31%,
+            rgba(255, 255, 255, 0.24) 0 0.45px,
+            transparent 0.6px 3px
+        );
+    background-size: 5px 5px;
+    mix-blend-mode: overlay;
+    animation: grainDance 1.1s steps(2, jump-none) infinite;
+}
+
+@keyframes cloudDriftHigh {
+    from {
+        transform: translate3d(calc(var(--cloud-offset) - 760px), -1.5%, 0);
+    }
+    to {
+        transform: translate3d(calc(var(--cloud-offset) + 100px), 1.5%, 0);
+    }
+}
+
+@keyframes cloudDriftLow {
+    from {
+        transform: translate3d(calc(var(--cloud-low-offset) - 540px), 1%, 0);
+    }
+    to {
+        transform: translate3d(calc(var(--cloud-low-offset) + 180px), -1%, 0);
+    }
+}
+
+@keyframes starsBreathe {
+    from {
+        opacity: 0.56;
+        filter: brightness(0.92);
+    }
+    to {
+        opacity: 0.88;
+        filter: brightness(1.18);
+    }
+}
+
+@keyframes grainDance {
+    0% {
+        transform: translate3d(-1%, -1%, 0);
+    }
+    25% {
+        transform: translate3d(1%, 0%, 0);
+    }
+    50% {
+        transform: translate3d(0%, 1%, 0);
+    }
+    75% {
+        transform: translate3d(1%, -1%, 0);
+    }
+    100% {
+        transform: translate3d(-1%, 1%, 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cloudsHigh,
+    .cloudsLow,
+    .starFieldNear,
+    .grain {
+        animation: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .edgeColor {
+        inset: -20vmax;
+    }
+
+    .clouds {
+        filter: blur(7px);
+    }
+
+    .grain {
+        opacity: 0.035;
+    }
 }
