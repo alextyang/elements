@@ -32,9 +32,9 @@ coherent backscatter are observed.
 Illuminated area is never used as a proxy for lunar brightness. Disk-integrated
 irradiance follows the measured nonlinear lunar phase law, including a narrow
 opposition enhancement and Earth-Moon distance. The glow is then split into
-the phenomena that actually produce it: a compact eye/display point-spread
+the phenomena that actually produce it: a compact optical/seeing point-spread
 function around the bright pixels, a spectrally tinted Rayleigh component, a
-two-lobe aerosol forward-scattering aureole, and a weak multiple-scattering
+two-scale aerosol forward-scattering aureole, and a weak multiple-scattering
 floor. Source and view airmass both enter the single-scattering transport
 integral. Thin cloud and mist modulate that same angular field with correlated
 density, so humid nights develop broken luminous veils instead of a circular
@@ -49,9 +49,11 @@ only the much smaller ocular PSF follows the centroid and extent of the
 actually illuminated phase. This prevents a detached glow and keeps a bright
 direct Moon coupled to a corresponding atmospheric response.
 
-The transparent celestial pass is composited as emitted radiance. A zero-light
-dark hemisphere is therefore neutral over the atmosphere rather than an opaque
-dark disc; visible earthshine only adds its measured, terrain-shaped signal.
+The transparent celestial pass is composited as emitted radiance. Coverage is
+derived from sunlit terrain plus the much fainter earthshine exposure, never
+from the geometric lunar silhouette. A zero-light dark hemisphere is therefore
+transparent and neutral over the atmosphere rather than an opaque dark disc;
+visible earthshine only adds its measured, terrain-shaped signal.
 Measured earthshine surface brightness spans roughly +13.5 to +15.5 visual
 magnitudes per square arcsecond and varies strongly with phase and terrestrial
 weather. The display mapping therefore treats it as a separate secondary

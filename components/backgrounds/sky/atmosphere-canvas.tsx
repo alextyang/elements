@@ -434,26 +434,38 @@ void main() {
     float aureole_transport = source_scatter_transport;
 
     float lunar_rayleigh = 0.0597 * (1.0 + moon_cosine * moon_cosine);
-    float coarse_g = mix(
-        0.48,
-        0.74,
-        aerosol_size * 0.62 + aerosol * 0.22 + humidity * 0.16
+    // Empirical two-scale aerosol aureole. A Moffat/King profile better matches
+    // the smooth power-law shoulders seen in lunar photography than a strongly
+    // forward HG peak, while retaining the correct monotonic, source-centred
+    // energy falloff. Particle state changes angular scale rather than peak
+    // energy, preventing the familiar circular stamp as conditions vary.
+    float fine_scale = mix(
+        0.008,
+        0.026,
+        aerosol_size * 0.50 + aerosol * 0.16 + humidity * 0.34
     );
-    float fine_g = mix(
-        0.68,
-        0.83,
-        aerosol_size * 0.52 + aerosol * 0.2 + humidity * 0.28
+    float coarse_scale = mix(
+        0.055,
+        0.16,
+        aerosol_size * 0.34 + aerosol * 0.24 + humidity * 0.42
     );
-    // Normalise the phase functions at the source direction before applying
-    // a display-space scattering energy. The prior raw HG peak jumped by an
-    // order of magnitude with particle size, so fixing the Moon projection
-    // exposed a huge artificial blob/column. Particle size should control the
-    // aureole's angular falloff, not create energy from nowhere.
-    float coarse_mie = henyey_greenstein(moon_cosine, coarse_g) /
-        max(henyey_greenstein(1.0, coarse_g), 0.0001);
-    float fine_mie = henyey_greenstein(moon_cosine, fine_g) /
-        max(henyey_greenstein(1.0, fine_g), 0.0001);
-    float lunar_mie = mix(coarse_mie, fine_mie, 0.24 + humidity * 0.20);
+    float fine_mie = pow(
+        1.0 + (lunar_separation / fine_scale) *
+            (lunar_separation / fine_scale),
+        -1.08
+    );
+    float coarse_mie = pow(
+        1.0 + (lunar_separation / coarse_scale) *
+            (lunar_separation / coarse_scale),
+        -1.32
+    );
+    float lunar_mie = mix(fine_mie, coarse_mie, 0.20 + humidity * 0.24);
+    float aureole_texture = mix(
+        0.985,
+        1.015,
+        fbm(density_point * (1.18 + humidity * 0.42) + vec2(4.1, 8.7))
+    );
+    lunar_mie *= aureole_texture;
 
     float transmission_luminance = max(
         dot(u_moon_transmittance, vec3(0.2126, 0.7152, 0.0722)),

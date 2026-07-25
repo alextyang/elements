@@ -117,7 +117,6 @@ uniform float u_light_angle;
 uniform float u_texture_angle;
 uniform float u_use_photo;
 uniform float u_opacity;
-uniform float u_halo_opacity;
 uniform float u_earthshine;
 uniform float u_exposure;
 uniform float u_psf_sigma;
@@ -148,12 +147,6 @@ vec3 tone_map(vec3 color) {
         0.0,
         1.0
     );
-}
-
-float hash21(vec2 point) {
-    vec3 p3 = fract(vec3(point.xyx) * vec3(0.1031, 0.1030, 0.0973));
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
 }
 
 struct LunarSample {
@@ -192,7 +185,10 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
         phase_depth
     ));
     float incidence = dot(surface_normal, light_direction);
-    vec3 surface;
+    float lit_coverage = smoothstep(-0.018, 0.026, incidence);
+    float shadow_gate = 1.0 - lit_coverage;
+    float earthshine_coverage = shadow_gate * u_earthshine;
+    vec3 surface = vec3(0.0);
 
     if (u_use_photo > 0.5) {
         // NASA's hourly LRO/LOLA render supplies the real phase, libration,
@@ -208,8 +204,24 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
             max((photo_srgb - vec3(0.006)) / 0.994, vec3(0.0)),
             vec3(2.08)
         );
-        surface = photo_linear * u_light_tint;
-        float shadow_gate = 1.0 - smoothstep(-0.018, 0.035, incidence);
+        // Restore the modest local contrast lost when the high-resolution
+        // lunar frame is minified to a few dozen display pixels. This is a
+        // scene-linear contrast shoulder, not sharpening, so it adds no ringing
+        // or repeated texture work to the animated celestial pass.
+        photo_linear = clamp(
+            (photo_linear - vec3(0.075)) * 1.17 + vec3(0.075),
+            vec3(0.0),
+            vec3(1.35)
+        );
+        float photo_signal = dot(photo_linear, vec3(0.2126, 0.7152, 0.0722));
+        // The SVS frame already contains the authoritative libration, phase
+        // orientation and terrain shadowing. Reapplying the approximate local
+        // light vector can rotate a real crescent into its own mask, so photo
+        // coverage comes from the registered frame signal alone.
+        lit_coverage = smoothstep(0.0008, 0.009, photo_signal);
+        shadow_gate = 1.0 - lit_coverage;
+        earthshine_coverage = shadow_gate * u_earthshine;
+        surface = photo_linear * u_light_tint * lit_coverage;
         if (u_earthshine > 0.0005) {
             // NASA's phase render intentionally contains no earthshine. Reuse
             // the registered LROC albedo so the dark hemisphere retains maria
@@ -220,8 +232,8 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
             );
             earthshine_albedo = mix(vec3(0.68), earthshine_albedo, 0.34);
             surface += earthshine_albedo *
-                mix(u_shadow_tint, u_light_tint, 0.12) *
-                u_earthshine * shadow_gate * 0.52;
+                mix(u_shadow_tint, u_light_tint, 0.08) *
+                earthshine_coverage * 0.22;
         }
     } else {
         vec3 albedo = texture(u_albedo, uv).rgb;
@@ -241,28 +253,36 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
             1.22
         );
         vec3 contrast_albedo = clamp(
-            (albedo - vec3(0.5)) * 1.34 + vec3(0.5),
+            (albedo - vec3(0.5)) * 1.42 + vec3(0.5),
             0.0,
             1.0
         );
         vec3 lunar_albedo = pow(max(contrast_albedo, vec3(0.012)), vec3(0.96));
         vec3 lit_surface = lunar_albedo * u_light_tint *
             (0.4 + reflectance * 0.84);
+        lit_coverage = smoothstep(-0.014, 0.022, incidence);
+        shadow_gate = 1.0 - lit_coverage;
+        earthshine_coverage = shadow_gate * u_earthshine;
         vec3 dark_surface = lunar_albedo * u_shadow_tint *
-            u_earthshine * (0.07 + surface_normal.z * 0.05);
-        surface = mix(
-            dark_surface,
-            lit_surface,
-            smoothstep(-0.014, 0.022, incidence)
-        );
+            earthshine_coverage * (0.18 + surface_normal.z * 0.08);
+        surface = lit_surface * lit_coverage + dark_surface;
     }
 
     float opposition_bloom = pow(smoothstep(0.985, 1.0, u_fraction), 2.0) *
         pow(max(surface_normal.z, 0.0), 5.0) * 0.055;
-    surface += u_light_tint * opposition_bloom;
+    surface += u_light_tint * opposition_bloom * lit_coverage;
+    // Alpha represents light arriving from the Moon, not the Moon's geometric
+    // silhouette. An unilluminated hemisphere therefore cannot darken or tint
+    // the already-rendered sky. Earthshine remains a faint additive secondary
+    // exposure instead of a readable grey disc.
+    float emitted_coverage = coverage * clamp(
+        lit_coverage + earthshine_coverage,
+        0.0,
+        1.0
+    );
     return LunarSample(
         surface * u_transmittance * u_exposure * coverage,
-        coverage
+        emitted_coverage
     );
 }
 
@@ -355,58 +375,38 @@ void main() {
         blurred_radiance / max(disc_coverage, 0.0001)
     );
 
-    // The remaining broad term is ocular/display glare. The atmospheric
-    // aureole is evaluated in the full-sky shader, while the direct lunar
-    // image—including its limb and terminator—has already received the PSF.
-    vec2 bright_limb = vec2(cos(u_light_angle), sin(u_light_angle));
-    vec2 tangent = vec2(-bright_limb.y, bright_limb.x);
-    // Compact ocular/display glare follows the luminous phase, not the centre
-    // of the whole geometric disc. The centroid approaches the bright limb as
-    // the phase narrows while the tall emitter still includes both cusps.
-    float phase_shape = pow(clamp(u_fraction, 0.0, 1.0), 0.42);
-    vec2 luminous_center = bright_limb * (1.0 - u_fraction) * 0.36;
-    vec2 glare_point = screen_point - luminous_center;
-    float axial = dot(glare_point, bright_limb) /
-        mix(0.36, 0.94, phase_shape);
-    float lateral = dot(glare_point, tangent) /
-        mix(0.70, 0.96, phase_shape);
-    float angle = atan(lateral, axial);
-    float anisotropic_radius = length(vec2(axial, lateral));
-    float irregularity = 0.006 * sin(angle * 3.0 + 0.8) +
-        0.003 * sin(angle * 7.0 - 1.4);
-    float separation = max(0.0, anisotropic_radius - 1.0 + irregularity);
-    // Keep the renderer-local term to the diffraction/seeing shoulder of the
-    // resolved disc. Wider aerosol, humidity, and cloud scattering belongs to
-    // the atmosphere pass; duplicating it here produced a recognizable stamp
-    // and made several independently plausible glows add to an implausible
-    // result. The inverse-square eye-scatter tail is present, but far below the
-    // local shoulder at this intentionally enlarged display scale.
-    float near_glare = exp(-separation * 7.6) * 0.048;
-    float ocular_glare = 0.0028 / (0.34 + separation * separation * 7.5);
-    float diffuse_tail = exp(-separation * 2.4) * 0.00045;
-    float angular_variation = 0.992 + 0.008 * cos(angle * 2.0 + 0.7);
-    float halo_coverage = u_halo_opacity *
-        (near_glare + ocular_glare + diffuse_tail) *
-        angular_variation *
-        (1.0 - smoothstep(2.15, 2.85, radial));
-    halo_coverage *= 1.0 - disc_coverage;
-    // Stochastic alpha quantisation prevents the few available 8-bit alpha
-    // levels in a very faint compact glare from becoming concentric bands.
-    // The pattern is fixed in physical pixels, so it never shimmers.
-    halo_coverage = floor(
-        clamp(halo_coverage, 0.0, 1.0) * 255.0 +
-        hash21(gl_FragCoord.xy + vec2(41.0, 113.0))
-    ) / 255.0;
-    vec3 halo_color = mix(u_light_tint, vec3(0.78, 0.84, 0.96), 0.045);
+    // The convolved direct image owns only the optical/seeing shoulder. The
+    // full-sky atmosphere pass is the sole owner of Rayleigh, aerosol, humidity
+    // and cloud aureoles, so independent radial fields can no longer stack into
+    // a detached blob or quantised rings.
+    if (disc_coverage <= 0.0001) discard;
+    out_color = vec4(disc_color, disc_coverage * u_opacity);
+}`;
 
-    float combined_coverage = disc_coverage + halo_coverage;
-    if (combined_coverage <= 0.0001) discard;
-    vec3 combined_premultiplied =
-        disc_color * disc_coverage + halo_color * halo_coverage;
-    out_color = vec4(
-        combined_premultiplied / combined_coverage,
-        combined_coverage * u_opacity
-    );
+const COMPOSITE_VERTEX_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 a_position;
+uniform vec2 u_center;
+uniform vec2 u_extent;
+out vec2 v_uv;
+
+void main() {
+    gl_Position = vec4(u_center + a_position * u_extent, 0.0, 1.0);
+    v_uv = a_position * 0.5 + 0.5;
+}`;
+
+const COMPOSITE_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 v_uv;
+uniform sampler2D u_cached_moon;
+out vec4 out_color;
+
+void main() {
+    vec4 sample_color = texture(u_cached_moon, v_uv);
+    if (sample_color.a <= 0.0001) discard;
+    out_color = sample_color;
 }`;
 
 // NASA Scientific Visualization Studio CGI Moon Kit: LROC WAC albedo and
@@ -488,8 +488,10 @@ const loadTexture = (
     redraw: () => void,
 ) => {
     const image = new Image();
+    let cancelled = false;
     image.decoding = "async";
     image.addEventListener("load", () => {
+        if (cancelled) return;
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.texImage2D(
@@ -504,6 +506,10 @@ const loadTexture = (
         redraw();
     });
     image.src = source;
+    return () => {
+        cancelled = true;
+        image.src = "";
+    };
 };
 
 interface CelestialCanvasProps {
@@ -542,9 +548,15 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
 
         let starProgram: WebGLProgram;
         let moonProgram: WebGLProgram;
+        let compositeProgram: WebGLProgram;
         try {
             starProgram = createProgram(gl, STAR_VERTEX_SHADER, STAR_FRAGMENT_SHADER);
             moonProgram = createProgram(gl, MOON_VERTEX_SHADER, MOON_FRAGMENT_SHADER);
+            compositeProgram = createProgram(
+                gl,
+                COMPOSITE_VERTEX_SHADER,
+                COMPOSITE_FRAGMENT_SHADER,
+            );
         } catch (error) {
             console.warn("Celestial shaders unavailable", error);
             return undefined;
@@ -554,7 +566,14 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
         const moonBuffer = gl.createBuffer();
         const starVertexArray = gl.createVertexArray();
         const moonVertexArray = gl.createVertexArray();
-        if (!starBuffer || !moonBuffer || !starVertexArray || !moonVertexArray) {
+        const compositeVertexArray = gl.createVertexArray();
+        if (
+            !starBuffer ||
+            !moonBuffer ||
+            !starVertexArray ||
+            !moonVertexArray ||
+            !compositeVertexArray
+        ) {
             return undefined;
         }
 
@@ -572,6 +591,22 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
         gl.enableVertexAttribArray(moonPositionLocation);
         gl.vertexAttribPointer(
             moonPositionLocation,
+            2,
+            gl.FLOAT,
+            false,
+            0,
+            0,
+        );
+
+        gl.bindVertexArray(compositeVertexArray);
+        gl.bindBuffer(gl.ARRAY_BUFFER, moonBuffer);
+        const compositePositionLocation = gl.getAttribLocation(
+            compositeProgram,
+            "a_position",
+        );
+        gl.enableVertexAttribArray(compositePositionLocation);
+        gl.vertexAttribPointer(
+            compositePositionLocation,
             2,
             gl.FLOAT,
             false,
@@ -608,12 +643,32 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
         const albedoTexture = createTexture(gl);
         const elevationTexture = createTexture(gl);
         const photoTexture = createTexture(gl);
+        const moonCacheTexture = gl.createTexture();
+        const moonFramebuffer = gl.createFramebuffer();
+        if (!moonCacheTexture || !moonFramebuffer) return undefined;
+        gl.bindTexture(gl.TEXTURE_2D, moonCacheTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, moonFramebuffer);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,
+            gl.COLOR_ATTACHMENT0,
+            gl.TEXTURE_2D,
+            moonCacheTexture,
+            0,
+        );
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         let requestedPhotoUrl = "";
         let loadedPhotoUrl = "";
         let photoRequest = 0;
         let uploadedScene: CelestialScene | null = null;
         let starCount = 0;
         let devicePixelRatio = 1;
+        let moonCacheSize = 0;
+        let moonDirty = true;
+        let disposed = false;
 
         const uniform = (program: WebGLProgram, name: string) =>
             gl.getUniformLocation(program, name);
@@ -625,7 +680,7 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
             const image = new Image();
             image.decoding = "async";
             image.addEventListener("load", () => {
-                if (request !== photoRequest) return;
+                if (disposed || request !== photoRequest) return;
                 gl.bindTexture(gl.TEXTURE_2D, photoTexture);
                 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
                 gl.texImage2D(
@@ -638,16 +693,17 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                 );
                 gl.generateMipmap(gl.TEXTURE_2D);
                 loadedPhotoUrl = source;
+                moonDirty = true;
                 draw();
             });
             image.addEventListener("error", () => {
-                if (request === photoRequest) loadedPhotoUrl = "";
+                if (!disposed && request === photoRequest) loadedPhotoUrl = "";
             });
             image.src = source;
         };
 
         const draw = (time = performance.now() / 1000) => {
-            if (document.hidden) return;
+            if (disposed || document.hidden) return;
             const current = sceneRef.current;
             if (
                 current.moon.photoUrl &&
@@ -663,6 +719,7 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                 canvas.width = width;
                 canvas.height = height;
                 gl.viewport(0, 0, width, height);
+                moonDirty = true;
             }
 
             gl.clearColor(0, 0, 0, 0);
@@ -671,6 +728,7 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
             gl.enable(gl.BLEND);
 
             if (uploadedScene !== current) {
+                moonDirty = true;
                 const starData = new Float32Array(current.stars.length * 10);
                 current.stars.forEach((star, index) => {
                     const offset = index * 10;
@@ -725,9 +783,6 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
 
             const moon = current.moon;
             if (moon.visible && moon.opacity > 0.001) {
-                gl.useProgram(moonProgram);
-                gl.bindVertexArray(moonVertexArray);
-
                 const minimumDimension = Math.min(bounds.width, bounds.height);
                 const radiusCss = Math.min(
                     22,
@@ -736,84 +791,107 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                 const radius = radiusCss * devicePixelRatio;
                 const centerX = moon.x / 50 - 1;
                 const centerY = 1 - moon.y / 50;
-                gl.uniform2f(uniform(moonProgram, "u_center"), centerX, centerY);
+                const requiredCacheSize = Math.max(128, Math.ceil(radius * 10));
+                if (moonCacheSize !== requiredCacheSize) {
+                    moonCacheSize = requiredCacheSize;
+                    gl.bindTexture(gl.TEXTURE_2D, moonCacheTexture);
+                    gl.texImage2D(
+                        gl.TEXTURE_2D,
+                        0,
+                        gl.RGBA,
+                        moonCacheSize,
+                        moonCacheSize,
+                        0,
+                        gl.RGBA,
+                        gl.UNSIGNED_BYTE,
+                        null,
+                    );
+                    moonDirty = true;
+                }
+
+                if (moonDirty) {
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, moonFramebuffer);
+                    gl.viewport(0, 0, moonCacheSize, moonCacheSize);
+                    gl.clearColor(0, 0, 0, 0);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+                    gl.disable(gl.BLEND);
+                    gl.useProgram(moonProgram);
+                    gl.bindVertexArray(moonVertexArray);
+                    gl.uniform2f(uniform(moonProgram, "u_center"), 0, 0);
+                    gl.uniform2f(uniform(moonProgram, "u_extent"), 1, 1);
+                    gl.uniform1f(uniform(moonProgram, "u_fraction"), moon.fraction);
+                    gl.uniform1f(
+                        uniform(moonProgram, "u_light_angle"),
+                        (moon.rotation * Math.PI) / 180,
+                    );
+                    gl.uniform1f(
+                        uniform(moonProgram, "u_texture_angle"),
+                        (moon.textureRotation * Math.PI) / 180,
+                    );
+                    gl.uniform1f(uniform(moonProgram, "u_opacity"), moon.opacity);
+                    gl.uniform1f(
+                        uniform(moonProgram, "u_earthshine"),
+                        moon.earthshineOpacity,
+                    );
+                    gl.uniform1f(uniform(moonProgram, "u_exposure"), moon.exposure);
+                    gl.uniform1f(
+                        uniform(moonProgram, "u_psf_sigma"),
+                        moon.psfSigma / radiusCss,
+                    );
+                    gl.uniform1f(uniform(moonProgram, "u_psf_wing"), moon.psfWing);
+                    gl.uniform1f(
+                        uniform(moonProgram, "u_psf_stretch"),
+                        moon.psfStretch,
+                    );
+                    gl.uniform1f(
+                        uniform(moonProgram, "u_dispersion"),
+                        moon.dispersion / radiusCss,
+                    );
+                    gl.uniform1f(uniform(moonProgram, "u_disc_pixel"), 1 / radius);
+                    gl.uniform3fv(
+                        uniform(moonProgram, "u_light_tint"),
+                        parseRgb(moon.lightColor),
+                    );
+                    gl.uniform3fv(
+                        uniform(moonProgram, "u_shadow_tint"),
+                        parseRgb(moon.shadowColor),
+                    );
+                    gl.uniform3fv(
+                        uniform(moonProgram, "u_transmittance"),
+                        moon.transmittance,
+                    );
+                    gl.uniform2f(uniform(moonProgram, "u_texel"), 1 / 2048, 1 / 1024);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, albedoTexture);
+                    gl.uniform1i(uniform(moonProgram, "u_albedo"), 0);
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, elevationTexture);
+                    gl.uniform1i(uniform(moonProgram, "u_elevation"), 1);
+                    gl.activeTexture(gl.TEXTURE2);
+                    gl.bindTexture(gl.TEXTURE_2D, photoTexture);
+                    gl.uniform1i(uniform(moonProgram, "u_photo"), 2);
+                    gl.uniform1f(
+                        uniform(moonProgram, "u_use_photo"),
+                        moon.photoUrl && loadedPhotoUrl === moon.photoUrl ? 1 : 0,
+                    );
+                    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                    moonDirty = false;
+                }
+
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.viewport(0, 0, width, height);
+                gl.enable(gl.BLEND);
+                gl.useProgram(compositeProgram);
+                gl.bindVertexArray(compositeVertexArray);
+                gl.uniform2f(uniform(compositeProgram, "u_center"), centerX, centerY);
                 gl.uniform2f(
-                    uniform(moonProgram, "u_extent"),
+                    uniform(compositeProgram, "u_extent"),
                     (radius * 5 * 2) / width,
                     (radius * 5 * 2) / height,
                 );
-                gl.uniform1f(uniform(moonProgram, "u_fraction"), moon.fraction);
-                gl.uniform1f(
-                    uniform(moonProgram, "u_light_angle"),
-                    (moon.rotation * Math.PI) / 180,
-                );
-                gl.uniform1f(
-                    uniform(moonProgram, "u_texture_angle"),
-                    (moon.textureRotation * Math.PI) / 180,
-                );
-                gl.uniform1f(uniform(moonProgram, "u_opacity"), moon.opacity);
-                gl.uniform1f(
-                    uniform(moonProgram, "u_halo_opacity"),
-                    moon.haloOpacity,
-                );
-                gl.uniform1f(
-                    uniform(moonProgram, "u_earthshine"),
-                    moon.earthshineOpacity,
-                );
-                gl.uniform1f(
-                    uniform(moonProgram, "u_exposure"),
-                    moon.exposure,
-                );
-                gl.uniform1f(
-                    uniform(moonProgram, "u_psf_sigma"),
-                    moon.psfSigma / radiusCss,
-                );
-                gl.uniform1f(
-                    uniform(moonProgram, "u_psf_wing"),
-                    moon.psfWing,
-                );
-                gl.uniform1f(
-                    uniform(moonProgram, "u_psf_stretch"),
-                    moon.psfStretch,
-                );
-                gl.uniform1f(
-                    uniform(moonProgram, "u_dispersion"),
-                    moon.dispersion / radiusCss,
-                );
-                gl.uniform1f(
-                    uniform(moonProgram, "u_disc_pixel"),
-                    1 / radius,
-                );
-                gl.uniform3fv(
-                    uniform(moonProgram, "u_light_tint"),
-                    parseRgb(moon.lightColor),
-                );
-                gl.uniform3fv(
-                    uniform(moonProgram, "u_shadow_tint"),
-                    parseRgb(moon.shadowColor),
-                );
-                gl.uniform3fv(
-                    uniform(moonProgram, "u_transmittance"),
-                    moon.transmittance,
-                );
-                gl.uniform2f(
-                    uniform(moonProgram, "u_texel"),
-                    1 / 2048,
-                    1 / 1024,
-                );
                 gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, albedoTexture);
-                gl.uniform1i(uniform(moonProgram, "u_albedo"), 0);
-                gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_2D, elevationTexture);
-                gl.uniform1i(uniform(moonProgram, "u_elevation"), 1);
-                gl.activeTexture(gl.TEXTURE2);
-                gl.bindTexture(gl.TEXTURE_2D, photoTexture);
-                gl.uniform1i(uniform(moonProgram, "u_photo"), 2);
-                gl.uniform1f(
-                    uniform(moonProgram, "u_use_photo"),
-                    moon.photoUrl && loadedPhotoUrl === moon.photoUrl ? 1 : 0,
-                );
+                gl.bindTexture(gl.TEXTURE_2D, moonCacheTexture);
+                gl.uniform1i(uniform(compositeProgram, "u_cached_moon"), 0);
                 gl.blendFuncSeparate(
                     gl.SRC_ALPHA,
                     gl.ONE_MINUS_SRC_ALPHA,
@@ -825,8 +903,14 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
         };
 
         redrawRef.current = () => draw();
-        loadTexture(gl, albedoTexture, MOON_ALBEDO_URL, () => draw());
-        loadTexture(gl, elevationTexture, MOON_ELEVATION_URL, () => draw());
+        const cancelAlbedoLoad = loadTexture(gl, albedoTexture, MOON_ALBEDO_URL, () => {
+            moonDirty = true;
+            draw();
+        });
+        const cancelElevationLoad = loadTexture(gl, elevationTexture, MOON_ELEVATION_URL, () => {
+            moonDirty = true;
+            draw();
+        });
         draw();
 
         const resizeObserver = new ResizeObserver(() => draw());
@@ -847,6 +931,10 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
         document.addEventListener("visibilitychange", handleVisibility);
 
         return () => {
+            disposed = true;
+            photoRequest += 1;
+            cancelAlbedoLoad();
+            cancelElevationLoad();
             redrawRef.current = null;
             window.clearInterval(animation);
             resizeObserver.disconnect();
@@ -855,11 +943,15 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
             gl.deleteBuffer(moonBuffer);
             gl.deleteVertexArray(starVertexArray);
             gl.deleteVertexArray(moonVertexArray);
+            gl.deleteVertexArray(compositeVertexArray);
             gl.deleteTexture(albedoTexture);
             gl.deleteTexture(elevationTexture);
             gl.deleteTexture(photoTexture);
+            gl.deleteTexture(moonCacheTexture);
+            gl.deleteFramebuffer(moonFramebuffer);
             gl.deleteProgram(starProgram);
             gl.deleteProgram(moonProgram);
+            gl.deleteProgram(compositeProgram);
         };
     }, []);
 

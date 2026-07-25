@@ -172,7 +172,6 @@ export interface MoonScene {
     x: number;
     y: number;
     opacity: number;
-    haloOpacity: number;
     earthshineOpacity: number;
     scale: number;
     rotation: number;
@@ -402,20 +401,20 @@ export const calculateCelestialScene = ({
     // like badly defocused photographs. Values are CSS-pixel sigmas and remain
     // stable across DPR and viewport sizes.
     const psfSigma = clamp(
-        0.12 +
-            seeingPath ** 0.68 * 0.34 +
-            atmosphericVeil * 0.08 +
-            Math.max(0, haze - 0.78) * 0.06,
-        0.12,
-        0.66,
+        0.075 +
+            seeingPath ** 0.68 * 0.24 +
+            atmosphericVeil * 0.055 +
+            Math.max(0, haze - 0.78) * 0.035,
+        0.075,
+        0.46,
     );
     const psfWing = clamp(
-        0.016 +
-            seeingPath * 0.032 +
-            atmosphericVeil * 0.068 +
-            Math.max(0, haze - 0.82) * 0.014,
-        0.014,
-        0.12,
+        0.007 +
+            seeingPath * 0.018 +
+            atmosphericVeil * 0.036 +
+            Math.max(0, haze - 0.82) * 0.009,
+        0.006,
+        0.068,
     );
     const psfStretch = 1 + seeingPath * 0.09 + atmosphericVeil * 0.018;
     // Broadband differential refraction is minute except close to the
@@ -446,23 +445,13 @@ export const calculateCelestialScene = ({
                     (nighttimeOpacity - daytimeOpacity) * darkness) *
                 atmosphericClarity *
                 clamp(moonVisibility, 0, 2),
-            haloOpacity:
-                clamp(
-                    (0.02 + apparentIrradiance ** 0.52 * 0.14) *
-                        darkness *
-                        moonHorizonFade *
-                        (0.55 + haze * 0.16 + clamp(cloudDensity / 3) * 0.1) *
-                        clamp(moonVisibility, 0, 2),
-                    0,
-                    0.2,
-                ),
             earthshineOpacity:
                 earthshineWindow *
                 darkness ** 1.8 *
                 moonHorizonFade *
                 atmosphericClarity *
                 clamp(earthshineVariability, 0.62, 1) *
-                0.02,
+                0.0075,
             scale: distanceScale * (1 + lowAltitudeWarmth * 0.045),
             rotation,
             textureRotation: -(moon.parallacticAngle / DEG),
