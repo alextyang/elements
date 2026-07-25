@@ -34,6 +34,14 @@ export type SkyNightCharacter =
     | "polar"
     | "airglow";
 
+export type SkyAerosolType =
+    | "clean"
+    | "maritime"
+    | "dust"
+    | "smoke"
+    | "sulfate"
+    | "pollution";
+
 export interface SkyFamily {
     id: string;
     label: string;
@@ -62,6 +70,14 @@ export interface SkyFamily {
         humidity: number;
         artificialGlow: number;
         twilightChroma: number;
+        aerosolType?: SkyAerosolType;
+        aerosolSize?: number;
+        aerosolAbsorption?: number;
+        ozone?: number;
+        observerAltitude?: number;
+        inversion?: number;
+        stratosphericAerosol?: number;
+        groundAlbedo?: number;
     };
     atmospheres: SkyAtmosphere[];
     seasonWeights: Record<SkySeason, number>;
@@ -278,7 +294,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         grade: { hueShift: -2, chroma: 1.08, lightness: 0, hueJitter: 3, chromaJitter: 0.08, lightnessJitter: 0.018 },
         intensity: { contrast: 1.08, saturation: 1.1, edge: 1.08, glow: 1.02, haze: 0.78 },
-        optics: { nightCharacter: "pristine", nightTint: "#0a1b43", nightFloor: 0.075, horizonLift: 0.035, aerosol: 0.18, humidity: 0.18, artificialGlow: 0.01, twilightChroma: 1.02 },
+        optics: { nightCharacter: "pristine", nightTint: "#0a1b43", nightFloor: 0.075, horizonLift: 0.035, aerosol: 0.18, humidity: 0.18, artificialGlow: 0.01, twilightChroma: 1.02, aerosolType: "clean", aerosolSize: 0.18, aerosolAbsorption: 0.03, ozone: 1, observerAltitude: 0.16, inversion: 0.05, stratosphericAerosol: 0.03, groundAlbedo: 0.2 },
         atmospheres: ["crystal", "cirrus"],
         seasonWeights: seasons(1.25, 1.1, 1.05, 0.9),
         regionWeights: { continental: 1.2, dry: 1.15, polar: 1.25 },
@@ -289,7 +305,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
         grade: { hueShift: -5, chroma: 0.84, lightness: 0.018, hueJitter: 3, chromaJitter: 0.06, lightnessJitter: 0.015 },
         intensity: { contrast: 0.91, saturation: 0.9, edge: 0.8, glow: 1.08, haze: 1.3 },
-        optics: { nightCharacter: "marine", nightTint: "#123b4a", nightFloor: 0.105, horizonLift: 0.072, aerosol: 0.52, humidity: 0.82, artificialGlow: 0.025, twilightChroma: 0.78 },
+        optics: { nightCharacter: "marine", nightTint: "#123b4a", nightFloor: 0.105, horizonLift: 0.072, aerosol: 0.52, humidity: 0.82, artificialGlow: 0.025, twilightChroma: 0.78, aerosolType: "maritime", aerosolSize: 0.78, aerosolAbsorption: 0.03, ozone: 0.96, observerAltitude: 0.02, inversion: 0.38, stratosphericAerosol: 0.04, groundAlbedo: 0.28 },
         atmospheres: ["mist", "haze", "soft"],
         seasonWeights: seasons(0.85, 1.15, 1.35, 1.0),
         regionWeights: { marine: 1.65, humid: 1.15 },
@@ -300,7 +316,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([2, 2, 2, 2, 2, 4, 3, 3, 2, 2, 2, 2, 2]),
         grade: { hueShift: 4, chroma: 1.04, lightness: 0.004, hueJitter: 4, chromaJitter: 0.08, lightnessJitter: 0.018 },
         intensity: { contrast: 1.02, saturation: 1.08, edge: 1.12, glow: 1.08, haze: 0.92 },
-        optics: { nightCharacter: "alpine", nightTint: "#211640", nightFloor: 0.075, horizonLift: 0.04, aerosol: 0.2, humidity: 0.25, artificialGlow: 0, twilightChroma: 1.05 },
+        optics: { nightCharacter: "alpine", nightTint: "#211640", nightFloor: 0.075, horizonLift: 0.04, aerosol: 0.2, humidity: 0.25, artificialGlow: 0, twilightChroma: 1.05, aerosolType: "clean", aerosolSize: 0.12, aerosolAbsorption: 0.02, ozone: 1.08, observerAltitude: 0.78, inversion: 0.02, stratosphericAerosol: 0.08, groundAlbedo: 0.42 },
         atmospheres: ["cirrus", "soft", "crystal"],
         seasonWeights: seasons(1.2, 1.05, 0.82, 1.2),
         regionWeights: { continental: 1.25, polar: 1.2, dry: 1.1 },
@@ -311,7 +327,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([3, 3, 3, 3, 3, 5, 4, 4, 3, 3, 3, 3, 3]),
         grade: { hueShift: 5, chroma: 1.12, lightness: 0.006, hueJitter: 3, chromaJitter: 0.09, lightnessJitter: 0.016 },
         intensity: { contrast: 1.07, saturation: 1.12, edge: 1.14, glow: 1.16, haze: 0.82 },
-        optics: { nightCharacter: "desert", nightTint: "#101f43", nightFloor: 0.064, horizonLift: 0.045, aerosol: 0.3, humidity: 0.08, artificialGlow: 0.008, twilightChroma: 1.08 },
+        optics: { nightCharacter: "desert", nightTint: "#101f43", nightFloor: 0.064, horizonLift: 0.045, aerosol: 0.3, humidity: 0.08, artificialGlow: 0.008, twilightChroma: 1.08, aerosolType: "dust", aerosolSize: 0.74, aerosolAbsorption: 0.14, ozone: 0.98, observerAltitude: 0.22, inversion: 0.16, stratosphericAerosol: 0.03, groundAlbedo: 0.46 },
         atmospheres: ["crystal", "cirrus", "soft"],
         seasonWeights: seasons(0.9, 1.05, 1.3, 1.35),
         regionWeights: { dry: 1.75, continental: 1.1 },
@@ -322,7 +338,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([4, 5, 5, 5, 5, 6, 5, 5, 4, 4, 4, 4, 5]),
         grade: { hueShift: -2, chroma: 0.7, lightness: -0.018, hueJitter: 3, chromaJitter: 0.05, lightnessJitter: 0.012 },
         intensity: { contrast: 1.15, saturation: 0.82, edge: 0.72, glow: 0.78, haze: 1.2 },
-        optics: { nightCharacter: "overcast", nightTint: "#151c27", nightFloor: 0.085, horizonLift: 0.025, aerosol: 0.68, humidity: 0.72, artificialGlow: 0.035, twilightChroma: 0.62 },
+        optics: { nightCharacter: "overcast", nightTint: "#151c27", nightFloor: 0.085, horizonLift: 0.025, aerosol: 0.68, humidity: 0.72, artificialGlow: 0.035, twilightChroma: 0.62, aerosolType: "sulfate", aerosolSize: 0.3, aerosolAbsorption: 0.09, ozone: 0.94, observerAltitude: 0.06, inversion: 0.58, stratosphericAerosol: 0.04, groundAlbedo: 0.18 },
         atmospheres: ["soft", "mist", "haze"],
         seasonWeights: seasons(1.25, 1.2, 0.72, 1.25),
         regionWeights: { marine: 1.15, continental: 1.2, humid: 1.35 },
@@ -333,7 +349,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([6, 6, 6, 6, 5, 7, 5, 5, 6, 6, 6, 6, 6]),
         grade: { hueShift: 7, chroma: 0.9, lightness: -0.005, hueJitter: 3, chromaJitter: 0.07, lightnessJitter: 0.015 },
         intensity: { contrast: 1.03, saturation: 0.96, edge: 1.0, glow: 1.18, haze: 1.22 },
-        optics: { nightCharacter: "smoky", nightTint: "#261c24", nightFloor: 0.085, horizonLift: 0.08, aerosol: 0.9, humidity: 0.22, artificialGlow: 0.08, twilightChroma: 0.92 },
+        optics: { nightCharacter: "smoky", nightTint: "#261c24", nightFloor: 0.085, horizonLift: 0.08, aerosol: 0.9, humidity: 0.22, artificialGlow: 0.08, twilightChroma: 0.92, aerosolType: "smoke", aerosolSize: 0.22, aerosolAbsorption: 0.62, ozone: 0.9, observerAltitude: 0.08, inversion: 0.7, stratosphericAerosol: 0.04, groundAlbedo: 0.18 },
         atmospheres: ["haze", "soft", "cirrus"],
         seasonWeights: seasons(0.72, 0.85, 1.2, 1.65),
         regionWeights: { dry: 1.35, continental: 1.1, marine: 0.9 },
@@ -344,7 +360,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([1, 6, 1, 7, 3, 3, 2, 2, 6, 1, 1, 6, 6]),
         grade: { hueShift: -7, chroma: 1.02, lightness: 0.012, hueJitter: 4, chromaJitter: 0.08, lightnessJitter: 0.016 },
         intensity: { contrast: 0.94, saturation: 0.92, edge: 0.86, glow: 1.04, haze: 1.18 },
-        optics: { nightCharacter: "humid", nightTint: "#07313b", nightFloor: 0.095, horizonLift: 0.082, aerosol: 0.58, humidity: 0.94, artificialGlow: 0.035, twilightChroma: 0.88 },
+        optics: { nightCharacter: "humid", nightTint: "#07313b", nightFloor: 0.095, horizonLift: 0.082, aerosol: 0.58, humidity: 0.94, artificialGlow: 0.035, twilightChroma: 0.88, aerosolType: "maritime", aerosolSize: 0.66, aerosolAbsorption: 0.04, ozone: 0.92, observerAltitude: 0.02, inversion: 0.52, stratosphericAerosol: 0.03, groundAlbedo: 0.24 },
         atmospheres: ["haze", "mist", "soft"],
         seasonWeights: seasons(0.72, 1.2, 1.55, 0.95),
         regionWeights: { tropical: 1.7, humid: 1.55, marine: 1.1 },
@@ -355,7 +371,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([3, 4, 4, 4, 6, 2, 6, 6, 1, 4, 4, 4, 4]),
         grade: { hueShift: -5, chroma: 0.88, lightness: 0.02, hueJitter: 3, chromaJitter: 0.06, lightnessJitter: 0.014 },
         intensity: { contrast: 1.05, saturation: 0.94, edge: 0.92, glow: 1.0, haze: 0.88 },
-        optics: { nightCharacter: "polar", nightTint: "#142743", nightFloor: 0.072, horizonLift: 0.035, aerosol: 0.14, humidity: 0.28, artificialGlow: 0, twilightChroma: 0.83 },
+        optics: { nightCharacter: "polar", nightTint: "#142743", nightFloor: 0.072, horizonLift: 0.035, aerosol: 0.14, humidity: 0.28, artificialGlow: 0, twilightChroma: 0.83, aerosolType: "clean", aerosolSize: 0.12, aerosolAbsorption: 0.02, ozone: 1.12, observerAltitude: 0.12, inversion: 0.14, stratosphericAerosol: 0.06, groundAlbedo: 0.88 },
         atmospheres: ["crystal", "soft", "cirrus"],
         seasonWeights: seasons(1.8, 1.0, 0.48, 0.95),
         regionWeights: { polar: 1.7, continental: 1.2 },
@@ -366,7 +382,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([5, 2, 2, 6, 4, 8, 3, 3, 5, 7, 7, 2, 7]),
         grade: { hueShift: 5, chroma: 1.1, lightness: 0.008, hueJitter: 4, chromaJitter: 0.1, lightnessJitter: 0.018 },
         intensity: { contrast: 1.03, saturation: 1.13, edge: 1.18, glow: 1.16, haze: 0.9 },
-        optics: { nightCharacter: "airglow", nightTint: "#28152f", nightFloor: 0.072, horizonLift: 0.05, aerosol: 0.26, humidity: 0.3, artificialGlow: 0.008, twilightChroma: 1.08 },
+        optics: { nightCharacter: "airglow", nightTint: "#28152f", nightFloor: 0.072, horizonLift: 0.05, aerosol: 0.26, humidity: 0.3, artificialGlow: 0.008, twilightChroma: 1.08, aerosolType: "sulfate", aerosolSize: 0.28, aerosolAbsorption: 0.03, ozone: 1.08, observerAltitude: 0.38, inversion: 0.04, stratosphericAerosol: 0.3, groundAlbedo: 0.28 },
         atmospheres: ["cirrus", "crystal", "soft"],
         seasonWeights: seasons(1.1, 1.25, 1.05, 1.3),
         regionWeights: { marine: 1.1, continental: 1.1, dry: 1.1 },
@@ -377,7 +393,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([5, 7, 7, 2, 2, 8, 3, 3, 7, 5, 5, 7, 7]),
         grade: { hueShift: 7, chroma: 1.08, lightness: -0.006, hueJitter: 4, chromaJitter: 0.09, lightnessJitter: 0.014 },
         intensity: { contrast: 1.1, saturation: 1.12, edge: 1.16, glow: 1.02, haze: 0.76 },
-        optics: { nightCharacter: "pristine", nightTint: "#17113b", nightFloor: 0.055, horizonLift: 0.026, aerosol: 0.1, humidity: 0.15, artificialGlow: 0, twilightChroma: 1.04 },
+        optics: { nightCharacter: "pristine", nightTint: "#17113b", nightFloor: 0.055, horizonLift: 0.026, aerosol: 0.1, humidity: 0.15, artificialGlow: 0, twilightChroma: 1.04, aerosolType: "clean", aerosolSize: 0.08, aerosolAbsorption: 0.01, ozone: 1.13, observerAltitude: 0.58, inversion: 0.01, stratosphericAerosol: 0.08, groundAlbedo: 0.24 },
         atmospheres: ["crystal", "cirrus"],
         seasonWeights: seasons(1.15, 1.05, 0.92, 1.25),
         regionWeights: { continental: 1.15, polar: 1.1 },
@@ -388,7 +404,7 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([6, 6, 6, 7, 3, 9, 7, 7, 6, 6, 6, 6, 6]),
         grade: { hueShift: -9, chroma: 0.82, lightness: 0.014, hueJitter: 3, chromaJitter: 0.06, lightnessJitter: 0.015 },
         intensity: { contrast: 0.92, saturation: 0.82, edge: 0.74, glow: 1.02, haze: 1.32 },
-        optics: { nightCharacter: "marine", nightTint: "#16342f", nightFloor: 0.1, horizonLift: 0.09, aerosol: 0.7, humidity: 0.88, artificialGlow: 0.04, twilightChroma: 0.68 },
+        optics: { nightCharacter: "marine", nightTint: "#16342f", nightFloor: 0.1, horizonLift: 0.09, aerosol: 0.7, humidity: 0.88, artificialGlow: 0.04, twilightChroma: 0.68, aerosolType: "maritime", aerosolSize: 0.58, aerosolAbsorption: 0.07, ozone: 0.9, observerAltitude: 0.02, inversion: 0.76, stratosphericAerosol: 0.03, groundAlbedo: 0.3 },
         atmospheres: ["haze", "mist", "soft"],
         seasonWeights: seasons(0.82, 1.4, 1.2, 1.05),
         regionWeights: { marine: 1.35, humid: 1.2, tropical: 1.1 },
@@ -399,9 +415,75 @@ export const SKY_FAMILIES: SkyFamily[] = [
         phaseIndices: phaseIndices([7, 0, 4, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0]),
         grade: { hueShift: -1, chroma: 1.16, lightness: -0.004, hueJitter: 3, chromaJitter: 0.08, lightnessJitter: 0.016 },
         intensity: { contrast: 1.14, saturation: 1.16, edge: 1.12, glow: 1.14, haze: 0.7 },
-        optics: { nightCharacter: "desert", nightTint: "#071a44", nightFloor: 0.05, horizonLift: 0.022, aerosol: 0.12, humidity: 0.08, artificialGlow: 0, twilightChroma: 1.08 },
+        optics: { nightCharacter: "desert", nightTint: "#071a44", nightFloor: 0.05, horizonLift: 0.022, aerosol: 0.12, humidity: 0.08, artificialGlow: 0, twilightChroma: 1.08, aerosolType: "clean", aerosolSize: 0.1, aerosolAbsorption: 0.02, ozone: 1.04, observerAltitude: 0.42, inversion: 0.02, stratosphericAerosol: 0.02, groundAlbedo: 0.36 },
         atmospheres: ["crystal", "cirrus"],
         seasonWeights: seasons(1.0, 1.15, 1.45, 1.15),
         regionWeights: { dry: 1.35, continental: 1.15, tropical: 1.05 },
+    },
+    {
+        id: "post-storm-cerulean",
+        label: "Post-storm Cerulean",
+        phaseIndices: phaseIndices([0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0]),
+        grade: { hueShift: -4, chroma: 1.02, lightness: 0.01, hueJitter: 2, chromaJitter: 0.05, lightnessJitter: 0.012 },
+        intensity: { contrast: 1.1, saturation: 1.03, edge: 0.9, glow: 1.02, haze: 0.88 },
+        optics: { nightCharacter: "pristine", nightTint: "#0b2141", nightFloor: 0.07, horizonLift: 0.045, aerosol: 0.09, humidity: 0.58, artificialGlow: 0.008, twilightChroma: 0.92, aerosolType: "clean", aerosolSize: 0.14, aerosolAbsorption: 0.01, ozone: 1.02, observerAltitude: 0.08, inversion: 0.02, stratosphericAerosol: 0.02, groundAlbedo: 0.25 },
+        atmospheres: ["crystal", "cirrus", "soft"],
+        seasonWeights: seasons(0.72, 1.28, 1.22, 1.05),
+        regionWeights: { continental: 1.35, humid: 1.2, marine: 0.82 },
+    },
+    {
+        id: "coastal-silver",
+        label: "Coastal Silver",
+        phaseIndices: phaseIndices([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+        grade: { hueShift: -3, chroma: 0.72, lightness: 0.026, hueJitter: 2, chromaJitter: 0.04, lightnessJitter: 0.012 },
+        intensity: { contrast: 0.88, saturation: 0.82, edge: 0.68, glow: 1.14, haze: 1.42 },
+        optics: { nightCharacter: "marine", nightTint: "#14343d", nightFloor: 0.108, horizonLift: 0.094, aerosol: 0.66, humidity: 0.9, artificialGlow: 0.018, twilightChroma: 0.7, aerosolType: "maritime", aerosolSize: 0.9, aerosolAbsorption: 0.015, ozone: 0.94, observerAltitude: 0, inversion: 0.6, stratosphericAerosol: 0.02, groundAlbedo: 0.34 },
+        atmospheres: ["mist", "haze", "soft"],
+        seasonWeights: seasons(0.9, 1.15, 1.42, 1.05),
+        regionWeights: { marine: 1.85, humid: 1.18, tropical: 1.1 },
+    },
+    {
+        id: "saharan-veil",
+        label: "Saharan Veil",
+        phaseIndices: phaseIndices([7, 3, 3, 3, 3, 5, 4, 4, 3, 3, 6, 6, 6]),
+        grade: { hueShift: 6, chroma: 0.88, lightness: 0.004, hueJitter: 2, chromaJitter: 0.06, lightnessJitter: 0.014 },
+        intensity: { contrast: 0.98, saturation: 0.94, edge: 0.86, glow: 1.2, haze: 1.38 },
+        optics: { nightCharacter: "desert", nightTint: "#251c25", nightFloor: 0.078, horizonLift: 0.088, aerosol: 0.78, humidity: 0.12, artificialGlow: 0.012, twilightChroma: 0.86, aerosolType: "dust", aerosolSize: 0.92, aerosolAbsorption: 0.24, ozone: 0.96, observerAltitude: 0.06, inversion: 0.58, stratosphericAerosol: 0.04, groundAlbedo: 0.52 },
+        atmospheres: ["haze", "soft", "cirrus"],
+        seasonWeights: seasons(0.5, 1.02, 1.58, 1.35),
+        regionWeights: { dry: 1.9, tropical: 1.42, marine: 0.72 },
+    },
+    {
+        id: "volcanic-amethyst",
+        label: "Volcanic Amethyst",
+        phaseIndices: phaseIndices([5, 2, 2, 2, 2, 4, 3, 3, 7, 7, 7, 2, 7]),
+        grade: { hueShift: 3, chroma: 0.96, lightness: -0.002, hueJitter: 2, chromaJitter: 0.05, lightnessJitter: 0.012 },
+        intensity: { contrast: 1.04, saturation: 1.02, edge: 1.04, glow: 1.2, haze: 1.0 },
+        optics: { nightCharacter: "airglow", nightTint: "#211633", nightFloor: 0.068, horizonLift: 0.052, aerosol: 0.42, humidity: 0.2, artificialGlow: 0.004, twilightChroma: 1.02, aerosolType: "sulfate", aerosolSize: 0.18, aerosolAbsorption: 0.015, ozone: 1.1, observerAltitude: 0.2, inversion: 0.04, stratosphericAerosol: 0.92, groundAlbedo: 0.26 },
+        atmospheres: ["cirrus", "crystal", "haze"],
+        seasonWeights: seasons(0.13, 0.13, 0.13, 0.13),
+        regionWeights: { continental: 1.1, marine: 1.1, polar: 1.1 },
+    },
+    {
+        id: "urban-amber-inversion",
+        label: "Urban Amber Inversion",
+        phaseIndices: phaseIndices([7, 6, 6, 6, 5, 7, 5, 5, 6, 6, 6, 6, 6]),
+        grade: { hueShift: 5, chroma: 0.72, lightness: -0.012, hueJitter: 2, chromaJitter: 0.04, lightnessJitter: 0.01 },
+        intensity: { contrast: 0.96, saturation: 0.82, edge: 0.72, glow: 1.18, haze: 1.48 },
+        optics: { nightCharacter: "smoky", nightTint: "#2a1c20", nightFloor: 0.105, horizonLift: 0.13, aerosol: 0.86, humidity: 0.58, artificialGlow: 0.14, twilightChroma: 0.68, aerosolType: "pollution", aerosolSize: 0.28, aerosolAbsorption: 0.38, ozone: 0.88, observerAltitude: 0, inversion: 0.96, stratosphericAerosol: 0.02, groundAlbedo: 0.16 },
+        atmospheres: ["haze", "mist", "soft"],
+        seasonWeights: seasons(1.35, 0.78, 0.62, 1.2),
+        regionWeights: { continental: 1.3, humid: 1.2, marine: 0.86 },
+    },
+    {
+        id: "monsoon-pewter",
+        label: "Monsoon Pewter",
+        phaseIndices: phaseIndices([4, 5, 5, 5, 5, 6, 5, 5, 4, 4, 4, 4, 5]),
+        grade: { hueShift: -4, chroma: 0.62, lightness: -0.008, hueJitter: 2, chromaJitter: 0.04, lightnessJitter: 0.012 },
+        intensity: { contrast: 1.08, saturation: 0.72, edge: 0.62, glow: 0.82, haze: 1.34 },
+        optics: { nightCharacter: "overcast", nightTint: "#13232a", nightFloor: 0.092, horizonLift: 0.045, aerosol: 0.58, humidity: 1, artificialGlow: 0.022, twilightChroma: 0.58, aerosolType: "maritime", aerosolSize: 0.64, aerosolAbsorption: 0.05, ozone: 0.9, observerAltitude: 0, inversion: 0.46, stratosphericAerosol: 0.02, groundAlbedo: 0.2 },
+        atmospheres: ["soft", "mist", "haze"],
+        seasonWeights: seasons(0.3, 1.05, 1.72, 0.88),
+        regionWeights: { tropical: 1.85, humid: 1.55, marine: 1.2 },
     },
 ];

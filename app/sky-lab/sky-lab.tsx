@@ -19,6 +19,7 @@ import {
 import {
     PHASE_ORDER,
     SKY_FAMILIES,
+    SkyAerosolType,
     SkyAtmosphere,
     SkyPhase,
     SkyRegion,
@@ -78,6 +79,14 @@ const REGIONS: SkyRegion[] = [
     "polar",
 ];
 const SEASONS: SkySeason[] = ["winter", "spring", "summer", "autumn"];
+const AEROSOL_TYPES: SkyAerosolType[] = [
+    "clean",
+    "maritime",
+    "dust",
+    "smoke",
+    "sulfate",
+    "pollution",
+];
 
 const PHASE_LABELS: Record<SkyPhase, string> = {
     night: "Night",
@@ -118,6 +127,17 @@ interface LabSettings {
     edge: number;
     glow: number;
     haze: number;
+    manualComposition: boolean;
+    aerosolType: "auto" | SkyAerosolType;
+    aerosol: number;
+    humidity: number;
+    aerosolSize: number;
+    aerosolAbsorption: number;
+    ozone: number;
+    observerAltitude: number;
+    inversion: number;
+    stratosphericAerosol: number;
+    groundAlbedo: number;
     cloudDensity: number;
     motionSpeed: number;
     motionAmount: number;
@@ -158,6 +178,17 @@ const DEFAULT_SETTINGS: LabSettings = {
     edge: 1,
     glow: 1,
     haze: 1,
+    manualComposition: false,
+    aerosolType: "auto",
+    aerosol: 0.35,
+    humidity: 0.45,
+    aerosolSize: 0.35,
+    aerosolAbsorption: 0.08,
+    ozone: 1,
+    observerAltitude: 0.08,
+    inversion: 0.1,
+    stratosphericAerosol: 0.03,
+    groundAlbedo: 0.24,
     cloudDensity: 1,
     motionSpeed: 1,
     motionAmount: 1,
@@ -268,6 +299,7 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
         "season",
         "variant",
         "edgeDirection",
+        "aerosolType",
     ];
     const numbers: (keyof LabSettings)[] = [
         "hue",
@@ -278,6 +310,15 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
         "edge",
         "glow",
         "haze",
+        "aerosol",
+        "humidity",
+        "aerosolSize",
+        "aerosolAbsorption",
+        "ozone",
+        "observerAltitude",
+        "inversion",
+        "stratosphericAerosol",
+        "groundAlbedo",
         "cloudDensity",
         "motionSpeed",
         "motionAmount",
@@ -297,7 +338,7 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
         const value = Number(rawValue);
         if (Number.isFinite(value)) Object.assign(next, { [key]: value });
     });
-    ["manualGrade", "manualIntensity", "paused"].forEach((key) => {
+    ["manualGrade", "manualIntensity", "manualComposition", "paused"].forEach((key) => {
         const value = params.get(key);
         if (value !== null) Object.assign(next, { [key]: value === "1" });
     });
@@ -317,6 +358,7 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
     if (next.season !== "auto" && !isOneOf(SEASONS, next.season)) next.season = "auto";
     if (!isOneOf(["auto", "-1", "0", "1"], next.variant)) next.variant = "auto";
     if (!isOneOf(["auto", "original", "flipped"], next.edgeDirection)) next.edgeDirection = "auto";
+    if (next.aerosolType !== "auto" && !isOneOf(AEROSOL_TYPES, next.aerosolType)) next.aerosolType = "auto";
 
     next.hue = limit(next.hue, -12, 12);
     next.chroma = limit(next.chroma, 0.7, 1.3);
@@ -326,6 +368,15 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
     next.edge = limit(next.edge, 0.5, 1.5);
     next.glow = limit(next.glow, 0.55, 1.5);
     next.haze = limit(next.haze, 0.45, 1.65);
+    next.aerosol = limit(next.aerosol, 0.015, 1);
+    next.humidity = limit(next.humidity, 0, 1);
+    next.aerosolSize = limit(next.aerosolSize, 0, 1);
+    next.aerosolAbsorption = limit(next.aerosolAbsorption, 0, 1);
+    next.ozone = limit(next.ozone, 0.65, 1.35);
+    next.observerAltitude = limit(next.observerAltitude, 0, 1);
+    next.inversion = limit(next.inversion, 0, 1);
+    next.stratosphericAerosol = limit(next.stratosphericAerosol, 0, 1);
+    next.groundAlbedo = limit(next.groundAlbedo, 0, 1);
     next.cloudDensity = limit(next.cloudDensity, 0, 2);
     next.motionSpeed = limit(next.motionSpeed, 0.25, 3);
     next.motionAmount = limit(next.motionAmount, 0, 2);
@@ -457,6 +508,23 @@ export function SkyLab() {
                       edge: settings.edge,
                       glow: settings.glow,
                       haze: settings.haze,
+                }
+                : undefined,
+            aerosolType:
+                settings.aerosolType === "auto"
+                    ? undefined
+                    : settings.aerosolType,
+            composition: settings.manualComposition
+                ? {
+                      aerosol: settings.aerosol,
+                      humidity: settings.humidity,
+                      aerosolSize: settings.aerosolSize,
+                      aerosolAbsorption: settings.aerosolAbsorption,
+                      ozone: settings.ozone,
+                      observerAltitude: settings.observerAltitude,
+                      inversion: settings.inversion,
+                      stratosphericAerosol: settings.stratosphericAerosol,
+                      groundAlbedo: settings.groundAlbedo,
                   }
                 : undefined,
             cloudDensity: settings.cloudDensity,
@@ -517,6 +585,17 @@ export function SkyLab() {
             edge: randomBetween(0.68, 1.35),
             glow: randomBetween(0.72, 1.34),
             haze: randomBetween(0.62, 1.48),
+            manualComposition: true,
+            aerosolType: AEROSOL_TYPES[Math.floor(Math.random() * AEROSOL_TYPES.length)],
+            aerosol: randomStepped(0.03, 0.96, 0.01),
+            humidity: randomStepped(0.02, 1, 0.01),
+            aerosolSize: randomStepped(0.04, 0.96, 0.01),
+            aerosolAbsorption: randomStepped(0, 0.72, 0.01),
+            ozone: randomStepped(0.72, 1.28, 0.01),
+            observerAltitude: randomStepped(0, 0.9, 0.01),
+            inversion: randomStepped(0, 0.94, 0.01),
+            stratosphericAerosol: randomStepped(0, 0.86, 0.01),
+            groundAlbedo: randomStepped(0.08, 0.92, 0.01),
             cloudDensity: randomStepped(0.34, 1.8, 0.02),
             motionSpeed: randomStepped(0.45, 2.25, 0.05),
             motionAmount: randomStepped(0.44, 1.76, 0.02),
@@ -567,6 +646,10 @@ export function SkyLab() {
                 <div className={styles.astronomyStatus}>
                     <span>{snapshot?.lightingRegime ?? "Resolving lighting regime"}</span>
                     <span>{Math.round((snapshot?.darkness ?? 0) * 100)}% nocturnal adaptation</span>
+                    <span>{titleCase(snapshot?.aerosolType ?? "resolving aerosol")}</span>
+                    <span>{Math.round((snapshot?.aerosol ?? 0) * 100)}% aerosol</span>
+                    <span>{Math.round((snapshot?.humidity ?? 0) * 100)}% humidity</span>
+                    <span>{Math.round((snapshot?.inversion ?? 0) * 100)}% inversion</span>
                     <span>{snapshot?.moonPhase ?? "Resolving lunar state"}</span>
                     <span>{Math.round((snapshot?.moonIllumination ?? 0) * 100)}% illuminated</span>
                     <span>{snapshot?.visibleStars ?? 0} visible catalogue stars</span>
@@ -668,6 +751,29 @@ export function SkyLab() {
                     <Slider label="Wrapped edges" value={settings.edge} min={0.5} max={1.5} step={0.01} disabled={!settings.manualIntensity} onChange={(value) => update("edge", value)} />
                     <Slider label="Horizon glow" value={settings.glow} min={0.55} max={1.5} step={0.01} disabled={!settings.manualIntensity} onChange={(value) => update("glow", value)} />
                     <Slider label="Atmospheric haze" value={settings.haze} min={0.45} max={1.65} step={0.01} disabled={!settings.manualIntensity} onChange={(value) => update("haze", value)} />
+                </fieldset>
+
+                <fieldset>
+                    <legend>
+                        Atmospheric composition
+                        <label className={styles.toggle}>
+                            <input type="checkbox" checked={settings.manualComposition} onChange={(event) => update("manualComposition", event.target.checked)} />
+                            Manual
+                        </label>
+                    </legend>
+                    <SelectField label="Aerosol species" value={settings.aerosolType} onChange={(value) => update("aerosolType", value as LabSettings["aerosolType"])}>
+                        <option value="auto">Family default</option>
+                        {AEROSOL_TYPES.map((type) => <option key={type} value={type}>{titleCase(type)}</option>)}
+                    </SelectField>
+                    <Slider label="Aerosol optical depth" value={settings.aerosol} min={0.015} max={1} step={0.005} disabled={!settings.manualComposition} onChange={(value) => update("aerosol", value)} />
+                    <Slider label="Relative humidity" value={settings.humidity} min={0} max={1} step={0.01} disabled={!settings.manualComposition} format={(value) => `${Math.round(value * 100)}%`} onChange={(value) => update("humidity", value)} />
+                    <Slider label="Particle size" value={settings.aerosolSize} min={0} max={1} step={0.01} disabled={!settings.manualComposition} onChange={(value) => update("aerosolSize", value)} />
+                    <Slider label="Aerosol absorption" value={settings.aerosolAbsorption} min={0} max={1} step={0.01} disabled={!settings.manualComposition} onChange={(value) => update("aerosolAbsorption", value)} />
+                    <Slider label="Ozone column" value={settings.ozone} min={0.65} max={1.35} step={0.01} disabled={!settings.manualComposition} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("ozone", value)} />
+                    <Slider label="Observer altitude" value={settings.observerAltitude} min={0} max={1} step={0.01} disabled={!settings.manualComposition} onChange={(value) => update("observerAltitude", value)} />
+                    <Slider label="Boundary inversion" value={settings.inversion} min={0} max={1} step={0.01} disabled={!settings.manualComposition} onChange={(value) => update("inversion", value)} />
+                    <Slider label="Stratospheric aerosol" value={settings.stratosphericAerosol} min={0} max={1} step={0.01} disabled={!settings.manualComposition} onChange={(value) => update("stratosphericAerosol", value)} />
+                    <Slider label="Ground albedo" value={settings.groundAlbedo} min={0} max={1} step={0.01} disabled={!settings.manualComposition} onChange={(value) => update("groundAlbedo", value)} />
                 </fieldset>
 
                 <fieldset>

@@ -16,6 +16,14 @@ export interface SkyRadianceScene {
     moonLightColor: string;
     aerosol: number;
     humidity: number;
+    aerosolSize: number;
+    aerosolAbsorption: number;
+    ozone: number;
+    observerAltitude: number;
+    inversion: number;
+    stratosphericAerosol: number;
+    groundAlbedo: number;
+    aerosolTint: [number, number, number];
     cloudiness: number;
     edgeStrength: number;
     horizonStrength: number;
@@ -45,6 +53,9 @@ uniform vec2 u_sun;
 uniform vec2 u_moon;
 uniform vec4 u_optics;
 uniform vec4 u_light;
+uniform vec4 u_composition;
+uniform vec3 u_layers;
+uniform vec3 u_aerosol_tint;
 uniform vec4 u_seed;
 uniform float u_airglow;
 uniform vec3 u_moon_tint;
@@ -163,6 +174,13 @@ void main() {
     float moonlight = u_light.y;
     float edge_strength = u_light.z;
     float horizon_strength = u_light.w;
+    float aerosol_size = u_composition.x;
+    float aerosol_absorption = u_composition.y;
+    float ozone = u_composition.z;
+    float observer_altitude = u_composition.w;
+    float inversion = u_layers.x;
+    float stratospheric_aerosol = u_layers.y;
+    float ground_albedo = u_layers.z;
 
     vec3 base_srgb = sky_spline(y);
     vec3 radiance = srgb_to_linear(base_srgb);
@@ -176,19 +194,26 @@ void main() {
     // to the horizon without introducing a horizontal color-stop boundary.
     float elevation_sine = max(0.018, view.y);
     float air_mass = 1.0 / (elevation_sine + 0.115 * pow(elevation_sine + 0.035, -0.55));
-    float normalized_path = saturate((air_mass - 0.88) / 4.6);
+    float effective_air_mass = air_mass * (1.0 - observer_altitude * 0.12);
+    float normalized_path = saturate((effective_air_mass - 0.88) / 4.6);
     float molecular = pow(normalized_path, 1.18);
-    float aerosol_path = pow(normalized_path, mix(1.9, 0.72, aerosol));
+    float aerosol_path = pow(
+        normalized_path,
+        mix(1.72, 0.62, aerosol * 0.72 + aerosol_size * 0.28)
+    );
 
     // Rayleigh is broad; Mie is strongly forward-scattering. A weaker reverse
     // lobe supplies the observed antisolar / Belt-of-Venus volume at twilight.
     float rayleigh_phase = 0.0597 * (1.0 + sun_cosine * sun_cosine);
-    float mie_phase = henyey_greenstein(sun_cosine, mix(0.64, 0.82, aerosol));
+    float mie_phase = henyey_greenstein(
+        sun_cosine,
+        mix(0.6, 0.86, aerosol_size * 0.7 + aerosol * 0.3)
+    );
     float reverse_phase = henyey_greenstein(-sun_cosine, 0.38);
     float sun_available = smoother(-15.0, 6.0, solar_altitude);
     float twilight = 1.0 - smoother(-5.0, 11.0, abs(solar_altitude + 2.0));
     float low_sun_path = 1.0 - smoother(-3.0, 18.0, solar_altitude);
-    float ozone_path = twilight * (1.0 - humidity * 0.28);
+    float ozone_path = twilight * ozone * (1.0 - humidity * 0.28);
     float forward_scatter = sun_available * mie_phase *
         (0.026 + aerosol * 0.085) * (0.35 + aerosol_path * 0.92);
     float molecular_fill = sun_available * rayleigh_phase *
@@ -201,9 +226,22 @@ void main() {
     vec3 rayleigh_blue = srgb_to_linear(vec3(0.30, 0.56, 0.94));
     vec3 ozone_violet = srgb_to_linear(vec3(0.48, 0.40, 0.76));
     vec3 molecular_color = mix(rayleigh_blue, ozone_violet, ozone_path * 0.28);
-    vec3 aerosol_white = srgb_to_linear(vec3(0.91, 0.88, 0.80));
+    vec3 aerosol_white = srgb_to_linear(mix(
+        u_aerosol_tint,
+        vec3(0.92, 0.91, 0.87),
+        humidity * 0.42
+    ));
     vec3 sunset_red = srgb_to_linear(vec3(0.96, 0.31, 0.12));
-    vec3 solar_scatter = mix(aerosol_white, sunset_red, low_sun_path * (0.48 + aerosol * 0.38));
+    vec3 absorbing_sunset = mix(
+        sunset_red,
+        srgb_to_linear(vec3(0.72, 0.19, 0.075)),
+        aerosol_absorption * 0.58
+    );
+    vec3 solar_scatter = mix(
+        aerosol_white,
+        absorbing_sunset,
+        low_sun_path * (0.42 + aerosol * 0.34 + aerosol_absorption * 0.16)
+    );
     solar_scatter = mix(solar_scatter, glow_linear, 0.18);
     vec3 venus_rose = srgb_to_linear(vec3(0.79, 0.43, 0.55));
     vec3 humid_neutral = srgb_to_linear(vec3(0.66, 0.65, 0.66));
@@ -216,6 +254,16 @@ void main() {
     radiance += mix(molecular_color, haze_linear, 0.16) * molecular_fill * (1.0 - night * 0.72);
     radiance += antisolar_color * antisolar;
 
+    // The clear dome is not azimuthally uniform. Rayleigh's 1+cos² phase
+    // response leaves a broad, subtle minimum roughly 90° from the Sun.
+    // This low-amplitude modulation supplies real dome depth without drawing
+    // a visible lobe into hazy or overcast skies.
+    float rayleigh_azimuth = sun_cosine * sun_cosine - 0.36;
+    float angular_contrast = sun_available * (1.0 - night) *
+        (1.0 - aerosol * 0.72) * (1.0 - humidity * 0.48) *
+        (1.0 - cloudiness * 0.6) * (0.018 + observer_altitude * 0.014);
+    radiance *= 1.0 + rayleigh_azimuth * angular_contrast;
+
     // Horizontal anisotropy wraps around the screen edges as atmospheric
     // illumination, not as a pair of recognizable radial stamps.
     float left_field = exp(-pow((uv.x + 0.07) / 0.48, 2.0)) *
@@ -227,6 +275,48 @@ void main() {
     radiance = mix(radiance, srgb_to_linear(u_left), left_field * edge_fade * 0.105);
     radiance = mix(radiance, srgb_to_linear(u_right), right_field * edge_fade * 0.105);
 
+    // The rising Earth shadow and the Belt of Venus are coupled structures,
+    // not a generic pink gradient. Their elevation follows solar depression
+    // and their azimuth is restricted to the antisolar hemisphere.
+    float view_elevation = asin(clamp(view.y, -1.0, 1.0));
+    float shadow_active = smoother(-12.0, -5.0, solar_altitude) *
+        (1.0 - smoother(1.5, 5.0, solar_altitude)) * (1.0 - night * 0.7);
+    float antisolar_alignment = mix(
+        0.28,
+        1.0,
+        smoother(0.18, 0.9, -sun_cosine)
+    );
+    float shadow_top = radians(clamp(1.1 - solar_altitude * 1.18, 0.2, 15.0));
+    float below_shadow = 1.0 - smoother(
+        shadow_top - radians(1.5),
+        shadow_top + radians(2.4),
+        view_elevation
+    );
+    float earth_shadow = shadow_active * antisolar_alignment * below_shadow;
+    vec3 shadow_chromaticity = vec3(0.68, 0.77, 0.94);
+    radiance = mix(radiance, radiance * shadow_chromaticity, earth_shadow * 0.34);
+
+    float belt_center = shadow_top + radians(3.2 + humidity * 1.8);
+    float belt_width = radians(3.1 + aerosol * 2.2 + humidity * 1.5);
+    float venus_belt = shadow_active * antisolar_alignment *
+        exp(-pow((view_elevation - belt_center) / belt_width, 2.0)) *
+        (1.0 - aerosol * 0.42) * (1.0 - humidity * 0.38);
+    radiance += antisolar_color * venus_belt * (0.018 + ozone * 0.012);
+
+    // Elevated sulfate produces a distinct post-sunset arch above the normal
+    // boundary-layer glow. It remains rare because the production families
+    // assign significant stratospheric aerosol only to volcanic conditions.
+    float strato_center = radians(10.0 + (1.0 - low_sun_path) * 7.0);
+    float strato_band = twilight * stratospheric_aerosol *
+        exp(-pow((view_elevation - strato_center) / radians(9.0), 2.0)) *
+        (0.58 + 0.42 * smoother(-0.65, 0.72, sun_cosine));
+    vec3 strato_color = mix(
+        srgb_to_linear(vec3(0.58, 0.32, 0.66)),
+        srgb_to_linear(vec3(0.96, 0.47, 0.22)),
+        smoother(-8.0, 1.0, solar_altitude)
+    );
+    radiance += strato_color * strato_band * 0.035;
+
     // Correlated low-frequency density variation gives clean skies depth and
     // makes aerosol fields non-uniform. The amplitude stays below cloud form.
     vec2 density_point = vec2(
@@ -237,6 +327,19 @@ void main() {
     float density_envelope = smoother(0.08, 0.87, y) * (1.0 - smoother(0.88, 1.02, y));
     float density_amount = (0.006 + aerosol * 0.012 + humidity * 0.008) * density_envelope;
     radiance *= 1.0 + density * density_amount * (1.0 - cloudiness * 0.38);
+
+    // Boundary-layer inversions have a finite height and irregular optical
+    // depth. They compress distant contrast close to the horizon rather than
+    // tinting the full dome.
+    float inversion_center = radians(2.2 + inversion * 1.8);
+    float inversion_width = radians(2.6 + aerosol * 3.8 + humidity * 1.8);
+    float inversion_band = inversion *
+        exp(-pow((view_elevation - inversion_center) / inversion_width, 2.0)) *
+        (0.78 + density * 0.44);
+    float inversion_opacity = inversion_band * aerosol *
+        (0.075 + aerosol_absorption * 0.045) * (1.0 - night * 0.28);
+    vec3 inversion_color = mix(aerosol_white, haze_linear, 0.34);
+    radiance = mix(radiance, inversion_color, saturate(inversion_opacity));
 
     // Multiple-scattering fill is wide and lowest-frequency. It prevents a
     // clear sky from reading as a flat ramp while retaining twilight contrast.
@@ -251,6 +354,35 @@ void main() {
     );
     radiance += multi_scatter_color * multi_scatter;
 
+    // Surface reflectance returns a small fraction of daylight to the lowest
+    // atmosphere. Snow, water, vegetation, and desert therefore produce
+    // different horizon depth without being used as arbitrary color grades.
+    float ground_bounce = horizon_volume * ground_albedo * sun_available *
+        (1.0 - night) * (0.004 + humidity * 0.005 + cloudiness * 0.006);
+    vec3 ground_bounce_color = mix(aerosol_white, solar_scatter, low_sun_path * 0.36);
+    radiance += ground_bounce_color * ground_bounce;
+
+    // A single static, band-limited optical-depth field integrates very thin
+    // cloud and moisture into the radiance solution. Animated CSS layers still
+    // provide slow movement, while this pass supplies extinction, directional
+    // light, and depth without a permanent full-screen animation loop.
+    vec2 veil_point = vec2(
+        uv.x * (3.4 + u_seed.y * 1.6) + u_seed.w * 17.0,
+        uv.y * (8.0 + u_seed.x * 2.4) + u_seed.z * 13.0
+    );
+    float veil_noise = fbm(veil_point + vec2(uv.y * 1.7, 0.0));
+    float veil_density = cloudiness *
+        pow(smoother(0.46, 0.78, veil_noise), 1.65) *
+        smoother(0.02, 0.24, y) * (1.0 - smoother(0.9, 1.04, y));
+    float veil_extinction = veil_density * (0.032 + humidity * 0.062);
+    vec3 veil_light = mix(
+        srgb_to_linear(vec3(0.72, 0.77, 0.82)),
+        solar_scatter,
+        smoother(-5.0, 12.0, solar_altitude) * 0.36
+    );
+    radiance = radiance * exp(-veil_extinction) +
+        veil_light * veil_density * (0.01 + humidity * 0.02) * (1.0 - night * 0.58);
+
     // Natural night is layered rather than uniformly blue: weak airglow,
     // integrated celestial radiance, moon aureole, and near-horizon extinction.
     float nocturnal_airglow = night * u_airglow *
@@ -262,6 +394,12 @@ void main() {
         0.13 + (1.0 - aerosol) * 0.10
     );
     radiance += oxygen_airglow * nocturnal_airglow * airglow_ripple * (0.006 + 0.018 * u_seed.x);
+
+    float red_airglow = night * u_airglow * (1.0 - aerosol * 0.58) *
+        exp(-pow((y - (0.42 + u_seed.w * 0.1)) / 0.24, 2.0)) *
+        (0.58 + 0.42 * fbm(vec2(uv.x * 1.7 + 21.0, uv.y * 1.2 + u_seed.z * 8.0)));
+    radiance += srgb_to_linear(vec3(0.53, 0.17, 0.14)) *
+        red_airglow * (0.001 + u_seed.y * 0.0032);
 
     float zodiacal_axis = abs((uv.x - (0.25 + u_seed.z * 0.5)) + (y - 0.76) * (u_seed.y - 0.5));
     float zodiacal = night * (1.0 - moonlight) * (1.0 - aerosol) *
@@ -276,7 +414,9 @@ void main() {
     float moon_elevation_sine = max(0.018, moon_direction.y);
     float moon_air_mass = 1.0 /
         (moon_elevation_sine + 0.115 * pow(moon_elevation_sine + 0.035, -0.55));
-    float optical_depth = 0.052 + aerosol * 0.105 + humidity * 0.028;
+    float optical_depth = 0.052 +
+        aerosol * (0.09 + aerosol_absorption * 0.045) +
+        humidity * 0.028;
     float view_transmission = exp(-optical_depth * air_mass);
     float source_transmission = exp(-optical_depth * moon_air_mass);
     float mass_difference = moon_air_mass - air_mass;
@@ -288,11 +428,11 @@ void main() {
     float lunar_rayleigh = 0.0597 * (1.0 + moon_cosine * moon_cosine);
     float coarse_mie = henyey_greenstein(
         moon_cosine,
-        mix(0.52, 0.76, aerosol * 0.72 + humidity * 0.28)
+        mix(0.5, 0.8, aerosol_size * 0.62 + aerosol * 0.22 + humidity * 0.16)
     );
     float fine_mie = henyey_greenstein(
         moon_cosine,
-        mix(0.78, 0.89, aerosol * 0.46 + humidity * 0.54)
+        mix(0.76, 0.9, aerosol_size * 0.52 + aerosol * 0.2 + humidity * 0.28)
     );
     float lunar_mie = mix(coarse_mie, fine_mie, 0.24 + humidity * 0.20);
 
@@ -308,7 +448,11 @@ void main() {
     vec3 lunar_spectrum = srgb_to_linear(u_moon_tint) *
         mix(vec3(1.0), normalized_transmission, 0.72);
     vec3 molecular_spectrum = lunar_spectrum * vec3(0.58, 0.78, 1.12);
-    vec3 aerosol_spectrum = mix(lunar_spectrum, haze_linear, 0.10 + humidity * 0.08);
+    vec3 aerosol_spectrum = mix(
+        lunar_spectrum,
+        mix(aerosol_white, haze_linear, 0.28),
+        0.08 + humidity * 0.08 + aerosol_absorption * 0.12
+    );
 
     float rayleigh_scatter = moonlight * scatter_transport * lunar_rayleigh *
         (0.10 + molecular * 0.14);
@@ -523,6 +667,20 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
                 current.edgeStrength,
                 current.horizonStrength,
             );
+            gl.uniform4f(
+                uniform("u_composition"),
+                current.aerosolSize,
+                current.aerosolAbsorption,
+                current.ozone,
+                current.observerAltitude,
+            );
+            gl.uniform3f(
+                uniform("u_layers"),
+                current.inversion,
+                current.stratosphericAerosol,
+                current.groundAlbedo,
+            );
+            gl.uniform3fv(uniform("u_aerosol_tint"), current.aerosolTint);
             gl.uniform4fv(uniform("u_seed"), current.seed);
             gl.uniform1f(uniform("u_airglow"), current.airglowStrength);
             gl.uniform3fv(

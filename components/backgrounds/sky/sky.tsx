@@ -18,6 +18,7 @@ import {
     PHASE_ORDER,
     SKY_FAMILIES,
     SKY_PALETTES,
+    SkyAerosolType,
     SkyAtmosphere,
     SkyFamily,
     SkyPalette,
@@ -44,6 +45,18 @@ export const SKY_BLOOM_STYLES = [
 
 export type SkyBloomStyle = (typeof SKY_BLOOM_STYLES)[number];
 
+export interface SkyCompositionControls {
+    aerosol: number;
+    humidity: number;
+    aerosolSize: number;
+    aerosolAbsorption: number;
+    ozone: number;
+    observerAltitude: number;
+    inversion: number;
+    stratosphericAerosol: number;
+    groundAlbedo: number;
+}
+
 export interface SkyPreviewOptions {
     date?: Date;
     timezone?: string;
@@ -67,6 +80,8 @@ export interface SkyPreviewOptions {
     bloomScale?: number;
     starVisibility?: number;
     moonVisibility?: number;
+    composition?: Partial<SkyCompositionControls>;
+    aerosolType?: SkyAerosolType;
 }
 
 export interface SkySnapshot {
@@ -80,6 +95,11 @@ export interface SkySnapshot {
     visibleStars: number;
     lightingRegime: string;
     darkness: number;
+    aerosolType: SkyAerosolType;
+    aerosol: number;
+    humidity: number;
+    inversion: number;
+    stratosphericAerosol: number;
 }
 
 interface SkyProps {
@@ -166,6 +186,11 @@ const TIMEZONE_REGIONS: Partial<Record<string, SkyRegion>> = {
     "Pacific/Honolulu": "tropical",
 };
 
+interface ResolvedAtmosphericComposition extends SkyCompositionControls {
+    aerosolType: SkyAerosolType;
+    aerosolTint: [number, number, number];
+}
+
 interface SkyVisual {
     palette: SkyPalette;
     radiance: SkyRadianceScene;
@@ -180,6 +205,7 @@ interface SkyVisual {
     cloudHeight: number;
     nightDepth: number;
     lightingRegime: string;
+    composition: ResolvedAtmosphericComposition;
     motionDirection: "alternate" | "alternate-reverse";
     baseDuration: number;
     edgeDuration: number;
@@ -243,6 +269,99 @@ const PHASE_SOLAR_ALTITUDE: Record<SkyPhase, number> = {
     afterglow: -3.5,
     dusk: -6.5,
     blueHourEvening: -11,
+};
+
+const AEROSOL_TINTS: Record<SkyAerosolType, [number, number, number]> = {
+    clean: [0.91, 0.94, 1],
+    maritime: [0.94, 0.95, 0.9],
+    dust: [0.9, 0.68, 0.43],
+    smoke: [0.68, 0.55, 0.46],
+    sulfate: [0.91, 0.88, 0.94],
+    pollution: [0.79, 0.69, 0.57],
+};
+
+const resolveAtmosphericComposition = ({
+    family,
+    atmosphere,
+    randomValues,
+    override,
+    aerosolTypeOverride,
+}: {
+    family: SkyFamily;
+    atmosphere: SkyAtmosphere;
+    randomValues: number[];
+    override?: Partial<SkyCompositionControls>;
+    aerosolTypeOverride?: SkyAerosolType;
+}): ResolvedAtmosphericComposition => {
+    const optics = family.optics;
+    const aerosolType = aerosolTypeOverride ?? optics.aerosolType ?? "clean";
+    const styleBias = {
+        crystal: { aerosol: -0.06, humidity: -0.08, inversion: -0.08 },
+        cirrus: { aerosol: -0.01, humidity: 0.02, inversion: -0.02 },
+        haze: { aerosol: 0.12, humidity: 0.04, inversion: 0.13 },
+        mist: { aerosol: 0.04, humidity: 0.1, inversion: 0.08 },
+        soft: { aerosol: 0.05, humidity: 0.08, inversion: 0.05 },
+    }[atmosphere];
+    const observerAltitude = clamp(
+        override?.observerAltitude ??
+            (optics.observerAltitude ?? 0.08) + (randomValues[2] - 0.5) * 0.08,
+    );
+    const aerosol = clamp(
+        override?.aerosol ??
+            (optics.aerosol +
+                styleBias.aerosol +
+                (randomValues[25] - 0.5) * 0.12) *
+                (1 - observerAltitude * 0.24),
+        0.015,
+        1,
+    );
+    const humidity = clamp(
+        override?.humidity ??
+            (optics.humidity +
+                styleBias.humidity +
+                (randomValues[26] - 0.5) * 0.1) *
+                (1 - observerAltitude * 0.14),
+    );
+
+    return {
+        aerosolType,
+        aerosolTint: AEROSOL_TINTS[aerosolType],
+        aerosol,
+        humidity,
+        aerosolSize: clamp(
+            override?.aerosolSize ??
+                (optics.aerosolSize ?? 0.3) + (randomValues[27] - 0.5) * 0.08,
+        ),
+        aerosolAbsorption: clamp(
+            override?.aerosolAbsorption ??
+                (optics.aerosolAbsorption ?? 0.04) +
+                    (randomValues[28] - 0.5) * 0.04,
+        ),
+        ozone: clamp(
+            override?.ozone ??
+                (optics.ozone ?? 1) + (randomValues[29] - 0.5) * 0.1,
+            0.65,
+            1.35,
+        ),
+        observerAltitude,
+        inversion: clamp(
+            override?.inversion ??
+                (optics.inversion ?? 0.08) +
+                    styleBias.inversion +
+                    (randomValues[24] - 0.5) * 0.1,
+        ),
+        stratosphericAerosol: clamp(
+            override?.stratosphericAerosol ??
+                (optics.stratosphericAerosol ?? 0.03) +
+                    (atmosphere === "cirrus" ? 0.025 : 0) +
+                    (randomValues[30] - 0.5) * 0.04,
+        ),
+        groundAlbedo: clamp(
+            override?.groundAlbedo ??
+                (optics.groundAlbedo ?? 0.24) +
+                    (randomValues[31] - 0.5) * 0.06,
+        ),
+    };
 };
 
 interface OklabColor {
@@ -377,6 +496,7 @@ const applyPhysicalAtmosphere = ({
     source,
     family,
     atmosphere,
+    composition,
     solarAltitude,
     moonAltitude,
     moonFraction,
@@ -386,6 +506,7 @@ const applyPhysicalAtmosphere = ({
     source: SkyPalette;
     family: SkyFamily;
     atmosphere: SkyAtmosphere;
+    composition: ResolvedAtmosphericComposition;
     solarAltitude: number;
     moonAltitude: number;
     moonFraction: number;
@@ -407,14 +528,14 @@ const applyPhysicalAtmosphere = ({
     const dailyExposure = (randomValues[28] - 0.5) * 0.038;
     const naturalAirglow =
         (0.008 + randomValues[30] ** 2 * 0.026) *
-        (1 - optics.aerosol * 0.48);
+        (1 - composition.aerosol * 0.48);
     const groundGlow =
         optics.artificialGlow *
         (0.52 + randomValues[31] * 0.78) *
         (1 + cloudy * 0.7);
-    const humidityLift = optics.humidity * 0.018;
-    const moonZenithLift = moonlight * (0.055 + optics.aerosol * 0.026);
-    const moonHorizonLift = moonlight * (0.068 + optics.humidity * 0.045);
+    const humidityLift = composition.humidity * 0.018;
+    const moonZenithLift = moonlight * (0.055 + composition.aerosol * 0.026);
+    const moonHorizonLift = moonlight * (0.068 + composition.humidity * 0.045);
     const floor = clamp(
         optics.nightFloor + dailyExposure + naturalAirglow + moonZenithLift,
         0.045,
@@ -435,12 +556,12 @@ const applyPhysicalAtmosphere = ({
     const cloudLight =
         middle -
         0.018 * (1 - moonlight) +
-        moonlight * (0.085 + optics.humidity * 0.035) +
+        moonlight * (0.085 + composition.humidity * 0.035) +
         groundGlow * 0.72;
     const warmCloudLight =
         cloudLight + moonlight * 0.02 + groundGlow * 0.38;
     const chromaScale = clamp(
-        0.58 + (1 - optics.humidity) * 0.2 + moonlight * 0.08,
+        0.58 + (1 - composition.humidity) * 0.2 + moonlight * 0.08,
         0.5,
         0.82,
     );
@@ -603,6 +724,12 @@ const FAMILY_SOLAR_CONSTRAINT: Record<
     "violet-nocturne": { daylight: 0.76, twilight: 0.56 },
     "sage-haze": { daylight: 0.76, twilight: 0.58 },
     "cobalt-gold": { daylight: 0.28, twilight: 0.42 },
+    "post-storm-cerulean": { daylight: 0.34, twilight: 0.34 },
+    "coastal-silver": { daylight: 0.68, twilight: 0.58 },
+    "saharan-veil": { daylight: 0.64, twilight: 0.48 },
+    "volcanic-amethyst": { daylight: 0.64, twilight: 0.52 },
+    "urban-amber-inversion": { daylight: 0.78, twilight: 0.66 },
+    "monsoon-pewter": { daylight: 0.8, twilight: 0.72 },
 };
 
 const capColorChroma = (source: string, maximum: number) => {
@@ -621,12 +748,14 @@ const constrainSolarPalette = ({
     source,
     family,
     atmosphere,
+    composition,
     solarAltitude,
     randomValues,
 }: {
     source: SkyPalette;
     family: SkyFamily;
     atmosphere: SkyAtmosphere;
+    composition: ResolvedAtmosphericComposition;
     solarAltitude: number;
     randomValues: number[];
 }) => {
@@ -638,8 +767,8 @@ const constrainSolarPalette = ({
         soft: 0.42,
     }[atmosphere];
     const moistureVeil = clamp(
-        family.optics.humidity * 0.58 +
-            family.optics.aerosol * 0.26 +
+        composition.humidity * 0.58 +
+            composition.aerosol * 0.26 +
             styleVeil,
         0,
         1,
@@ -669,7 +798,10 @@ const constrainSolarPalette = ({
     // Aerosol reddening belongs to the solar lobe. Humidity broadens and
     // whitens it; clean air preserves the narrower pink antisolar arch.
     const solarWarmth = clamp(
-        0.28 + family.optics.aerosol * 0.52 - family.optics.humidity * 0.16,
+        0.28 +
+            composition.aerosol * 0.52 +
+            composition.aerosolAbsorption * 0.16 -
+            composition.humidity * 0.16,
         0.18,
         0.76,
     );
@@ -679,7 +811,7 @@ const constrainSolarPalette = ({
         haze: mixColor(
             "#b5a9b7",
             "#c98291",
-            (1 - family.optics.humidity) * 0.56,
+            (1 - composition.humidity) * 0.56,
         ),
     };
 
@@ -1138,7 +1270,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const motionStyle =
         preview?.motionStyle ??
         motionStyles[Math.floor(daily.randomValues[6] * motionStyles.length)];
-    const useSun = daylight > 0.05 || moonAltitude < -5;
+    const useSun = visualDaylight > 0.05 || moonAltitude < -5;
     const celestial = useSun ? sun : moon;
     const celestialAltitude = useSun ? altitude : moonAltitude;
     const edgeOpacityByAtmosphere: Record<SkyAtmosphere, [number, number]> = {
@@ -1151,10 +1283,18 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const [edgeLow, edgeHigh] = edgeOpacityByAtmosphere[atmosphereStyle];
     const intensity = daily.family.intensity;
     const cloudDensity = preview?.cloudDensity ?? 1;
+    const composition = resolveAtmosphericComposition({
+        family: daily.family,
+        atmosphere: atmosphereStyle,
+        randomValues: daily.randomValues,
+        override: preview?.composition,
+        aerosolTypeOverride: preview?.aerosolType,
+    });
     const solarPalette = constrainSolarPalette({
         source: rawPalette,
         family: daily.family,
         atmosphere: atmosphereStyle,
+        composition,
         solarAltitude: visualSolarAltitude,
         randomValues: daily.randomValues,
     });
@@ -1162,6 +1302,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         source: solarPalette,
         family: daily.family,
         atmosphere: atmosphereStyle,
+        composition,
         solarAltitude: visualSolarAltitude,
         moonAltitude,
         moonFraction: moonIllumination.fraction,
@@ -1178,9 +1319,13 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
                 ));
     const motionSpeed = preview?.motionSpeed ?? 1;
     const motionAmount = preview?.motionAmount ?? 1;
-    const sunX = clamp(50 + Math.sin(celestial.azimuth) * 47, 2, 98);
-    const sunY = clamp(78 - Math.sin(celestial.altitude) * 69, 8, 84);
-    const horizonGlow = clamp((18 - Math.abs(altitude)) / 18);
+    const sunX = clamp(50 + Math.sin(sun.azimuth) * 47, 2, 98);
+    const sunY = clamp(
+        78 - Math.sin((visualSolarAltitude * Math.PI) / 180) * 69,
+        8,
+        84,
+    );
+    const horizonGlow = clamp((18 - Math.abs(visualSolarAltitude)) / 18);
     const bloomStyle =
         preview?.bloomStyle ?? chooseBloomStyle(daily.randomValues[17]);
     const bloomScale =
@@ -1228,15 +1373,15 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         0,
         1,
     );
-    const celestialScene = calculateCelestialScene({
+    const astronomicalScene = calculateCelestialScene({
         date,
         latitude,
         longitude,
         haze: clamp(
             intensity.haze *
                 (0.64 +
-                    daily.family.optics.aerosol * 0.42 +
-                    daily.family.optics.humidity * 0.14),
+                    composition.aerosol * 0.42 +
+                    composition.humidity * 0.14),
             0.42,
             1.7,
         ),
@@ -1245,6 +1390,14 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         starVisibility: preview?.starVisibility,
         moonVisibility: preview?.moonVisibility,
     });
+    const celestialScene: CelestialScene = preview?.phase
+        ? {
+              ...astronomicalScene,
+              starsOpacity:
+                  astronomicalScene.starsOpacity *
+                  physicalAtmosphere.darkness,
+          }
+        : astronomicalScene;
     const shaderSunY = clamp(
         0.78 - Math.sin((visualSolarAltitude * Math.PI) / 180) * 0.69,
         0.03,
@@ -1270,8 +1423,16 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
             moonlight: celestialScene.moon.scatteringRadiance,
             moonTransmittance: celestialScene.moon.transmittance,
             moonLightColor: celestialScene.moon.lightColor,
-            aerosol: daily.family.optics.aerosol,
-            humidity: daily.family.optics.humidity,
+            aerosol: composition.aerosol,
+            humidity: composition.humidity,
+            aerosolSize: composition.aerosolSize,
+            aerosolAbsorption: composition.aerosolAbsorption,
+            ozone: composition.ozone,
+            observerAltitude: composition.observerAltitude,
+            inversion: composition.inversion,
+            stratosphericAerosol: composition.stratosphericAerosol,
+            groundAlbedo: composition.groundAlbedo,
+            aerosolTint: composition.aerosolTint,
             cloudiness: atmosphericCloudiness,
             edgeStrength: clamp(intensity.edge * 0.82, 0.45, 1.35),
             horizonStrength: clamp(intensity.haze * 0.88, 0.5, 1.45),
@@ -1314,6 +1475,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         cloudHeight: 8 + daily.randomValues[2] * 24,
         nightDepth: physicalAtmosphere.darkness,
         lightingRegime: physicalAtmosphere.regime,
+        composition,
         motionDirection:
             daily.randomValues[7] > 0.5 ? "alternate" : "alternate-reverse",
         baseDuration: (26 + daily.randomValues[8] * 20) / motionSpeed,
@@ -1334,7 +1496,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         saturationLow:
             intensity.saturation *
             0.96 *
-            (1 - daily.family.optics.humidity * visualDaylight * 0.08) *
+            (1 - composition.humidity * visualDaylight * 0.08) *
             (1 - physicalAtmosphere.darkness * 0.3) *
             between(
                 1,
@@ -1448,6 +1610,11 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
                         : 0,
                 lightingRegime: next.lightingRegime,
                 darkness: next.nightDepth,
+                aerosolType: next.composition.aerosolType,
+                aerosol: next.composition.aerosol,
+                humidity: next.composition.humidity,
+                inversion: next.composition.inversion,
+                stratosphericAerosol: next.composition.stratosphericAerosol,
             });
             document
                 .getElementById("theme-color")

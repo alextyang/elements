@@ -143,6 +143,27 @@ from becoming the color of molecular or aerosol illumination everywhere, while
 preserving the intended day-to-day diversity at the source-facing horizon,
 antisolar edge, cloud deck, and humidity veil.
 
+Atmospheric composition is resolved into independent, daily seeded dimensions:
+aerosol optical depth, aerosol species, particle size, absorption, humidity,
+ozone column, observer altitude, boundary-layer inversion, stratospheric
+aerosol, and ground albedo. The atmosphere style then applies a small coupled
+weather bias rather than replacing those values. Altitude reduces effective
+airmass and boundary aerosol; humidity increases particle scattering while
+compressing chroma; particle size changes forward-scattering anisotropy;
+absorption changes low-Sun transmission; ozone changes twilight blue/violet;
+and ground albedo only returns energy into the lowest multiple-scattering layer.
+The unlisted laboratory exposes every dimension independently, while production
+uses family-constrained combinations.
+
+The two-dimensional radiance field now includes a subtle Rayleigh phase
+minimum, a solar-depression-driven Earth shadow, a bounded Belt of Venus,
+finite-height irregular inversion layers, elevated volcanic afterglow, and
+separate green and red airglow layers. Thin cloud optical depth is evaluated in
+the static atmospheric pass so it can extinguish and re-scatter sky radiance;
+the moving CSS cloud layers remain responsible only for slow temporal change.
+This preserves integration without adding a continuously animated full-screen
+shader.
+
 Deep night is composed after the display palette is selected. Zenith and
 horizon luminance settle nonlinearly from nautical through astronomical
 twilight; chroma compresses for mesopic vision; haze lifts and desaturates the
@@ -169,6 +190,12 @@ Every daily family has a real-world anchor:
 | Violet Nocturne | exceptionally clear blue hour and moonless high sky | violet is strongly desaturated in deep night |
 | Sage Haze | humid haze or marine stratus | sage is a low-chroma veil, never a saturated night fill |
 | Cobalt Gold | very clear dry air with strong low-sun contrast | cobalt/gold opposition is enhanced at the edges |
+| Post-storm Cerulean | aerosol-scavenged air with residual humidity and retreating cloud | washed clarity is held slightly longer |
+| Coastal Silver | coarse sea-salt aerosol in a bright humid maritime boundary layer | silver glare remains readable without cyan saturation |
+| Saharan Veil | transported coarse mineral dust over otherwise dry air | ochre forward scattering is selectively enriched |
+| Volcanic Amethyst | fine, weakly absorbing stratospheric sulfate after an eruption | rare elevated purple-orange afterglow is gently emphasized |
+| Urban Amber Inversion | absorbing fine pollution trapped below a temperature inversion | low amber skyglow remains localized to the boundary layer |
+| Monsoon Pewter | saturated tropical air beneath a deep stratiform cloud deck | muted pewter separation avoids a featureless flat gray |
 
 The CIE General Sky supplies the clear-to-overcast daylight distribution
 constraint. Perez is used as a daylight reference only, since it does not model
@@ -185,12 +212,18 @@ Primary technical references:
   [Precomputed Atmospheric Scattering](https://ebruneton.github.io/precomputed_atmospheric_scattering/)
 - Sébastien Hillaire,
   [A Scalable and Production Ready Sky and Atmosphere Rendering Technique](https://sebh.github.io/publications/egsr2020.pdf)
+- Simon Schneegans et al.,
+  [Physically Based Real-Time Rendering of Atmospheres using Mie Theory](https://diglib.eg.org/items/1fb6b85a-b3f8-4817-975f-f65634020f03)
 - Alexander Wilkie et al.,
   [A Fitted Radiance and Attenuation Model for Realistic Atmospheres](https://cgg.mff.cuni.cz/publications/skymodel-2021/)
 - Sergey Kocifaj et al.,
   [The influence of tropospheric haze on twilight sky color](https://opg.optica.org/ao/abstract.cfm?URI=AO-56-19-G179)
 - Sergey Kocifaj et al.,
   [The role of ozone and aerosols in the colouration of the twilight sky](https://acp.copernicus.org/articles/23/14829/2023/)
+- NASA Earth Observatory,
+  [Aerosols: Tiny Particles, Big Impact](https://science.nasa.gov/earth/earth-observatory/aerosols/)
+- NOAA Global Monitoring Laboratory,
+  [Aerosol hygroscopic growth measurements](https://gml.noaa.gov/aero/instrumentation/humid.html)
 - Hartmut Winkler,
   [A revised simplified scattering model for the moonlit sky brightness profile](https://academic.oup.com/mnras/article/514/1/208/6589414)
 - Amy Jones et al.,
