@@ -181,6 +181,10 @@ export interface MoonScene {
     transmittance: [number, number, number];
     irradiance: number;
     altitude: number;
+    psfSigma: number;
+    psfWing: number;
+    psfStretch: number;
+    dispersion: number;
     exposure: number;
     photoUrl?: string;
     fraction: number;
@@ -203,6 +207,7 @@ interface CelestialInput {
     longitude: number;
     haze: number;
     cloudDensity: number;
+    atmosphericVeil: number;
     starVisibility?: number;
     moonVisibility?: number;
 }
@@ -213,6 +218,7 @@ export const calculateCelestialScene = ({
     longitude,
     haze,
     cloudDensity,
+    atmosphericVeil,
     starVisibility = 1,
     moonVisibility = 1,
 }: CelestialInput): CelestialScene => {
@@ -373,6 +379,37 @@ export const calculateCelestialScene = ({
         0,
         1.24,
     );
+    const seeingPath = clamp((moonAirmass - 1) / 7.5);
+    // Delivered lunar image quality is a convolution of turbulence, the
+    // optical system, and scattered aerosol/cloud light. Values are CSS-pixel
+    // sigmas; the canvas converts them to angular lunar-radius units so the PSF
+    // remains stable across DPR and viewport sizes.
+    const psfSigma = clamp(
+        0.24 +
+            seeingPath ** 0.68 * 0.58 +
+            atmosphericVeil * 0.62 +
+            Math.max(0, haze - 0.72) * 0.18,
+        0.24,
+        1.48,
+    );
+    const psfWing = clamp(
+        0.055 +
+            seeingPath * 0.075 +
+            atmosphericVeil * 0.17 +
+            Math.max(0, haze - 0.8) * 0.045,
+        0.045,
+        0.3,
+    );
+    const psfStretch = 1 + seeingPath * 0.16 + atmosphericVeil * 0.045;
+    // Broadband differential refraction is minute except close to the
+    // horizon. Keeping it subpixel avoids a decorative RGB fringe while still
+    // reproducing the slight zenith-directed chromatic softness of real
+    // low-altitude lunar photographs.
+    const dispersion = clamp(
+        seeingPath ** 1.55 * (0.035 + lowAltitudeWarmth * 0.22),
+        0,
+        0.24,
+    );
 
     return {
         stars,
@@ -415,6 +452,10 @@ export const calculateCelestialScene = ({
             transmittance,
             irradiance: apparentIrradiance,
             altitude: moonAltitude,
+            psfSigma,
+            psfWing,
+            psfStretch,
+            dispersion,
             exposure: 1.34 + darkness * 0.62,
             photoUrl: nasaMoonFrameUrl(date),
             fraction: illumination.fraction,

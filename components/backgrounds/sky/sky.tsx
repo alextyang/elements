@@ -973,6 +973,14 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const sideColor = daily.randomValues[30] > 0.5
         ? palette.left
         : palette.right;
+    const atmosphericCloudiness = clamp(
+        cloudDensity *
+            ({ crystal: 0.08, cirrus: 0.26, haze: 0.38, mist: 0.55, soft: 0.68 }[
+                atmosphereStyle
+            ]),
+        0,
+        1,
+    );
     const celestialScene = calculateCelestialScene({
         date,
         latitude,
@@ -986,6 +994,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
             1.7,
         ),
         cloudDensity,
+        atmosphericVeil: atmosphericCloudiness,
         starVisibility: preview?.starVisibility,
         moonVisibility: preview?.moonVisibility,
     });
@@ -1004,15 +1013,6 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         0.03,
         1.12,
     );
-    const atmosphericCloudiness = clamp(
-        cloudDensity *
-            ({ crystal: 0.08, cirrus: 0.26, haze: 0.38, mist: 0.55, soft: 0.68 }[
-                atmosphereStyle
-            ]),
-        0,
-        1,
-    );
-
     return {
         palette,
         radiance: {

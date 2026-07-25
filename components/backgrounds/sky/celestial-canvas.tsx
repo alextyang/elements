@@ -120,6 +120,11 @@ uniform float u_opacity;
 uniform float u_halo_opacity;
 uniform float u_earthshine;
 uniform float u_exposure;
+uniform float u_psf_sigma;
+uniform float u_psf_wing;
+uniform float u_psf_stretch;
+uniform float u_dispersion;
+uniform float u_disc_pixel;
 uniform vec3 u_light_tint;
 uniform vec3 u_shadow_tint;
 uniform vec3 u_transmittance;
@@ -145,56 +150,29 @@ vec3 tone_map(vec3 color) {
     );
 }
 
-void main() {
-    // Work in screen coordinates: +x right, +y down. The apparent bright-limb
-    // angle therefore remains identical to the astronomical projection.
-    vec2 screen_point = vec2(v_disc.x, -v_disc.y);
-    float radial = length(screen_point);
-    if (radial > 8.0) discard;
+struct LunarSample {
+    vec3 radiance;
+    float coverage;
+};
 
-    if (radial > 1.0) {
-        // This pass contains only the compact optical PSF: diffraction/seeing
-        // close to the limb and the eye/display glare tail. Kilometre-scale
-        // aerosol scattering lives in the atmosphere shader, so there is no
-        // arbitrary second circular halo. The centroid follows the bright
-        // crescent instead of the geometrical centre of the dark hemisphere.
-        vec2 bright_limb = vec2(cos(u_light_angle), sin(u_light_angle));
-        vec2 glare_point = screen_point - bright_limb * (1.0 - u_fraction) * 0.24;
-        float angle = atan(glare_point.y, glare_point.x);
-        float anisotropic_radius = length(vec2(glare_point.x * 0.955, glare_point.y * 1.045));
-        float irregularity = 0.018 * sin(angle * 3.0 + 0.8) +
-            0.011 * sin(angle * 7.0 - 1.4);
-        float separation = max(0.0, anisotropic_radius - 1.0 + irregularity);
-        float near_psf = exp(-separation * 2.72) * 0.39;
-        float ocular_glare = 0.046 / (0.24 + separation * separation * 1.16);
-        float diffuse_tail = exp(-separation * 0.44) * 0.009;
-        float angular_variation = 0.96 + 0.04 * cos(angle * 2.0 + 0.7);
-        float quad_fade = 1.0 - smoothstep(6.2, 7.8, radial);
-        float halo = u_halo_opacity *
-            (near_psf + ocular_glare + diffuse_tail) *
-            angular_variation *
-            quad_fade;
-        vec3 halo_color = mix(u_light_tint, vec3(0.78, 0.84, 0.96), 0.045);
-        out_color = vec4(halo_color, halo * u_opacity);
-        return;
+LunarSample sample_lunar_radiance(vec2 requested_point) {
+    float requested_radius = length(requested_point);
+    float coverage = 1.0 - smoothstep(
+        1.0 - u_disc_pixel,
+        1.0 + u_disc_pixel,
+        requested_radius
+    );
+    if (coverage <= 0.0001) return LunarSample(vec3(0.0), 0.0);
+
+    vec2 screen_point = requested_point;
+    if (requested_radius > 0.9997) {
+        screen_point *= 0.9997 / requested_radius;
     }
-
+    float radial = length(screen_point);
     float z = sqrt(max(0.0, 1.0 - radial * radial));
     vec3 surface_normal = normalize(vec3(screen_point, z));
-
     vec2 texture_point = rotate2d(screen_point, u_texture_angle);
     vec3 texture_normal = normalize(vec3(texture_point, z));
-    vec2 uv = vec2(
-        0.5 + atan(texture_normal.x, texture_normal.z) / (2.0 * PI),
-        0.5 - asin(clamp(texture_normal.y, -1.0, 1.0)) / PI
-    );
-
-    vec3 albedo = texture(u_albedo, uv).rgb;
-    float height_left = texture(u_elevation, uv - vec2(u_texel.x, 0.0)).r;
-    float height_right = texture(u_elevation, uv + vec2(u_texel.x, 0.0)).r;
-    float height_down = texture(u_elevation, uv - vec2(0.0, u_texel.y)).r;
-    float height_up = texture(u_elevation, uv + vec2(0.0, u_texel.y)).r;
-    vec2 relief = vec2(height_left - height_right, height_down - height_up);
 
     float phase_depth = u_fraction * 2.0 - 1.0;
     float transverse = sqrt(max(0.0, 1.0 - phase_depth * phase_depth));
@@ -203,60 +181,176 @@ void main() {
         sin(u_light_angle) * transverse,
         phase_depth
     ));
-    vec3 relief_normal = normalize(surface_normal + vec3(relief * 1.8, 0.0));
-    float incidence = dot(relief_normal, light_direction);
-    float lit_mask = smoothstep(-0.014, 0.022, incidence);
-    float positive_incidence = max(incidence, 0.0);
+    float incidence = dot(surface_normal, light_direction);
+    vec3 surface;
 
-    // A restrained Lommel-Seeliger/Lambert blend reproduces the Moon's dusty,
-    // retroreflective surface better than ordinary sphere shading.
-    float lommel_seeliger = (2.0 * positive_incidence) /
-        max(0.12, positive_incidence + max(surface_normal.z, 0.0));
-    float reflectance = clamp(
-        lommel_seeliger * 0.72 + positive_incidence * 0.28,
-        0.0,
-        1.22
-    );
-    vec3 contrast_albedo = clamp((albedo - vec3(0.5)) * 1.34 + vec3(0.5), 0.0, 1.0);
-    vec3 lunar_albedo = pow(max(contrast_albedo, vec3(0.012)), vec3(0.96));
-    vec3 lit_surface = lunar_albedo * u_light_tint * (0.4 + reflectance * 0.84);
-    vec3 dark_surface = lunar_albedo * u_shadow_tint *
-        (0.0012 + u_earthshine * (0.24 + surface_normal.z * 0.18));
-    vec3 procedural_surface = mix(dark_surface, lit_surface, lit_mask);
+    if (u_use_photo > 0.5) {
+        // NASA's hourly LRO/LOLA render supplies the real phase, libration,
+        // terrain shadows, and subsolar geometry. Its square frame includes a
+        // black border, so sample only the measured lunar disc.
+        const float PHOTO_DISC_RADIUS = 0.432;
+        vec2 photo_uv = vec2(
+            0.5 + texture_point.x * PHOTO_DISC_RADIUS,
+            0.5 - texture_point.y * PHOTO_DISC_RADIUS
+        );
+        vec3 photo_srgb = texture(u_photo, photo_uv).rgb;
+        vec3 photo_linear = pow(
+            max((photo_srgb - vec3(0.006)) / 0.994, vec3(0.0)),
+            vec3(2.08)
+        );
+        surface = photo_linear * u_light_tint;
+        float shadow_gate = 1.0 - smoothstep(-0.018, 0.035, incidence);
+        surface += mix(u_shadow_tint, u_light_tint, 0.24) *
+            u_earthshine * shadow_gate * 0.16;
+    } else {
+        vec2 uv = vec2(
+            0.5 + atan(texture_normal.x, texture_normal.z) / (2.0 * PI),
+            0.5 - asin(clamp(texture_normal.y, -1.0, 1.0)) / PI
+        );
+        vec3 albedo = texture(u_albedo, uv).rgb;
+        float height_left = texture(u_elevation, uv - vec2(u_texel.x, 0.0)).r;
+        float height_right = texture(u_elevation, uv + vec2(u_texel.x, 0.0)).r;
+        float height_down = texture(u_elevation, uv - vec2(0.0, u_texel.y)).r;
+        float height_up = texture(u_elevation, uv + vec2(0.0, u_texel.y)).r;
+        vec2 relief = vec2(height_left - height_right, height_down - height_up);
+        vec3 relief_normal = normalize(surface_normal + vec3(relief * 1.8, 0.0));
+        incidence = dot(relief_normal, light_direction);
+        float positive_incidence = max(incidence, 0.0);
+        float lommel_seeliger = (2.0 * positive_incidence) /
+            max(0.12, positive_incidence + max(surface_normal.z, 0.0));
+        float reflectance = clamp(
+            lommel_seeliger * 0.72 + positive_incidence * 0.28,
+            0.0,
+            1.22
+        );
+        vec3 contrast_albedo = clamp(
+            (albedo - vec3(0.5)) * 1.34 + vec3(0.5),
+            0.0,
+            1.0
+        );
+        vec3 lunar_albedo = pow(max(contrast_albedo, vec3(0.012)), vec3(0.96));
+        vec3 lit_surface = lunar_albedo * u_light_tint *
+            (0.4 + reflectance * 0.84);
+        vec3 dark_surface = lunar_albedo * u_shadow_tint *
+            (0.0012 + u_earthshine * (0.24 + surface_normal.z * 0.18));
+        surface = mix(
+            dark_surface,
+            lit_surface,
+            smoothstep(-0.014, 0.022, incidence)
+        );
+    }
 
-    // NASA's hourly LRO/LOLA render supplies real terrain shadows and
-    // libration. Earthshine is added below only when phase and sky contrast
-    // make it physically observable.
-    // NASA's square Dial-A-Moon frames include a roughly 7% black border.
-    // Sampling the whole image as the disc created a dark annulus and a false
-    // outer radius. Crop the texture coordinates to the actual lunar limb.
-    const float PHOTO_DISC_RADIUS = 0.432;
-    vec2 photo_uv = vec2(
-        0.5 + texture_point.x * PHOTO_DISC_RADIUS,
-        0.5 - texture_point.y * PHOTO_DISC_RADIUS
-    );
-    vec3 photo_srgb = texture(u_photo, photo_uv).rgb;
-    // Remove the compressed JPEG black floor before inverse transfer. Without
-    // this, exposure turns the nominally unlit hemisphere into a gray plate.
-    vec3 photo_linear = pow(
-        max((photo_srgb - vec3(0.006)) / 0.994, vec3(0.0)),
-        vec3(2.08)
-    );
-    vec3 photographed_surface = photo_linear * u_light_tint;
-    float lunar_disc = 1.0 - smoothstep(0.94, 1.0, radial);
-    float shadow_gate = 1.0 - smoothstep(-0.018, 0.035, incidence);
-    vec3 earthshine = mix(u_shadow_tint, u_light_tint, 0.24) *
-        u_earthshine * shadow_gate * lunar_disc * 0.16;
-    photographed_surface += earthshine;
-    vec3 surface = mix(procedural_surface, photographed_surface, u_use_photo);
-    surface = tone_map(surface * u_transmittance * u_exposure);
-
-    float limb_width = max(fwidth(radial) * 1.15, 0.006);
-    float limb = 1.0 - smoothstep(1.0 - limb_width, 1.0, radial);
     float opposition_bloom = pow(smoothstep(0.985, 1.0, u_fraction), 2.0) *
         pow(max(surface_normal.z, 0.0), 5.0) * 0.055;
     surface += u_light_tint * opposition_bloom;
-    out_color = vec4(surface, limb * u_opacity);
+    return LunarSample(
+        surface * u_transmittance * u_exposure * coverage,
+        coverage
+    );
+}
+
+LunarSample convolve_lunar(vec2 point) {
+    // A compact Moffat-like kernel: the central nine taps carry the
+    // turbulence/optical core and four wider taps carry the measured power-law
+    // seeing/scatter wing. All accumulation remains in scene-linear radiance.
+    vec2 sigma = vec2(u_psf_sigma, u_psf_sigma * u_psf_stretch);
+    LunarSample center = sample_lunar_radiance(point);
+    vec3 core_radiance = center.radiance * 0.28;
+    float core_coverage = center.coverage * 0.28;
+
+    LunarSample c0 = sample_lunar_radiance(point + vec2(sigma.x * 0.86, 0.0));
+    LunarSample c1 = sample_lunar_radiance(point - vec2(sigma.x * 0.86, 0.0));
+    LunarSample c2 = sample_lunar_radiance(point + vec2(0.0, sigma.y * 0.86));
+    LunarSample c3 = sample_lunar_radiance(point - vec2(0.0, sigma.y * 0.86));
+    core_radiance += (c0.radiance + c1.radiance + c2.radiance + c3.radiance) * 0.115;
+    core_coverage += (c0.coverage + c1.coverage + c2.coverage + c3.coverage) * 0.115;
+
+    vec2 diagonal = sigma * 0.78;
+    LunarSample d0 = sample_lunar_radiance(point + diagonal);
+    LunarSample d1 = sample_lunar_radiance(point + vec2(diagonal.x, -diagonal.y));
+    LunarSample d2 = sample_lunar_radiance(point + vec2(-diagonal.x, diagonal.y));
+    LunarSample d3 = sample_lunar_radiance(point - diagonal);
+    core_radiance += (d0.radiance + d1.radiance + d2.radiance + d3.radiance) * 0.065;
+    core_coverage += (d0.coverage + d1.coverage + d2.coverage + d3.coverage) * 0.065;
+
+    vec2 wing = sigma * vec2(2.35, 2.35);
+    LunarSample w0 = sample_lunar_radiance(point + vec2(wing.x, 0.0));
+    LunarSample w1 = sample_lunar_radiance(point - vec2(wing.x, 0.0));
+    LunarSample w2 = sample_lunar_radiance(point + vec2(0.0, wing.y));
+    LunarSample w3 = sample_lunar_radiance(point - vec2(0.0, wing.y));
+    vec3 wing_radiance = (w0.radiance + w1.radiance + w2.radiance + w3.radiance) * 0.25;
+    float wing_coverage = (w0.coverage + w1.coverage + w2.coverage + w3.coverage) * 0.25;
+
+    return LunarSample(
+        mix(core_radiance, wing_radiance, u_psf_wing),
+        mix(core_coverage, wing_coverage, u_psf_wing)
+    );
+}
+
+void main() {
+    // Work in screen coordinates: +x right, +y down. The PSF convolution is
+    // applied to the complete lunar radiance image before display tonemapping.
+    vec2 screen_point = vec2(v_disc.x, -v_disc.y);
+    float radial = length(screen_point);
+    if (radial > 8.0) discard;
+
+    LunarSample red_sample = LunarSample(vec3(0.0), 0.0);
+    LunarSample green_sample = LunarSample(vec3(0.0), 0.0);
+    LunarSample blue_sample = LunarSample(vec3(0.0), 0.0);
+    float blur_extent = 1.0 + u_psf_sigma * u_psf_stretch * 3.1 + u_disc_pixel * 1.5;
+    if (radial < blur_extent) {
+        // Differential refraction separates broadband channels toward the
+        // zenith only at high airmass. The displacement is deliberately
+        // subpixel and is convolved by the same atmospheric kernel.
+        vec2 chromatic_shift = vec2(0.0, u_dispersion);
+        red_sample = convolve_lunar(screen_point - chromatic_shift);
+        green_sample = convolve_lunar(screen_point);
+        blue_sample = convolve_lunar(screen_point + chromatic_shift);
+    }
+
+    float disc_coverage = clamp(
+        max(red_sample.coverage, max(green_sample.coverage, blue_sample.coverage)),
+        0.0,
+        1.0
+    );
+    vec3 blurred_radiance = vec3(
+        red_sample.radiance.r,
+        green_sample.radiance.g,
+        blue_sample.radiance.b
+    );
+    vec3 disc_color = tone_map(
+        blurred_radiance / max(disc_coverage, 0.0001)
+    );
+
+    // The remaining broad term is ocular/display glare. The atmospheric
+    // aureole is evaluated in the full-sky shader, while the direct lunar
+    // image—including its limb and terminator—has already received the PSF.
+    vec2 bright_limb = vec2(cos(u_light_angle), sin(u_light_angle));
+    vec2 glare_point = screen_point - bright_limb * (1.0 - u_fraction) * 0.24;
+    float angle = atan(glare_point.y, glare_point.x);
+    float anisotropic_radius = length(vec2(glare_point.x * 0.955, glare_point.y * 1.045));
+    float irregularity = 0.018 * sin(angle * 3.0 + 0.8) +
+        0.011 * sin(angle * 7.0 - 1.4);
+    float separation = max(0.0, anisotropic_radius - 1.0 + irregularity);
+    float near_glare = exp(-separation * 2.72) * 0.13;
+    float ocular_glare = 0.046 / (0.24 + separation * separation * 1.16);
+    float diffuse_tail = exp(-separation * 0.44) * 0.009;
+    float angular_variation = 0.96 + 0.04 * cos(angle * 2.0 + 0.7);
+    float halo_coverage = u_halo_opacity *
+        (near_glare + ocular_glare + diffuse_tail) *
+        angular_variation *
+        (1.0 - smoothstep(6.2, 7.8, radial));
+    halo_coverage *= 1.0 - disc_coverage;
+    vec3 halo_color = mix(u_light_tint, vec3(0.78, 0.84, 0.96), 0.045);
+
+    float combined_coverage = disc_coverage + halo_coverage;
+    if (combined_coverage <= 0.0001) discard;
+    vec3 combined_premultiplied =
+        disc_color * disc_coverage + halo_color * halo_coverage;
+    out_color = vec4(
+        combined_premultiplied / combined_coverage,
+        combined_coverage * u_opacity
+    );
 }`;
 
 // NASA Scientific Visualization Studio CGI Moon Kit: LROC WAC albedo and
@@ -593,6 +687,26 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                 gl.uniform1f(
                     uniform(moonProgram, "u_exposure"),
                     moon.exposure,
+                );
+                gl.uniform1f(
+                    uniform(moonProgram, "u_psf_sigma"),
+                    moon.psfSigma / radiusCss,
+                );
+                gl.uniform1f(
+                    uniform(moonProgram, "u_psf_wing"),
+                    moon.psfWing,
+                );
+                gl.uniform1f(
+                    uniform(moonProgram, "u_psf_stretch"),
+                    moon.psfStretch,
+                );
+                gl.uniform1f(
+                    uniform(moonProgram, "u_dispersion"),
+                    moon.dispersion / radiusCss,
+                );
+                gl.uniform1f(
+                    uniform(moonProgram, "u_disc_pixel"),
+                    1 / radius,
                 );
                 gl.uniform3fv(
                     uniform(moonProgram, "u_light_tint"),

@@ -42,6 +42,20 @@ gradient stamp. Low-altitude extinction warms both the direct Moon and its
 near-source aerosol scatter while wider molecular scatter remains relatively
 blue.
 
+The direct lunar image is also filtered as one scene-linear radiance source.
+NASA texture, terrain, terminator, limb, earthshine, and the opposition term
+all pass through the same atmosphere-dependent point-spread function before
+tone mapping and compositing. A compact Moffat-like core approximates the
+long-exposure turbulence/optical PSF; a separately weighted outer kernel adds
+the measured non-Gaussian seeing and aerosol wing. Airmass broadens and mildly
+stretches the kernel, cloud and aerosol optical depth transfer more energy into
+its wing, and only very low Moon altitudes introduce a subpixel
+zenith-directed broadband dispersion. Clear, high-altitude Moons therefore
+retain terrain detail, while humid and horizon Moons lose contrast across the
+whole disc and limb rather than acquiring an unrelated circular blur stamp.
+The much wider moonlit-sky aureole remains in the atmospheric pass because it
+is angular sky radiance, not image blur.
+
 The star field contains 8,874 real Hipparcos entries through Johnson V=6.5,
 generated reproducibly from CDS VizieR I/239. Apparent magnitude is modified by
 Kasten-Young airmass extinction and local lunar glare, then converted from its
@@ -169,3 +183,13 @@ Primary technical references:
   [The temporal power spectrum of scintillation](https://doi.org/10.1364/AO.8.000869)
 - ESA / DPAC,
   [Gaia DR3 photometry documentation](https://gea.esac.esa.int/archive/documentation/GDR3/)
+- Bo Xin et al.,
+  [Monitoring the Atmospheric Turbulence Profile with High Angular Resolution Stellar Images](https://arxiv.org/abs/1805.02845)
+- P. Martínez et al.,
+  [Atmospheric image blur with finite outer scale or partial adaptive correction](https://arxiv.org/abs/astro-ph/0109067)
+- Mohamed E. Hanafy et al.,
+  [Atmospheric scattering point-spread function: modeling and application in remote sensing](https://opg.optica.org/abstract.cfm?uri=josaa-31-6-1312)
+- C. Y. Hsu et al.,
+  [Measurement of atmospheric point spread function by imaging the Moon's edge](https://aas.aanda.org/articles/aas/pdf/1997/16/ds5557.pdf)
+- L. S. Samland,
+  [Impact of atmospheric dispersion on high-contrast imaging](https://arxiv.org/abs/2112.01284)
