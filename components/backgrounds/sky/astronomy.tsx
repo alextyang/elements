@@ -1,7 +1,5 @@
-import type { CSSProperties } from "react";
 import SunCalc from "suncalc";
 
-import styles from "./sky.module.css";
 import { HIPPARCOS_STARS } from "./star-catalog";
 
 const TAU = Math.PI * 2;
@@ -95,19 +93,6 @@ const phaseName = (phase: number) => {
     return "Waning crescent";
 };
 
-const illuminatedMoonPath = (fraction: number) => {
-    const radius = 46;
-    const terminator = fraction * 2 - 1;
-    const terminatorRadius = Math.max(0.08, Math.abs(terminator) * radius);
-    const terminatorSweep = terminator >= 0 ? 1 : 0;
-    return [
-        "M 50 4",
-        `A ${radius} ${radius} 0 0 1 50 96`,
-        `A ${terminatorRadius} ${radius} 0 0 ${terminatorSweep} 50 4`,
-        "Z",
-    ].join(" ");
-};
-
 export interface ProjectedStar {
     id: number;
     x: number;
@@ -116,7 +101,8 @@ export interface ProjectedStar {
     opacity: number;
     color: string;
     bright: boolean;
-    twinkle: "none" | "a" | "b" | "c";
+    scintillation: number;
+    phaseOffset: number;
 }
 
 export interface MoonScene {
@@ -128,6 +114,7 @@ export interface MoonScene {
     earthshineOpacity: number;
     scale: number;
     rotation: number;
+    textureRotation: number;
     fraction: number;
     phase: number;
     phaseName: string;
@@ -179,7 +166,10 @@ export const calculateCelestialScene = ({
         (clamp(starVisibility, 0, 2) - 1) * 0.8;
     const siderealTime = localSiderealTime(date, longitude);
     const latitudeRadians = latitude * DEG;
+    const moonPoint = projectHorizontal(moon.azimuth, moon.altitude);
     const stars = HIPPARCOS_STARS.flatMap<ProjectedStar>((star) => {
+        if (star.ra === 0 && star.dec === 0) return [];
+
         const horizontal = horizontalPosition(
             star.ra * DEG,
             star.dec * DEG,
@@ -197,7 +187,23 @@ export const calculateCelestialScene = ({
                       0.50572 * (altitudeDegrees + 6.07995) ** -1.6364);
         const extinction =
             0.15 * Math.max(0, airmass - 1) * (0.78 + haze * 0.28);
-        const apparentMagnitude = star.mag + extinction;
+        const separation = Math.acos(
+            clamp(
+                Math.sin(horizontal.altitude) * Math.sin(moon.altitude) +
+                    Math.cos(horizontal.altitude) *
+                        Math.cos(moon.altitude) *
+                        Math.cos(horizontal.azimuth - moon.azimuth),
+                -1,
+                1,
+            ),
+        );
+        const moonGlareExtinction =
+            moonAboveHorizon *
+            illumination.fraction ** 1.35 *
+            Math.exp(-(separation / DEG) / 11.5) *
+            2.15;
+        const apparentMagnitude =
+            star.mag + extinction + moonGlareExtinction;
         if (apparentMagnitude > limitingMagnitude + 0.18) return [];
 
         const projected = projectHorizontal(
@@ -212,27 +218,33 @@ export const calculateCelestialScene = ({
         );
         const radius = clamp(1.82 - (star.mag + 1.2) * 0.29, 0.52, 2.15);
         const bright = star.mag < 1.6;
-        const scintillation =
-            bright && altitudeDegrees < 48
-                ? (["a", "b", "c"] as const)[star.id % 3]
-                : "none";
+        const scintillation = bright
+            ? clamp(
+                  (airmass - 1) * 0.065 +
+                      clamp((34 - altitudeDegrees) / 34) * 0.08,
+                  0.015,
+                  0.24,
+              )
+            : 0;
 
-        return [{
-            id: star.id,
-            x: projected.x,
-            y: projected.y,
-            radius,
-            opacity: magnitudeBrightness * horizonFade,
-            color: colorForBv(
-                star.bv,
-                clamp((18 - altitudeDegrees) / 18),
-            ),
-            bright,
-            twinkle: scintillation,
-        }];
+        return [
+            {
+                id: star.id,
+                x: projected.x,
+                y: projected.y,
+                radius,
+                opacity: magnitudeBrightness * horizonFade,
+                color: colorForBv(
+                    star.bv,
+                    clamp((18 - altitudeDegrees) / 18),
+                ),
+                bright,
+                scintillation,
+                phaseOffset: (star.id * 0.61803398875) % 1,
+            },
+        ];
     });
 
-    const moonPoint = projectHorizontal(moon.azimuth, moon.altitude);
     const sunPoint = projectHorizontal(sun.azimuth, sun.altitude);
     let directionX = sunPoint.x - moonPoint.x;
     if (directionX > 50) directionX -= 100;
@@ -253,7 +265,11 @@ export const calculateCelestialScene = ({
 
     return {
         stars,
-        starsOpacity: clamp(night * clamp(starVisibility, 0, 2)),
+        starsOpacity: clamp(
+            night *
+                clamp(starVisibility, 0, 2) *
+                (1 - clamp(cloudDensity / 3) * 0.1),
+        ),
         limitingMagnitude,
         moon: {
             visible: moonAltitude > -1.5 && moonVisibility > 0,
@@ -266,13 +282,19 @@ export const calculateCelestialScene = ({
                 atmosphericClarity *
                 clamp(moonVisibility, 0, 2),
             haloOpacity:
-                (0.018 + illumination.fraction * 0.075) *
-                darkness *
-                moonHorizonFade,
+                clamp(
+                    (0.014 + illumination.fraction * 0.082) *
+                        darkness *
+                        moonHorizonFade *
+                        (0.72 + haze * 0.3 + clamp(cloudDensity / 3) * 0.22),
+                    0,
+                    0.16,
+                ),
             earthshineOpacity:
                 (0.025 + (1 - illumination.fraction) * 0.16) * darkness,
             scale: distanceScale * (1 + lowAltitudeWarmth * 0.045),
             rotation,
+            textureRotation: -(moon.parallacticAngle / DEG),
             fraction: illumination.fraction,
             phase: illumination.phase,
             phaseName: phaseName(illumination.phase),
@@ -294,115 +316,3 @@ const smoothHorizon = (altitude: number) => {
     const value = clamp((altitude + 0.75) / 8);
     return value * value * (3 - 2 * value);
 };
-
-interface CelestialLayerProps {
-    scene: CelestialScene;
-    paused?: boolean;
-}
-
-export function CelestialLayer({ scene, paused = false }: CelestialLayerProps) {
-    const moon = scene.moon;
-    const moonStyle = {
-        "--moon-x": `${moon.x}%`,
-        "--moon-y": `${moon.y}%`,
-        "--moon-opacity": moon.opacity,
-        "--moon-halo-opacity": moon.haloOpacity,
-        "--moon-scale": moon.scale,
-        "--moon-light": moon.lightColor,
-        "--moon-shadow": moon.shadowColor,
-    } as CSSProperties & Record<`--${string}`, string | number>;
-
-    return (
-        <>
-            <div
-                className={`${styles.stars} ${paused ? styles.celestialPaused : ""}`}
-                style={{ opacity: scene.starsOpacity }}
-                data-visible-stars={scene.stars.length}
-            >
-                <svg className={styles.starMap} aria-hidden="true">
-                    {scene.stars.map((star) => (
-                        <g
-                            key={star.id}
-                            className={
-                                star.twinkle === "none"
-                                    ? undefined
-                                    : styles[`starTwinkle${star.twinkle.toUpperCase()}`]
-                            }
-                            style={{ color: star.color, opacity: star.opacity }}
-                        >
-                            {star.bright && (
-                                <circle
-                                    className={styles.starAura}
-                                    cx={`${star.x}%`}
-                                    cy={`${star.y}%`}
-                                    r={star.radius * 2.8}
-                                />
-                            )}
-                            <circle
-                                className={styles.catalogStar}
-                                cx={`${star.x}%`}
-                                cy={`${star.y}%`}
-                                r={star.radius}
-                            />
-                        </g>
-                    ))}
-                </svg>
-            </div>
-
-            {moon.visible && (
-                <div
-                    className={`${styles.moon} ${paused ? styles.celestialPaused : ""}`}
-                    style={moonStyle}
-                    data-moon-phase={moon.phaseName}
-                >
-                    <svg viewBox="0 0 100 100" aria-hidden="true">
-                        <defs>
-                            <radialGradient id="moon-surface" cx="36%" cy="31%" r="72%">
-                                <stop offset="0%" stopColor="#fffef2" />
-                                <stop offset="54%" stopColor={moon.lightColor} />
-                                <stop offset="100%" stopColor="#b9ae9d" />
-                            </radialGradient>
-                            <clipPath id="moon-disc">
-                                <circle cx="50" cy="50" r="46" />
-                            </clipPath>
-                            <clipPath id="moon-illumination">
-                                <path
-                                    d={illuminatedMoonPath(moon.fraction)}
-                                    transform={`rotate(${moon.rotation} 50 50)`}
-                                />
-                            </clipPath>
-                        </defs>
-
-                        <circle
-                            cx="50"
-                            cy="50"
-                            r="46"
-                            fill={moon.shadowColor}
-                            opacity={moon.earthshineOpacity}
-                        />
-                        <g clipPath="url(#moon-illumination)">
-                            <circle cx="50" cy="50" r="46" fill="url(#moon-surface)" />
-                            <g className={styles.moonMaria} clipPath="url(#moon-disc)">
-                                <ellipse cx="35" cy="31" rx="11" ry="8" />
-                                <ellipse cx="61" cy="35" rx="9" ry="13" />
-                                <ellipse cx="48" cy="58" rx="13" ry="9" />
-                                <ellipse cx="70" cy="63" rx="8" ry="6" />
-                                <ellipse cx="29" cy="67" rx="6" ry="10" />
-                                <circle cx="63" cy="20" r="4" />
-                                <circle cx="43" cy="78" r="5" />
-                            </g>
-                            <g className={styles.moonCraters} clipPath="url(#moon-disc)">
-                                <circle cx="31" cy="44" r="3.2" />
-                                <circle cx="57" cy="72" r="2.6" />
-                                <circle cx="74" cy="46" r="2.1" />
-                                <circle cx="44" cy="22" r="1.8" />
-                                <circle cx="22" cy="58" r="1.5" />
-                            </g>
-                        </g>
-                        <circle className={styles.moonRim} cx="50" cy="50" r="45.5" />
-                    </svg>
-                </div>
-            )}
-        </>
-    );
-}

@@ -65,8 +65,7 @@
 .base,
 .edgeColor,
 .horizon,
-.stars,
-.moon,
+.celestialCanvas,
 .clouds,
 .mistLayer,
 .atmosphere,
@@ -176,106 +175,15 @@
     mix-blend-mode: screen;
 }
 
-.stars {
+.celestialCanvas {
     inset: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
-    mix-blend-mode: screen;
+    mix-blend-mode: normal;
     mask-image: linear-gradient(to bottom, black 0%, black 70%, transparent 82%);
-}
-
-.starMap {
-    position: absolute;
-    inset: 0;
     display: block;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-}
-
-.catalogStar,
-.starAura {
-    fill: currentColor;
-}
-
-.starAura {
-    opacity: 0.1;
-}
-
-.starTwinkleA,
-.starTwinkleB,
-.starTwinkleC {
-    transform-box: fill-box;
-    transform-origin: center;
-    will-change: transform;
-}
-
-.starTwinkleA {
-    animation: starScintillationA 5.3s ease-in-out infinite alternate;
-}
-
-.starTwinkleB {
-    animation: starScintillationB 6.7s ease-in-out infinite alternate-reverse;
-}
-
-.starTwinkleC {
-    animation: starScintillationC 4.4s ease-in-out infinite alternate;
-}
-
-.moon {
-    left: var(--moon-x);
-    top: var(--moon-y);
-    width: clamp(29px, 4.25vmin, 54px);
-    aspect-ratio: 1;
-    opacity: var(--moon-opacity);
-    transform: translate(-50%, -50%) scale(var(--moon-scale));
-    transform-origin: center;
-    mix-blend-mode: screen;
-}
-
-.moon::before {
-    content: "";
-    position: absolute;
-    inset: -145%;
-    border-radius: 50%;
-    opacity: var(--moon-halo-opacity);
-    background: radial-gradient(
-        circle,
-        color-mix(in srgb, var(--moon-light) 48%, transparent) 0%,
-        color-mix(in srgb, var(--moon-light) 13%, transparent) 26%,
-        transparent 70%
-    );
-}
-
-.moon svg {
-    position: relative;
-    display: block;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-}
-
-.moonMaria {
-    fill: #3e4653;
-    opacity: 0.125;
-    mix-blend-mode: multiply;
-}
-
-.moonCraters {
-    fill: none;
-    stroke: rgba(72, 70, 68, 0.2);
-    stroke-width: 0.62;
-    mix-blend-mode: multiply;
-}
-
-.moonRim {
-    fill: none;
-    stroke: rgba(255, 255, 255, 0.15);
-    stroke-width: 0.5;
-}
-
-.celestialPaused,
-.celestialPaused * {
-    animation-play-state: paused !important;
+    contain: strict;
 }
 
 .clouds {
@@ -753,36 +661,6 @@
     }
 }
 
-@keyframes starScintillationA {
-    from {
-        transform: scale(0.86);
-    }
-    to {
-        transform: scale(1.12);
-    }
-}
-
-@keyframes starScintillationB {
-    from {
-        transform: scale(0.92);
-    }
-    to {
-        transform: scale(1.17);
-    }
-}
-
-@keyframes starScintillationC {
-    0% {
-        transform: scale(0.88);
-    }
-    58% {
-        transform: scale(1.08);
-    }
-    100% {
-        transform: scale(0.97);
-    }
-}
-
 @keyframes grainDance {
     0% {
         transform: translate3d(-1%, -1%, 0);
@@ -804,7 +682,6 @@
 .paused .base,
 .paused .edgeColor,
 .paused .horizon,
-.paused .stars,
 .paused .cloudsHigh,
 .paused .cloudsLow,
 .paused .mistLayer,
@@ -818,15 +695,11 @@
     .base,
     .edgeColor,
     .horizon,
-    .stars,
     .cloudsHigh,
     .cloudsLow,
     .mistLayer,
     .atmosphere,
     .atmosphere::before,
-    .starTwinkleA,
-    .starTwinkleB,
-    .starTwinkleC,
     .grain {
         animation: none !important;
     }

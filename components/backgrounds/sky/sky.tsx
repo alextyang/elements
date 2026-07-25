@@ -5,9 +5,9 @@ import SunCalc from "suncalc";
 
 import {
     calculateCelestialScene,
-    CelestialLayer,
     type CelestialScene,
 } from "./astronomy";
+import { CelestialCanvas } from "./celestial-canvas";
 import styles from "./sky.module.css";
 import {
     PHASE_ORDER,
@@ -1007,7 +1007,7 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
             <div className={styles.base} />
             <div className={styles.edgeColor} />
             <div className={styles.horizon} />
-            {visual && <CelestialLayer scene={visual.celestial} paused={paused} />}
+            {visual && <CelestialCanvas scene={visual.celestial} paused={paused} />}
             <div className={`${styles.clouds} ${styles.cloudsHigh}`} />
             <div className={`${styles.clouds} ${styles.cloudsLow}`} />
             <div className={styles.mistLayer} />
