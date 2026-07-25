@@ -190,7 +190,6 @@
        radiance exactly neutral, so the lunar night side can never become a
        dark alpha stamp over the already-rendered atmosphere. */
     mix-blend-mode: screen;
-    mix-blend-mode: plus-lighter;
     mask-image: linear-gradient(to bottom, black 0%, black 70%, transparent 82%);
     display: block;
     contain: strict;

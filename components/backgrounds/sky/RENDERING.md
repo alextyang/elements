@@ -52,6 +52,13 @@ direct Moon coupled to a corresponding atmospheric response.
 The transparent celestial pass is composited as emitted radiance. A zero-light
 dark hemisphere is therefore neutral over the atmosphere rather than an opaque
 dark disc; visible earthshine only adds its measured, terrain-shaped signal.
+Measured earthshine surface brightness spans roughly +13.5 to +15.5 visual
+magnitudes per square arcsecond and varies strongly with phase and terrestrial
+weather. The display mapping therefore treats it as a separate secondary
+exposure: it reaches a subdued maximum below a ten-percent crescent, falls to
+zero by twenty percent illumination, and never supplies a generic dark-side
+fill. The star and Moon draws use separate WebGL vertex-array objects so the
+lunar quad cannot inherit catalogue-star attribute state.
 
 The direct lunar image is also filtered as one scene-linear radiance source.
 NASA texture, terrain, terminator, limb, earthshine, and the opposition term
@@ -72,7 +79,11 @@ make it visible. Its level is compensated for the photographic tone curve's
 dark toe, but still falls rapidly with illuminated fraction, sky brightness,
 airmass, and lost atmospheric clarity.
 The much wider moonlit-sky aureole remains in the atmospheric pass because it
-is angular sky radiance, not image blur.
+is angular sky radiance, not image blur. Its aerosol phase functions are
+normalised at the source direction before their energy is scaled. Particle size
+can consequently narrow or broaden the aureole without multiplying its peak
+radiance, while correlated cloud optical depth may still produce a broken,
+condition-dependent luminous veil.
 
 The star field contains 8,874 real Hipparcos entries through Johnson V=6.5,
 generated reproducibly from CDS VizieR I/239. Apparent magnitude is modified by
@@ -256,6 +267,10 @@ Primary technical references:
   [The wavelength dependence of the lunar phase curve](https://doi.org/10.1029/2011JE003916)
 - Peter Thejll et al.,
   [On the colour of the dark side of the Moon](https://arxiv.org/abs/1401.1994)
+- Pilar Montañés-Rodríguez et al.,
+  [Measurements of the surface brightness of the earthshine](https://bbso.njit.edu/Research/EarthShine/literature/Montanes_etal_2007_AJ.pdf)
+- Salvador Bará and Carmen Bao-Varela,
+  [Skyglow inside your eyes](https://arxiv.org/abs/2212.09103)
 - Andrew Crumey,
   [Human contrast threshold and astronomical visibility](https://arxiv.org/abs/1405.4209)
 - Andrew T. Young,

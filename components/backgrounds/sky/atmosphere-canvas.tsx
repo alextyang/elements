@@ -426,14 +426,25 @@ void main() {
     scatter_transport = max(0.0, scatter_transport);
 
     float lunar_rayleigh = 0.0597 * (1.0 + moon_cosine * moon_cosine);
-    float coarse_mie = henyey_greenstein(
-        moon_cosine,
-        mix(0.5, 0.8, aerosol_size * 0.62 + aerosol * 0.22 + humidity * 0.16)
+    float coarse_g = mix(
+        0.48,
+        0.74,
+        aerosol_size * 0.62 + aerosol * 0.22 + humidity * 0.16
     );
-    float fine_mie = henyey_greenstein(
-        moon_cosine,
-        mix(0.76, 0.9, aerosol_size * 0.52 + aerosol * 0.2 + humidity * 0.28)
+    float fine_g = mix(
+        0.68,
+        0.83,
+        aerosol_size * 0.52 + aerosol * 0.2 + humidity * 0.28
     );
+    // Normalise the phase functions at the source direction before applying
+    // a display-space scattering energy. The prior raw HG peak jumped by an
+    // order of magnitude with particle size, so fixing the Moon projection
+    // exposed a huge artificial blob/column. Particle size should control the
+    // aureole's angular falloff, not create energy from nowhere.
+    float coarse_mie = henyey_greenstein(moon_cosine, coarse_g) /
+        max(henyey_greenstein(1.0, coarse_g), 0.0001);
+    float fine_mie = henyey_greenstein(moon_cosine, fine_g) /
+        max(henyey_greenstein(1.0, fine_g), 0.0001);
     float lunar_mie = mix(coarse_mie, fine_mie, 0.24 + humidity * 0.20);
 
     float transmission_luminance = max(
@@ -455,9 +466,9 @@ void main() {
     );
 
     float rayleigh_scatter = moonlight * scatter_transport * lunar_rayleigh *
-        (0.10 + molecular * 0.14);
+        (0.012 + molecular * 0.018);
     float aerosol_scatter = moonlight * scatter_transport * lunar_mie *
-        (0.24 + aerosol * 0.48 + humidity * 0.20);
+        (0.026 + aerosol * 0.07 + humidity * 0.032);
     radiance += molecular_spectrum * rayleigh_scatter;
     radiance += aerosol_spectrum * aerosol_scatter;
 
@@ -470,15 +481,15 @@ void main() {
         0.78,
         fbm(density_point * (1.62 + humidity * 0.74) + vec2(9.7, 3.1))
     );
-    float cloud_forward = exp(-lunar_separation * mix(3.6, 2.25, humidity));
+    float cloud_forward = exp(-lunar_separation * mix(5.2, 3.1, humidity));
     float cloud_scatter = moonlight * cloudiness * cloud_structure * cloud_forward *
-        (0.009 + humidity * 0.027 + aerosol * 0.014);
+        (0.0035 + humidity * 0.011 + aerosol * 0.006);
     radiance += mix(lunar_spectrum, haze_linear, 0.22) * cloud_scatter;
 
     // Weak multiple-scattering fill connects the aureole to the raised
     // moonlit sky floor without flattening the pristine zenith.
     float lunar_multiple = moonlight * (1.0 - view_transmission) *
-        (0.0018 + aerosol * 0.0042 + humidity * 0.0035) *
+        (0.00045 + aerosol * 0.0011 + humidity * 0.0009) *
         (0.42 + normalized_path * 0.58);
     radiance += mix(molecular_spectrum, haze_linear, 0.38) * lunar_multiple;
 

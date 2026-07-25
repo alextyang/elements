@@ -380,6 +380,21 @@ export const calculateCelestialScene = ({
         0,
         1.24,
     );
+    // Earthshine is a genuinely faint secondary exposure, not a shaded fill
+    // for the geometrical lunar disc. It is most useful close to new Moon,
+    // when Earth is nearly full as seen from the lunar surface, and rapidly
+    // loses visual contrast as the sunlit crescent grows. The deliberately
+    // narrow window also avoids the familiar but photographic/HDR-only look
+    // of a plainly readable dark hemisphere beside a bright crescent.
+    const earthshineWindowLinear = clamp(
+        (0.2 - illumination.fraction) / 0.16,
+    );
+    const earthshineWindow =
+        earthshineWindowLinear ** 2 * (3 - 2 * earthshineWindowLinear);
+    const earthshineVariability =
+        0.78 +
+        0.14 * Math.sin(date.getTime() / 86_400_000 * 1.618 + latitude * 0.11) +
+        0.08 * Math.sin(date.getTime() / 86_400_000 * 0.371 - longitude * 0.07);
     const seeingPath = clamp((moonAirmass - 1) / 7.5);
     // The unscattered lunar image keeps a narrow seeing/optical core. Aerosol
     // and thin-cloud energy belongs mostly in the additive PSF wing and sky
@@ -433,20 +448,21 @@ export const calculateCelestialScene = ({
                 clamp(moonVisibility, 0, 2),
             haloOpacity:
                 clamp(
-                    (0.032 + apparentIrradiance ** 0.38 * 0.27) *
+                    (0.02 + apparentIrradiance ** 0.52 * 0.14) *
                         darkness *
                         moonHorizonFade *
-                        (0.66 + haze * 0.38 + clamp(cloudDensity / 3) * 0.34) *
+                        (0.55 + haze * 0.16 + clamp(cloudDensity / 3) * 0.1) *
                         clamp(moonVisibility, 0, 2),
                     0,
-                    0.42,
+                    0.2,
                 ),
             earthshineOpacity:
-                clamp((0.34 - illumination.fraction) / 0.31) ** 1.25 *
-                darkness ** 1.35 *
+                earthshineWindow *
+                darkness ** 1.8 *
                 moonHorizonFade *
                 atmosphericClarity *
-                0.092,
+                clamp(earthshineVariability, 0.62, 1) *
+                0.02,
             scale: distanceScale * (1 + lowAltitudeWarmth * 0.045),
             rotation,
             textureRotation: -(moon.parallacticAngle / DEG),
@@ -463,7 +479,7 @@ export const calculateCelestialScene = ({
             psfWing,
             psfStretch,
             dispersion,
-            exposure: 1.34 + darkness * 0.62,
+            exposure: 1.18 + darkness * 0.48,
             photoUrl: nasaMoonFrameUrl(date),
             fraction: illumination.fraction,
             phase: illumination.phase,

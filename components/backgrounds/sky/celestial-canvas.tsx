@@ -218,10 +218,10 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
                 max(texture(u_albedo, uv).rgb, vec3(0.012)),
                 vec3(0.96)
             );
-            earthshine_albedo = mix(vec3(0.72), earthshine_albedo, 0.58);
+            earthshine_albedo = mix(vec3(0.68), earthshine_albedo, 0.34);
             surface += earthshine_albedo *
-                mix(u_shadow_tint, u_light_tint, 0.18) *
-                u_earthshine * shadow_gate * 1.35;
+                mix(u_shadow_tint, u_light_tint, 0.12) *
+                u_earthshine * shadow_gate * 0.52;
         }
     } else {
         vec3 albedo = texture(u_albedo, uv).rgb;
@@ -249,7 +249,7 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
         vec3 lit_surface = lunar_albedo * u_light_tint *
             (0.4 + reflectance * 0.84);
         vec3 dark_surface = lunar_albedo * u_shadow_tint *
-            (0.0012 + u_earthshine * (0.24 + surface_normal.z * 0.18));
+            u_earthshine * (0.07 + surface_normal.z * 0.05);
         surface = mix(
             dark_surface,
             lit_surface,
@@ -375,14 +375,20 @@ void main() {
     float irregularity = 0.006 * sin(angle * 3.0 + 0.8) +
         0.003 * sin(angle * 7.0 - 1.4);
     float separation = max(0.0, anisotropic_radius - 1.0 + irregularity);
-    float near_glare = exp(-separation * 4.7) * 0.092;
-    float ocular_glare = 0.024 / (0.21 + separation * separation * 2.9);
-    float diffuse_tail = exp(-separation * 1.18) * 0.0035;
-    float angular_variation = 0.985 + 0.015 * cos(angle * 2.0 + 0.7);
+    // Keep the renderer-local term to the diffraction/seeing shoulder of the
+    // resolved disc. Wider aerosol, humidity, and cloud scattering belongs to
+    // the atmosphere pass; duplicating it here produced a recognizable stamp
+    // and made several independently plausible glows add to an implausible
+    // result. The inverse-square eye-scatter tail is present, but far below the
+    // local shoulder at this intentionally enlarged display scale.
+    float near_glare = exp(-separation * 7.6) * 0.048;
+    float ocular_glare = 0.0028 / (0.34 + separation * separation * 7.5);
+    float diffuse_tail = exp(-separation * 2.4) * 0.00045;
+    float angular_variation = 0.992 + 0.008 * cos(angle * 2.0 + 0.7);
     float halo_coverage = u_halo_opacity *
         (near_glare + ocular_glare + diffuse_tail) *
         angular_variation *
-        (1.0 - smoothstep(3.2, 4.4, radial));
+        (1.0 - smoothstep(2.15, 2.85, radial));
     halo_coverage *= 1.0 - disc_coverage;
     // Stochastic alpha quantisation prevents the few available 8-bit alpha
     // levels in a very faint compact glare from becoming concentric bands.
@@ -546,13 +552,58 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
 
         const starBuffer = gl.createBuffer();
         const moonBuffer = gl.createBuffer();
-        if (!starBuffer || !moonBuffer) return undefined;
+        const starVertexArray = gl.createVertexArray();
+        const moonVertexArray = gl.createVertexArray();
+        if (!starBuffer || !moonBuffer || !starVertexArray || !moonVertexArray) {
+            return undefined;
+        }
+
+        gl.bindVertexArray(moonVertexArray);
         gl.bindBuffer(gl.ARRAY_BUFFER, moonBuffer);
         gl.bufferData(
             gl.ARRAY_BUFFER,
             new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
             gl.STATIC_DRAW,
         );
+        const moonPositionLocation = gl.getAttribLocation(
+            moonProgram,
+            "a_position",
+        );
+        gl.enableVertexAttribArray(moonPositionLocation);
+        gl.vertexAttribPointer(
+            moonPositionLocation,
+            2,
+            gl.FLOAT,
+            false,
+            0,
+            0,
+        );
+
+        gl.bindVertexArray(starVertexArray);
+        gl.bindBuffer(gl.ARRAY_BUFFER, starBuffer);
+        const starStride = 10 * Float32Array.BYTES_PER_ELEMENT;
+        const starAttributes: Array<[string, number, number]> = [
+            ["a_position", 2, 0],
+            ["a_size", 1, 2],
+            ["a_opacity", 1, 3],
+            ["a_color", 3, 4],
+            ["a_scintillation", 1, 7],
+            ["a_phase", 1, 8],
+            ["a_chromatic", 1, 9],
+        ];
+        starAttributes.forEach(([name, size, offset]) => {
+            const location = gl.getAttribLocation(starProgram, name);
+            gl.enableVertexAttribArray(location);
+            gl.vertexAttribPointer(
+                location,
+                size,
+                gl.FLOAT,
+                false,
+                starStride,
+                offset * Float32Array.BYTES_PER_ELEMENT,
+            );
+        });
+        gl.bindVertexArray(null);
 
         const albedoTexture = createTexture(gl);
         const elevationTexture = createTexture(gl);
@@ -648,29 +699,7 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
 
             if (starCount > 0 && current.starsOpacity > 0.001) {
                 gl.useProgram(starProgram);
-                gl.bindBuffer(gl.ARRAY_BUFFER, starBuffer);
-                const stride = 10 * Float32Array.BYTES_PER_ELEMENT;
-                const attributes: Array<[string, number, number]> = [
-                    ["a_position", 2, 0],
-                    ["a_size", 1, 2],
-                    ["a_opacity", 1, 3],
-                    ["a_color", 3, 4],
-                    ["a_scintillation", 1, 7],
-                    ["a_phase", 1, 8],
-                    ["a_chromatic", 1, 9],
-                ];
-                attributes.forEach(([name, size, offset]) => {
-                    const location = gl.getAttribLocation(starProgram, name);
-                    gl.enableVertexAttribArray(location);
-                    gl.vertexAttribPointer(
-                        location,
-                        size,
-                        gl.FLOAT,
-                        false,
-                        stride,
-                        offset * Float32Array.BYTES_PER_ELEMENT,
-                    );
-                });
+                gl.bindVertexArray(starVertexArray);
                 gl.uniform1f(uniform(starProgram, "u_time"), time);
                 gl.uniform1f(
                     uniform(starProgram, "u_pixel_ratio"),
@@ -697,10 +726,7 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
             const moon = current.moon;
             if (moon.visible && moon.opacity > 0.001) {
                 gl.useProgram(moonProgram);
-                gl.bindBuffer(gl.ARRAY_BUFFER, moonBuffer);
-                const location = gl.getAttribLocation(moonProgram, "a_position");
-                gl.enableVertexAttribArray(location);
-                gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
+                gl.bindVertexArray(moonVertexArray);
 
                 const minimumDimension = Math.min(bounds.width, bounds.height);
                 const radiusCss = Math.min(
@@ -827,6 +853,8 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
             document.removeEventListener("visibilitychange", handleVisibility);
             gl.deleteBuffer(starBuffer);
             gl.deleteBuffer(moonBuffer);
+            gl.deleteVertexArray(starVertexArray);
+            gl.deleteVertexArray(moonVertexArray);
             gl.deleteTexture(albedoTexture);
             gl.deleteTexture(elevationTexture);
             gl.deleteTexture(photoTexture);
