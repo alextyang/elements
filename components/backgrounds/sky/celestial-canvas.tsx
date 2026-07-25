@@ -218,10 +218,10 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
                 max(texture(u_albedo, uv).rgb, vec3(0.012)),
                 vec3(0.96)
             );
-            earthshine_albedo = mix(vec3(0.72), earthshine_albedo, 0.42);
+            earthshine_albedo = mix(vec3(0.72), earthshine_albedo, 0.58);
             surface += earthshine_albedo *
                 mix(u_shadow_tint, u_light_tint, 0.18) *
-                u_earthshine * shadow_gate * 0.50;
+                u_earthshine * shadow_gate * 1.35;
         }
     } else {
         vec3 albedo = texture(u_albedo, uv).rgb;
@@ -365,9 +365,9 @@ void main() {
     float irregularity = 0.006 * sin(angle * 3.0 + 0.8) +
         0.003 * sin(angle * 7.0 - 1.4);
     float separation = max(0.0, anisotropic_radius - 1.0 + irregularity);
-    float near_glare = exp(-separation * 4.4) * 0.052;
-    float ocular_glare = 0.012 / (0.19 + separation * separation * 2.8);
-    float diffuse_tail = exp(-separation * 1.1) * 0.002;
+    float near_glare = exp(-separation * 4.4) * 0.075;
+    float ocular_glare = 0.019 / (0.20 + separation * separation * 2.8);
+    float diffuse_tail = exp(-separation * 1.1) * 0.003;
     float angular_variation = 0.985 + 0.015 * cos(angle * 2.0 + 0.7);
     float halo_coverage = u_halo_opacity *
         (near_glare + ocular_glare + diffuse_tail) *

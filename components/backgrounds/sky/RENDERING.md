@@ -57,7 +57,9 @@ therefore retain terrain detail, while humid and horizon Moons lose contrast
 without acquiring an unrelated circular blur stamp. NASA phase frames do not
 contain earthshine, so the registered LROC albedo map supplies subdued maria
 and highland structure on the dark hemisphere when real viewing conditions
-make it visible.
+make it visible. Its level is compensated for the photographic tone curve's
+dark toe, but still falls rapidly with illuminated fraction, sky brightness,
+airmass, and lost atmospheric clarity.
 The much wider moonlit-sky aureole remains in the atmospheric pass because it
 is angular sky radiance, not image blur.
 
