@@ -69,10 +69,22 @@ export function packCloudLayers(
         // picks a value within it, so a single scene holds both denser and
         // thinner regions rather than one uniform amount of sky cover.
         const coverage = present ? layer.coverage : 0;
+        const thickness = Math.max(1, layer.thickness);
         geometry[offset] = layer.baseAltitude;
-        geometry[offset + 1] = Math.max(1, layer.thickness);
+        geometry[offset + 1] = thickness;
         geometry[offset + 2] = Math.max(0, Math.min(1, coverage - 0.02));
-        geometry[offset + 3] = layer.opticalDepth;
+
+        // Extinction per metre, derived from a target optical depth across the
+        // layer rather than mapped straight from the optical-depth control.
+        // Extinction is only meaningful relative to how far light travels
+        // through the cloud, so a fixed coefficient makes a 900 m cirrus sheet
+        // as opaque as a cumulus: cirrus came out solid white at tau ~14 when
+        // it should sit near 2 and stay translucent. Squaring separates thin
+        // ice from convective water cloud across the control's range.
+        geometry[offset + 3] = Math.max(
+            0.0004,
+            Math.min(0.12, (layer.opticalDepth ** 2 * 110) / thickness),
+        );
 
         shape[offset] = layer.stratusBlend;
         shape[offset + 1] = layer.towerAmount;
@@ -125,10 +137,24 @@ export function packCloudLayers(
         // 504 000, all times the size factor — so the wrap is invisible in all
         // four lookups because each texture tiles. JavaScript numbers are
         // doubles, so the modulo itself stays exact.
+        // Coverage periods, held near a fixed world scale.
+        //
+        // Deriving these from the feature size scaled them with sizeFactor,
+        // which gave the high layer a 134 km fine period. Cirrus sits at ~9 km,
+        // where the whole upper sky spans barely 25 km horizontally, so its
+        // coverage came out uniform and the layer rendered as a flat white
+        // sheet. Weather systems are the same size regardless of which deck
+        // they belong to, so these stay near 160 km and 40 km for every layer.
+        // Both multipliers divide 420, keeping the drift wrap exact.
+        const coarseMultiple = level === "high" ? 42 : level === "middle" ? 70 : 140;
+        const fineMultiple = level === "high" ? 10 : level === "middle" ? 20 : 35;
+
         const period = basePeriod * 420;
         const wrap = (value: number) => ((value % period) + period) % period;
         drift[offset] = wrap(motion[offset] * timeSeconds);
         drift[offset + 1] = wrap(motion[offset + 1] * timeSeconds);
+        drift[offset + 2] = 1 / (basePeriod * coarseMultiple);
+        drift[offset + 3] = 1 / (basePeriod * fineMultiple);
     });
 
     return { geometry, shape, motion, phase, scale, drift, active };
@@ -225,8 +251,20 @@ float clouds_phase_multi(float cos_theta, vec3 g) {
         0.25 * hg_phase(cos_theta, -g.z);
 }
 
+/**
+ * Powder term, normalised below one.
+ *
+ * Photon scales this by PI, so it peaks near 3 and the octave loop's
+ * scatter_amount *= falloff * powder grows by about 1.3x per octave, roughly
+ * 5.6x over eight. Photon's exposure pipeline absorbs that; here it blew out
+ * optically thin cloud, because cirrus lets the light march through almost
+ * unattenuated and so leans on the early octaves where the gain is largest.
+ * Powder physically describes darkening near an illuminated boundary, so
+ * bounding it at one both conserves energy and makes the loop strictly
+ * decaying.
+ */
 float clouds_powder_effect(float density, float cos_theta) {
-    float powder = PI * density / (density + 0.15);
+    float powder = density / (density + 0.15);
     powder = mix(powder, 1.0, 0.8 * sqr(cos_theta * 0.5 + 0.5));
     return powder;
 }
@@ -253,6 +291,8 @@ struct CloudLayer {
     float windStretch;
     float curlStrength;
     vec2 drift;
+    float coverageCoarse;
+    float coverageFine;
     float extinction;
 };
 
@@ -351,8 +391,8 @@ float cloud_local_coverage(vec3 position3, CloudLayer layer) {
     //
     // Both remain integer divisors of the 420x drift wrap period, which is what
     // lets one CPU-wrapped drift value serve every texture without a seam.
-    vec2 p1 = position * (layer.baseScale / 140.0);
-    vec2 p2 = position * (layer.baseScale / 35.0);
+    vec2 p1 = position * layer.coverageCoarse;
+    vec2 p2 = position * layer.coverageFine;
     vec2 noise = vec2(
         texture(u_cloud_weather, p1).x,
         texture(u_cloud_weather, p2).w
@@ -736,10 +776,8 @@ CloudLayer cloud_layer_from_uniforms(int index) {
     vec4 scale = u_layer_scale[index];
     vec4 drift = u_layer_drift[index];
 
-    // Photon's cumulus extinction sits between 0.05 and 0.1 per metre. Optical
-    // depth scales within that band so cirrus stays translucent and a
-    // cumulonimbus core goes fully opaque.
-    float extinction = mix(0.012, 0.105, geometry.w);
+    // Extinction per metre, resolved on the CPU against layer thickness.
+    float extinction = geometry.w;
 
     return CloudLayer(
         geometry.x, geometry.y, geometry.z, phase.w,
@@ -747,7 +785,7 @@ CloudLayer cloud_layer_from_uniforms(int index) {
         motion.xy, motion.z, motion.w,
         phase.x, phase.y, phase.z,
         scale.x, scale.y, scale.z, scale.w,
-        drift.xy,
+        drift.xy, drift.z, drift.w,
         extinction
     );
 }

@@ -1667,7 +1667,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     // source radiance has to be an order of magnitude above the sky values used
     // elsewhere in this shader for a lit cloud edge to reach display white.
     // The airmass term above removes most of it again at low Sun.
-    const sunStrength = 26 * sunAbove;
+    const sunStrength = 62 * sunAbove;
     const sunRadiance: [number, number, number] = [
         sunTransmittance[0] * sunStrength,
         sunTransmittance[1] * sunStrength,
@@ -1689,7 +1689,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     // Hemispheric skylight on cloud tops, taken from the palette's upper sky so
     // cloud ambient always agrees with the dome rendered behind it.
     const upperSky = parseSkyColor(palette.upper);
-    const skyAmbientScale = 3.4 * (0.12 + sunAbove * 0.88) + moonStrength * 0.5;
+    const skyAmbientScale = 9.0 * (0.12 + sunAbove * 0.88) + moonStrength * 0.5;
     const cloudAmbient: [number, number, number] = [
         upperSky[0] * skyAmbientScale,
         upperSky[1] * skyAmbientScale,
@@ -1700,7 +1700,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     // forest or ocean, which is why overcast bases differ so much by terrain.
     const groundScale =
         composition.groundAlbedo *
-        1.9 *
+        5.0 *
         sunAbove *
         (1 - physicalAtmosphere.darkness * 0.8);
     const horizonColor = parseSkyColor(palette.horizon);
