@@ -716,6 +716,22 @@
     }
 }
 
+.paused .base,
+.paused .edgeColor,
+.paused .horizon,
+.paused .stars,
+.paused .sun,
+.paused .cloudsHigh,
+.paused .cloudsLow,
+.paused .mistLayer,
+.paused .atmosphere,
+.paused .atmosphere::before,
+.paused .starFieldFar,
+.paused .starFieldNear,
+.paused .grain {
+    animation-play-state: paused !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .base,
     .edgeColor,

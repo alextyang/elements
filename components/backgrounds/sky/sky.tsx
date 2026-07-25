@@ -16,6 +16,46 @@ import {
     SkySeason,
 } from "./sky-palettes";
 
+export type SkyMotionStyle =
+    | "drift"
+    | "bloom"
+    | "tide"
+    | "crosswind"
+    | "thermal";
+
+export interface SkyPreviewOptions {
+    date?: Date;
+    timezone?: string;
+    familyId?: string;
+    atmosphereStyle?: SkyAtmosphere;
+    motionStyle?: SkyMotionStyle;
+    phase?: SkyPhase;
+    region?: SkyRegion;
+    season?: SkySeason;
+    variantShift?: -1 | 0 | 1;
+    hueJitter?: number;
+    chromaJitter?: number;
+    lightnessJitter?: number;
+    flipEdges?: boolean;
+    intensity?: Partial<SkyFamily["intensity"]>;
+    cloudDensity?: number;
+    motionSpeed?: number;
+    motionAmount?: number;
+}
+
+export interface SkySnapshot {
+    palette: SkyPalette;
+    familyId: string;
+    atmosphereStyle: SkyAtmosphere;
+    motionStyle: SkyMotionStyle;
+}
+
+interface SkyProps {
+    preview?: SkyPreviewOptions;
+    paused?: boolean;
+    onVisualChange?: (snapshot: SkySnapshot) => void;
+}
+
 const PALETTE_KEYS: (keyof SkyPalette)[] = [
     "top",
     "upper",
@@ -98,7 +138,7 @@ interface SkyVisual {
     palette: SkyPalette;
     familyId: string;
     atmosphereStyle: SkyAtmosphere;
-    motionStyle: "drift" | "bloom" | "tide" | "crosswind" | "thermal";
+    motionStyle: SkyMotionStyle;
     sunX: number;
     sunY: number;
     sunOpacity: number;
@@ -360,26 +400,45 @@ const chooseDailyPalettes = (
     date: Date,
     timezone: string,
     latitude: number,
+    preview?: SkyPreviewOptions,
 ): {
     palettes: Record<SkyPhase, SkyPalette>;
     family: SkyFamily;
     randomValues: number[];
 } => {
     const random = seededRandom(hashString(`${localDateKey(date)}:${timezone}`));
-    const family = weightedFamily(
-        random(),
-        getSeason(date, latitude),
-        getRegion(timezone, latitude),
-    );
+    const selectedFamily = preview?.familyId
+        ? SKY_FAMILIES.find((candidate) => candidate.id === preview.familyId)
+        : undefined;
+    const baseFamily =
+        selectedFamily ??
+        weightedFamily(
+            random(),
+            preview?.season ?? getSeason(date, latitude),
+            preview?.region ?? getRegion(timezone, latitude),
+        );
+    const family: SkyFamily = preview?.intensity
+        ? {
+              ...baseFamily,
+              intensity: {
+                  ...baseFamily.intensity,
+                  ...preview.intensity,
+              },
+          }
+        : baseFamily;
     const palettes = {} as Record<SkyPhase, SkyPalette>;
-    const variantShift = Math.floor(random() * 3) - 1;
+    const variantShift =
+        preview?.variantShift ?? (Math.floor(random() * 3) - 1);
     const hueJitter =
+        preview?.hueJitter ??
         (random() * 2 - 1) * family.grade.hueJitter;
     const chromaJitter =
+        preview?.chromaJitter ??
         1 + (random() * 2 - 1) * family.grade.chromaJitter;
     const lightnessJitter =
+        preview?.lightnessJitter ??
         (random() * 2 - 1) * family.grade.lightnessJitter;
-    const flipEdges = random() > 0.5;
+    const flipEdges = preview?.flipEdges ?? random() > 0.5;
 
     PHASE_ORDER.forEach((phase) => {
         const choices = SKY_PALETTES[phase];
@@ -492,27 +551,33 @@ const interpolateKeyframes = (keyframes: Keyframe[], time: number) => {
     return mixPalette(from.palette, to.palette, progress);
 };
 
-const calculateSky = (date: Date): SkyVisual => {
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
+const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
+    const timezone =
+        preview?.timezone ??
+        Intl.DateTimeFormat().resolvedOptions().timeZone ??
+        "local";
     const [latitude, longitude] = getCoordinates(date, timezone);
-    const daily = chooseDailyPalettes(date, timezone, latitude);
+    const daily = chooseDailyPalettes(date, timezone, latitude, preview);
     const previousDate = new Date(date);
     previousDate.setDate(previousDate.getDate() - 1);
     const previousDaily = chooseDailyPalettes(
         previousDate,
         timezone,
         latitude,
+        preview,
     );
-    const palette = interpolateKeyframes(
-        buildKeyframes(
-            date,
-            latitude,
-            longitude,
-            daily.palettes,
-            previousDaily.palettes.night,
-        ),
-        date.getTime(),
-    );
+    const palette = preview?.phase
+        ? daily.palettes[preview.phase]
+        : interpolateKeyframes(
+              buildKeyframes(
+                  date,
+                  latitude,
+                  longitude,
+                  daily.palettes,
+                  previousDaily.palettes.night,
+              ),
+              date.getTime(),
+          );
     const sun = SunCalc.getPosition(date, latitude, longitude);
     const altitude = sun.altitude * (180 / Math.PI);
     const moon = SunCalc.getMoonPosition(date, latitude, longitude);
@@ -521,6 +586,7 @@ const calculateSky = (date: Date): SkyVisual => {
     const daylight = clamp((altitude + 8) / 11);
     const nearHorizon = 1 - clamp(Math.abs(altitude) / 24);
     const atmosphereStyle =
+        preview?.atmosphereStyle ??
         daily.family.atmospheres[
             Math.floor(
                 daily.randomValues[4] * daily.family.atmospheres.length,
@@ -542,6 +608,7 @@ const calculateSky = (date: Date): SkyVisual => {
         "thermal",
     ];
     const motionStyle =
+        preview?.motionStyle ??
         motionStyles[Math.floor(daily.randomValues[6] * motionStyles.length)];
     const useSun = daylight > 0.05 || moonAltitude < -5;
     const celestial = useSun ? sun : moon;
@@ -561,6 +628,9 @@ const calculateSky = (date: Date): SkyVisual => {
     };
     const [edgeLow, edgeHigh] = edgeOpacityByAtmosphere[atmosphereStyle];
     const intensity = daily.family.intensity;
+    const cloudDensity = preview?.cloudDensity ?? 1;
+    const motionSpeed = preview?.motionSpeed ?? 1;
+    const motionAmount = preview?.motionAmount ?? 1;
 
     return {
         palette,
@@ -578,13 +648,20 @@ const calculateSky = (date: Date): SkyVisual => {
             0.34 *
             clamp(1.12 - intensity.haze * 0.14, 0.72, 1.04),
         highCloudOpacity:
-            textureByStyle.high * textureStrength * (0.76 + daylight * 0.24),
+            textureByStyle.high *
+            textureStrength *
+            (0.76 + daylight * 0.24) *
+            cloudDensity,
         lowCloudOpacity:
-            textureByStyle.low * textureStrength * (0.76 + daylight * 0.24),
+            textureByStyle.low *
+            textureStrength *
+            (0.76 + daylight * 0.24) *
+            cloudDensity,
         mistOpacity:
             textureByStyle.mist *
             (0.8 + daily.randomValues[5] * 0.4) *
-            intensity.haze,
+            intensity.haze *
+            cloudDensity,
         cloudOffset: daily.randomValues[1] * 700,
         cloudHeight: 8 + daily.randomValues[2] * 24,
         horizonGlow: clamp((18 - Math.abs(altitude)) / 18),
@@ -592,18 +669,22 @@ const calculateSky = (date: Date): SkyVisual => {
         starRotation: daily.randomValues[3] * 18 - 9,
         motionDirection:
             daily.randomValues[7] > 0.5 ? "alternate" : "alternate-reverse",
-        baseDuration: 26 + daily.randomValues[8] * 20,
-        edgeDuration: 54 + daily.randomValues[9] * 48,
-        horizonDuration: 64 + daily.randomValues[10] * 58,
-        celestialDuration: 10 + daily.randomValues[11] * 9,
-        mistDuration: 88 + daily.randomValues[12] * 76,
-        starDuration: 180 + daily.randomValues[13] * 160,
-        highCloudDuration: 118 + daily.randomValues[14] * 86,
-        lowCloudDuration: 172 + daily.randomValues[15] * 118,
-        motionX: 1.2 + daily.randomValues[9] * 2.8,
+        baseDuration: (26 + daily.randomValues[8] * 20) / motionSpeed,
+        edgeDuration: (54 + daily.randomValues[9] * 48) / motionSpeed,
+        horizonDuration: (64 + daily.randomValues[10] * 58) / motionSpeed,
+        celestialDuration: (10 + daily.randomValues[11] * 9) / motionSpeed,
+        mistDuration: (88 + daily.randomValues[12] * 76) / motionSpeed,
+        starDuration: (180 + daily.randomValues[13] * 160) / motionSpeed,
+        highCloudDuration:
+            (118 + daily.randomValues[14] * 86) / motionSpeed,
+        lowCloudDuration:
+            (172 + daily.randomValues[15] * 118) / motionSpeed,
+        motionX: (1.2 + daily.randomValues[9] * 2.8) * motionAmount,
         motionY:
             (0.55 + daily.randomValues[10] * 1.5) *
-            (0.78 + clamp((18 - Math.abs(celestialAltitude)) / 18) * 0.3),
+            (0.78 +
+                clamp((18 - Math.abs(celestialAltitude)) / 18) * 0.3) *
+            motionAmount,
         animationDelay: -(12 + daily.randomValues[8] * 64),
         saturationLow: intensity.saturation * 0.96,
         saturationHigh: intensity.saturation * 1.04,
@@ -615,17 +696,19 @@ const calculateSky = (date: Date): SkyVisual => {
     };
 };
 
-export function Sky() {
+export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) {
     const [visual, setVisual] = useState<SkyVisual | null>(null);
 
     useEffect(() => {
         const updateSky = () => {
-            const date = new Date();
+            const date = preview?.date
+                ? new Date(preview.date)
+                : new Date();
 
             // Local-only art direction hook: `?sky-time=06:15` previews a
             // moment and `?sky-date=2026-07-24` previews a daily character,
             // without allowing production visitors to override nature.
-            if (process.env.NODE_ENV === "development") {
+            if (!preview && process.env.NODE_ENV === "development") {
                 const search = new URLSearchParams(window.location.search);
                 const previewDate = search.get("sky-date");
                 const dateMatch = previewDate?.match(
@@ -651,17 +734,25 @@ export function Sky() {
                 }
             }
 
-            const next = calculateSky(date);
+            const next = calculateSky(date, preview);
             setVisual(next);
+            onVisualChange?.({
+                palette: next.palette,
+                familyId: next.familyId,
+                atmosphereStyle: next.atmosphereStyle,
+                motionStyle: next.motionStyle,
+            });
             document
                 .getElementById("theme-color")
                 ?.setAttribute("content", next.palette.top);
         };
 
         updateSky();
+        if (preview) return undefined;
+
         const interval = window.setInterval(updateSky, 60 * 1000);
         return () => window.clearInterval(interval);
-    }, []);
+    }, [onVisualChange, preview]);
 
     const palette = visual?.palette;
     const customProperties = {
@@ -717,7 +808,7 @@ export function Sky() {
     return (
         <div
             id="sky"
-            className={`${styles.background} ${styles[visual?.atmosphereStyle ?? "crystal"]} ${styles[`motion${(visual?.motionStyle ?? "drift").replace(/^./, (letter) => letter.toUpperCase())}`]}`}
+            className={`${styles.background} ${styles[visual?.atmosphereStyle ?? "crystal"]} ${styles[`motion${(visual?.motionStyle ?? "drift").replace(/^./, (letter) => letter.toUpperCase())}`]} ${paused ? styles.paused : ""}`}
             style={customProperties}
             data-sky-family={visual?.familyId ?? "loading"}
             aria-hidden="true"
