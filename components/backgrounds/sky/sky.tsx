@@ -593,16 +593,16 @@ const FAMILY_SOLAR_CONSTRAINT: Record<
 > = {
     "crystal-azure": { daylight: 0.22, twilight: 0.22 },
     "marine-pearl": { daylight: 0.52, twilight: 0.42 },
-    "lavender-alpenglow": { daylight: 0.4, twilight: 0.28 },
+    "lavender-alpenglow": { daylight: 0.54, twilight: 0.62 },
     "desert-apricot": { daylight: 0.3, twilight: 0.24 },
     "storm-slate": { daylight: 0.62, twilight: 0.55 },
     "smoky-copper": { daylight: 0.58, twilight: 0.38 },
     "humid-aqua": { daylight: 0.74, twilight: 0.52 },
     "winter-ice": { daylight: 0.34, twilight: 0.3 },
-    "rose-afterglow": { daylight: 0.52, twilight: 0.3 },
-    "violet-nocturne": { daylight: 0.56, twilight: 0.32 },
+    "rose-afterglow": { daylight: 0.7, twilight: 0.58 },
+    "violet-nocturne": { daylight: 0.76, twilight: 0.56 },
     "sage-haze": { daylight: 0.76, twilight: 0.58 },
-    "cobalt-gold": { daylight: 0.24, twilight: 0.22 },
+    "cobalt-gold": { daylight: 0.28, twilight: 0.42 },
 };
 
 const capColorChroma = (source: string, maximum: number) => {
