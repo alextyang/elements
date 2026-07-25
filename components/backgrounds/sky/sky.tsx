@@ -154,10 +154,6 @@ interface SkyVisual {
     familyId: string;
     atmosphereStyle: SkyAtmosphere;
     motionStyle: SkyMotionStyle;
-    sunX: number;
-    sunY: number;
-    sunOpacity: number;
-    celestialSize: number;
     starsOpacity: number;
     highCloudOpacity: number;
     lowCloudOpacity: number;
@@ -170,7 +166,6 @@ interface SkyVisual {
     baseDuration: number;
     edgeDuration: number;
     horizonDuration: number;
-    celestialDuration: number;
     mistDuration: number;
     starDuration: number;
     highCloudDuration: number;
@@ -711,10 +706,8 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const sun = SunCalc.getPosition(date, latitude, longitude);
     const altitude = sun.altitude * (180 / Math.PI);
     const moon = SunCalc.getMoonPosition(date, latitude, longitude);
-    const moonIllumination = SunCalc.getMoonIllumination(date);
     const moonAltitude = moon.altitude * (180 / Math.PI);
     const daylight = clamp((altitude + 8) / 11);
-    const nearHorizon = 1 - clamp(Math.abs(altitude) / 24);
     const atmosphereStyle =
         preview?.atmosphereStyle ??
         daily.family.atmospheres[
@@ -743,12 +736,6 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const useSun = daylight > 0.05 || moonAltitude < -5;
     const celestial = useSun ? sun : moon;
     const celestialAltitude = useSun ? altitude : moonAltitude;
-    const moonVisibility =
-        clamp((moonAltitude + 5) / 14) *
-        (0.35 + moonIllumination.fraction * 0.65);
-    const celestialOpacity = useSun
-        ? daylight * (0.12 + nearHorizon * 0.5)
-        : (1 - daylight) * moonVisibility * 0.15;
     const edgeOpacityByAtmosphere: Record<SkyAtmosphere, [number, number]> = {
         crystal: [0.44, 0.54],
         haze: [0.2, 0.29],
@@ -771,8 +758,6 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const bloomGeometry = getBloomGeometry(
         bloomStyle,
         daily.randomValues,
-        sunX,
-        sunY,
         bloomScale,
     );
     const bloomVisibility = preview?.bloomVisibility ?? 1;
@@ -797,10 +782,6 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         0,
         0.28,
     );
-    const celestialVisibility =
-        (0.13 + daily.randomValues[28] ** 2.25 * 0.64) *
-        (bloomStyle === "softHalo" ? 1.12 : 1) *
-        bloomVisibility;
     const bloomWarmth = 0.12 + daily.randomValues[29] * 0.5;
     const sideColor = daily.randomValues[30] > 0.5
         ? palette.left
@@ -813,12 +794,6 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         motionStyle,
         sunX,
         sunY,
-        sunOpacity: celestialOpacity * intensity.glow * celestialVisibility,
-        celestialSize: useSun
-            ? (11 + daily.randomValues[19] * 18 + nearHorizon * 8) *
-              bloomScale
-            : (7 + moonIllumination.fraction * 6 + daily.randomValues[19] * 5) *
-              bloomScale,
         starsOpacity:
             clamp((-altitude - 7) / 14) *
             0.34 *
@@ -847,7 +822,6 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         baseDuration: (26 + daily.randomValues[8] * 20) / motionSpeed,
         edgeDuration: (54 + daily.randomValues[9] * 48) / motionSpeed,
         horizonDuration: (64 + daily.randomValues[10] * 58) / motionSpeed,
-        celestialDuration: (10 + daily.randomValues[11] * 9) / motionSpeed,
         mistDuration: (88 + daily.randomValues[12] * 76) / motionSpeed,
         starDuration: (180 + daily.randomValues[13] * 160) / motionSpeed,
         highCloudDuration:
@@ -960,10 +934,6 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
         "--sky-haze": palette?.haze,
         "--sky-cloud": palette?.cloud,
         "--sky-cloud-warm": palette?.cloudWarm,
-        "--sun-x": `${visual?.sunX ?? 50}%`,
-        "--sun-y": `${visual?.sunY ?? 74}%`,
-        "--sun-opacity": visual?.sunOpacity ?? 0,
-        "--celestial-size": `${visual?.celestialSize ?? 18}vmax`,
         "--stars-opacity": visual?.starsOpacity ?? 0,
         "--cloud-opacity": visual?.highCloudOpacity ?? 0.04,
         "--cloud-low-opacity": visual?.lowCloudOpacity ?? 0.02,
@@ -996,7 +966,6 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
         "--base-duration": `${visual?.baseDuration ?? 34}s`,
         "--edge-duration": `${visual?.edgeDuration ?? 74}s`,
         "--horizon-duration": `${visual?.horizonDuration ?? 92}s`,
-        "--celestial-duration": `${visual?.celestialDuration ?? 14}s`,
         "--mist-duration": `${visual?.mistDuration ?? 124}s`,
         "--star-duration": `${visual?.starDuration ?? 240}s`,
         "--cloud-high-duration": `${visual?.highCloudDuration ?? 150}s`,
@@ -1027,7 +996,6 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
                 <div className={styles.starFieldFar} />
                 <div className={styles.starFieldNear} />
             </div>
-            <div className={styles.sun} />
             <div className={`${styles.clouds} ${styles.cloudsHigh}`} />
             <div className={`${styles.clouds} ${styles.cloudsLow}`} />
             <div className={styles.mistLayer} />

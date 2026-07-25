@@ -10,9 +10,6 @@
     --sky-haze: #c7e8ed;
     --sky-cloud: #f5fbfc;
     --sky-cloud-warm: #e8f2f2;
-    --sun-x: 50%;
-    --sun-y: 74%;
-    --sun-opacity: 0;
     --stars-opacity: 0;
     --cloud-opacity: 0.04;
     --cloud-low-opacity: 0.02;
@@ -45,7 +42,6 @@
     --base-duration: 34s;
     --edge-duration: 74s;
     --horizon-duration: 92s;
-    --celestial-duration: 14s;
     --mist-duration: 124s;
     --star-duration: 240s;
     --cloud-high-duration: 150s;
@@ -53,7 +49,6 @@
     --motion-x: 2.2vmax;
     --motion-y: 1.1vmax;
     --animation-delay: -24s;
-    --celestial-size: 18vmax;
     --edge-opacity-low: 0.31;
     --edge-opacity-high: 0.41;
     --palette-saturation-low: 1.04;
@@ -74,7 +69,6 @@
 .edgeColor,
 .horizon,
 .stars,
-.sun,
 .clouds,
 .mistLayer,
 .atmosphere,
@@ -182,29 +176,6 @@
         transparent 100%
     );
     mix-blend-mode: screen;
-}
-
-.sun {
-    left: var(--sun-x);
-    top: var(--sun-y);
-    width: clamp(120px, var(--celestial-size), 460px);
-    aspect-ratio: 1;
-    border-radius: 50%;
-    opacity: var(--sun-opacity);
-    background:
-        radial-gradient(
-            circle,
-            color-mix(in srgb, var(--sky-glow) 82%, white) 0%,
-            color-mix(in srgb, var(--bloom-primary) 43%, transparent) 18%,
-            color-mix(in srgb, var(--bloom-secondary) 18%, transparent) 45%,
-            color-mix(in srgb, var(--sky-glow) 7%, transparent) 67%,
-            transparent 82%
-        );
-    mix-blend-mode: screen;
-    filter: blur(4px);
-    will-change: transform, opacity;
-    animation: celestialBreathe var(--celestial-duration) ease-in-out infinite alternate;
-    animation-delay: calc(var(--animation-delay) - 3s);
 }
 
 .stars {
@@ -614,17 +585,6 @@
     }
 }
 
-@keyframes celestialBreathe {
-    from {
-        transform: translate(-50%, -50%) scale(0.96);
-        opacity: calc(var(--sun-opacity) * 0.88);
-    }
-    to {
-        transform: translate(-50%, -50%) scale(1.045);
-        opacity: var(--sun-opacity);
-    }
-}
-
 @keyframes starParallax {
     from {
         transform: translate3d(calc(0px - var(--motion-x)), -0.2vmax, 0) rotate(var(--star-rotation)) scale(1.12);
@@ -784,7 +744,6 @@
 .paused .edgeColor,
 .paused .horizon,
 .paused .stars,
-.paused .sun,
 .paused .cloudsHigh,
 .paused .cloudsLow,
 .paused .mistLayer,
@@ -801,7 +760,6 @@
     .edgeColor,
     .horizon,
     .stars,
-    .sun,
     .cloudsHigh,
     .cloudsLow,
     .mistLayer,
