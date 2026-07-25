@@ -28,23 +28,53 @@ const mixRgb = (
     return `rgb(${mixed.join(", ")})`;
 };
 
-const colorForBv = (bv: number, horizonWarmth: number) => {
-    const color: [number, number, number] =
-        bv < -0.18
-            ? [190, 215, 255]
-            : bv < 0.05
-              ? [211, 227, 255]
-              : bv < 0.42
-                ? [239, 243, 255]
-                : bv < 0.82
-                  ? [255, 246, 226]
-                  : bv < 1.28
-                    ? [255, 222, 188]
-                    : [255, 190, 143];
-    const restrained = color.map((channel) =>
-        Math.round(channel + (255 - channel) * 0.24),
+const STELLAR_COLOR_STOPS: Array<{
+    bv: number;
+    color: [number, number, number];
+}> = [
+    { bv: -0.32, color: [160, 195, 255] },
+    { bv: 0, color: [205, 222, 255] },
+    { bv: 0.3, color: [241, 245, 255] },
+    { bv: 0.65, color: [255, 246, 229] },
+    { bv: 1, color: [255, 222, 187] },
+    { bv: 1.6, color: [255, 181, 126] },
+    { bv: 2.25, color: [255, 151, 91] },
+];
+
+const colorForBv = (
+    bv: number,
+    horizonWarmth: number,
+    apparentMagnitude: number,
+) => {
+    const safeBv = Number.isFinite(bv) ? bv : 0.65;
+    const upperIndex = STELLAR_COLOR_STOPS.findIndex(
+        (stop) => stop.bv >= safeBv,
+    );
+    const boundedUpperIndex =
+        upperIndex < 0 ? STELLAR_COLOR_STOPS.length - 1 : upperIndex;
+    const upper = STELLAR_COLOR_STOPS[boundedUpperIndex];
+    const lower = STELLAR_COLOR_STOPS[Math.max(0, boundedUpperIndex - 1)];
+    const progress = clamp(
+        (safeBv - lower.bv) / Math.max(0.001, upper.bv - lower.bv),
+    );
+    const planckian = lower.color.map((channel, index) =>
+        Math.round(channel + (upper.color[index] - channel) * progress),
     ) as [number, number, number];
-    return mixRgb(restrained, [255, 190, 143], horizonWarmth * 0.2);
+    // Scotopic vision greatly weakens the colour of threshold stars. Only the
+    // bright catalogue stars retain an obvious Planckian tint.
+    const colorVisibility = clamp(
+        (3.8 - apparentMagnitude) / 4.4,
+        0.08,
+        0.78,
+    );
+    const restrained = planckian.map((channel) =>
+        Math.round(255 + (channel - 255) * colorVisibility),
+    ) as [number, number, number];
+    return mixRgb(
+        restrained,
+        [255, 202, 165],
+        horizonWarmth * (0.05 + colorVisibility * 0.12),
+    );
 };
 
 const projectHorizontal = (azimuth: number, altitude: number) => ({
@@ -115,6 +145,7 @@ export interface ProjectedStar {
     color: string;
     bright: boolean;
     scintillation: number;
+    chromaticScintillation: number;
     phaseOffset: number;
 }
 
@@ -170,17 +201,18 @@ export const calculateCelestialScene = ({
     const illumination = SunCalc.getMoonIllumination(date);
     const sunAltitude = sun.altitude / DEG;
     const moonAltitude = moon.altitude / DEG;
-    const night = clamp((-sunAltitude - 3) / 15);
+    const nightLinear = clamp((-sunAltitude - 3) / 15);
+    const night = nightLinear * nightLinear * (3 - 2 * nightLinear);
     const moonAboveHorizon = clamp((moonAltitude + 1.5) / 8);
     const moonLightPenalty =
-        moonAboveHorizon * illumination.fraction ** 1.42 * 1.3;
+        moonAboveHorizon * illumination.fraction ** 1.42 * 1.48;
     const limitingMagnitude =
-        -0.1 +
-        night * 4.65 -
+        -0.45 +
+        night * 6.82 -
         moonLightPenalty -
-        Math.max(0, haze - 0.85) * 0.34 -
-        cloudDensity * 0.08 +
-        (clamp(starVisibility, 0, 2) - 1) * 0.8;
+        Math.max(0, haze - 0.48) * 0.72 -
+        cloudDensity * 0.12 +
+        (clamp(starVisibility, 0, 2) - 1) * 0.9;
     const siderealTime = localSiderealTime(date, longitude);
     const latitudeRadians = latitude * DEG;
     const moonPoint = projectHorizontal(moon.azimuth, moon.altitude);
@@ -228,24 +260,38 @@ export const calculateCelestialScene = ({
             Math.max(0, horizontal.altitude),
         );
         const horizonFade = smoothHorizon(altitudeDegrees);
-        // Perceptual display brightness is deliberately compressed relative
-        // to stellar flux. It preserves the magnitude hierarchy while keeping
-        // threshold stars visible against an emissive display's black floor.
+        const thresholdDistance = limitingMagnitude - apparentMagnitude;
+        const thresholdProgress = clamp((thresholdDistance + 0.12) / 0.68);
+        const thresholdFade =
+            thresholdProgress * thresholdProgress * (3 - 2 * thresholdProgress);
+        // Magnitudes are logarithmic flux measurements. A restrained power
+        // compression maps their enormous range onto an emissive display while
+        // preserving the hierarchy instead of keying brightness to the cutoff.
+        const relativeFlux = 10 ** (-0.4 * (apparentMagnitude + 1.46));
         const magnitudeBrightness = clamp(
-            ((limitingMagnitude - apparentMagnitude + 0.42) / 4.6) ** 0.68,
-            0.16,
+            relativeFlux ** 0.31 * thresholdFade,
+            0.012,
             1,
         );
-        const radius = clamp(1.82 - (star.mag + 1.2) * 0.29, 0.52, 2.15);
+        const radius = clamp(
+            0.48 + relativeFlux ** 0.23 * 1.34,
+            0.48,
+            1.82,
+        );
         const bright = star.mag < 1.6;
-        const scintillation = bright
-            ? clamp(
-                  (airmass - 1) * 0.065 +
-                      clamp((34 - altitudeDegrees) / 34) * 0.08,
-                  0.015,
-                  0.24,
-              )
-            : 0;
+        const scintillationVisibility = clamp(
+            (3.25 - apparentMagnitude) / 3.2,
+        );
+        const turbulentPath = clamp((airmass - 1) / 5.5);
+        const scintillation = clamp(
+            (0.01 + turbulentPath ** 0.68 * 0.25) *
+                scintillationVisibility *
+                (0.82 + haze * 0.16),
+            0,
+            0.29,
+        );
+        const chromaticScintillation =
+            scintillation * turbulentPath ** 0.72 * 0.82;
 
         return [
             {
@@ -257,9 +303,11 @@ export const calculateCelestialScene = ({
                 color: colorForBv(
                     star.bv,
                     clamp((18 - altitudeDegrees) / 18),
+                    apparentMagnitude,
                 ),
                 bright,
                 scintillation,
+                chromaticScintillation,
                 phaseOffset: (star.id * 0.61803398875) % 1,
             },
         ];
@@ -324,16 +372,17 @@ export const calculateCelestialScene = ({
                     0.16,
                 ),
             earthshineOpacity:
-                (0.025 + (1 - illumination.fraction) * 0.16) * darkness,
+                clamp((0.3 - illumination.fraction) / 0.26) ** 1.55 *
+                darkness ** 1.35 *
+                moonHorizonFade *
+                atmosphericClarity *
+                0.052,
             scale: distanceScale * (1 + lowAltitudeWarmth * 0.045),
             rotation,
             textureRotation: -(moon.parallacticAngle / DEG),
             atmosphericWarmth: lowAltitudeWarmth,
             transmittance,
-            exposure:
-                1.22 +
-                darkness * 1.12 +
-                (1 - illumination.fraction) * 0.42,
+            exposure: 1.34 + darkness * 0.62,
             photoUrl: nasaMoonFrameUrl(date),
             fraction: illumination.fraction,
             phase: illumination.phase,

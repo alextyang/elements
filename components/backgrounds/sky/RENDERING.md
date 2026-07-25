@@ -16,6 +16,36 @@ texture changes. Only visibly scintillating stars trigger the capped animation
 loop. This preserves a physically coherent base without creating a permanent
 full-screen GPU workload.
 
+## Lunar and stellar photometry
+
+The Moon uses NASA SVS hourly LRO/LOLA frames for the real phase, libration,
+terrain, and shadow geometry. The display-referred JPEG black floor is removed
+before inverse transfer and scene-linear exposure, preventing compressed dark
+pixels from becoming a visible gray hemisphere. Earthshine is a separate,
+blue-biased illumination term. It is restricted to thin crescents, requires a
+dark adapted sky, and is suppressed by low altitude and atmospheric clarity.
+The renderer never raises exposure merely because the illuminated fraction is
+small. Regolith shading uses a Lommel-Seeliger/Lambert blend, with the extra
+opposition term limited to the very small phase angles where shadow hiding and
+coherent backscatter are observed.
+
+The star field contains 8,874 real Hipparcos entries through Johnson V=6.5,
+generated reproducibly from CDS VizieR I/239. Apparent magnitude is modified by
+Kasten-Young airmass extinction and local lunar glare, then converted from its
+logarithmic flux scale into a display-compressed intensity. The visibility
+cutoff fades separately, so threshold proximity no longer defines a star's
+brightness. B-V colour is mapped continuously along a restrained Planckian
+sequence, with faint stars desaturated for scotopic vision and low-altitude
+stars mildly reddened by extinction.
+
+Stars use a compact Moffat-like seeing point-spread function. Diffraction
+crosses are omitted because they are imaging-aperture artifacts, not naked-eye
+stellar structure. Only sufficiently bright stars scintillate visibly. Their
+intensity follows mean-preserving, non-periodic noise at multiple atmospheric
+timescales; airmass controls its strength and the much weaker chromatic and
+angle-of-arrival variation. This avoids synchronized or sinusoidal twinkling
+while retaining the rapid, irregular behavior of low-altitude stars.
+
 ## Continuous radiance field
 
 The visible sky is no longer the direct interpolation of five CSS gradient
@@ -110,3 +140,15 @@ Primary technical references:
   [A multi-band map of the natural night sky brightness](https://arxiv.org/abs/2101.01500)
 - Madhukar Budagavi and Oscar Bici,
   [Adaptive Debanding Filter](https://arxiv.org/abs/2009.10804)
+- U.S. Geological Survey,
+  [ROLO lunar model and database](https://www.usgs.gov/media/files/rolo-lunar-model-and-database)
+- Bruce Hapke,
+  [The wavelength dependence of the lunar phase curve](https://doi.org/10.1029/2011JE003916)
+- Peter Thejll et al.,
+  [On the colour of the dark side of the Moon](https://arxiv.org/abs/1401.1994)
+- Andrew Crumey,
+  [Human contrast threshold and astronomical visibility](https://arxiv.org/abs/1405.4209)
+- Andrew T. Young,
+  [The temporal power spectrum of scintillation](https://doi.org/10.1364/AO.8.000869)
+- ESA / DPAC,
+  [Gaia DR3 photometry documentation](https://gea.esac.esa.int/archive/documentation/GDR3/)

@@ -14,26 +14,53 @@ in float a_opacity;
 in vec3 a_color;
 in float a_scintillation;
 in float a_phase;
+in float a_chromatic;
 
 uniform float u_time;
 uniform float u_pixel_ratio;
 uniform float u_global_opacity;
+uniform vec2 u_viewport;
 
 out vec3 v_color;
 out float v_opacity;
 out float v_bright;
 
+float hash11(float value) {
+    return fract(sin(value * 127.1) * 43758.5453123);
+}
+
+float noise1(float value) {
+    float cell = floor(value);
+    float local = fract(value);
+    local = local * local * (3.0 - 2.0 * local);
+    return mix(hash11(cell), hash11(cell + 1.0), local) * 2.0 - 1.0;
+}
+
 void main() {
-    float slow = sin(u_time * 1.19 + a_phase * 19.7);
-    float medium = sin(u_time * 2.31 + a_phase * 43.1);
-    float quick = sin(u_time * 4.73 + a_phase * 71.9);
-    float shimmer = slow * 0.52 + medium * 0.31 + quick * 0.17;
-    float intensity = 1.0 + shimmer * a_scintillation;
-    float chroma = shimmer * a_scintillation * 0.17;
+    float slow = noise1(u_time * 0.43 + a_phase * 113.0);
+    float medium = noise1(u_time * 1.73 + a_phase * 271.0);
+    float quick = noise1(u_time * 4.21 + a_phase * 619.0);
+    float shimmer = slow * 0.28 + medium * 0.46 + quick * 0.26;
+    float intensity = exp(
+        shimmer * a_scintillation * 1.42 -
+        0.28 * a_scintillation * a_scintillation
+    );
+    float redNoise = noise1(u_time * 2.37 + a_phase * 887.0);
+    float blueNoise = noise1(u_time * 3.11 + a_phase * 1289.0);
+    vec3 spectralVariation = vec3(
+        redNoise * a_chromatic,
+        -(redNoise + blueNoise) * a_chromatic * 0.13,
+        blueNoise * a_chromatic
+    );
+    vec2 wander = vec2(
+        noise1(u_time * 1.31 + a_phase * 1597.0),
+        noise1(u_time * 1.07 + a_phase * 1999.0)
+    ) * a_scintillation * 0.72 * u_pixel_ratio;
 
     gl_Position = vec4(a_position.x * 2.0 - 1.0, 1.0 - a_position.y * 2.0, 0.0, 1.0);
-    gl_PointSize = a_size * u_pixel_ratio * (1.0 + shimmer * a_scintillation * 0.1);
-    v_color = clamp(a_color + vec3(chroma * 0.32, -chroma * 0.08, -chroma * 0.24), 0.0, 1.0);
+    gl_Position.xy += wander * vec2(2.0 / u_viewport.x, 2.0 / u_viewport.y);
+    gl_PointSize = a_size * u_pixel_ratio * (1.0 + max(0.0, shimmer) * a_scintillation * 0.07);
+    v_color = clamp(a_color + spectralVariation, 0.0, 1.0);
     v_opacity = a_opacity * u_global_opacity * intensity;
     v_bright = smoothstep(3.2, 5.8, a_size);
 }`;
@@ -51,13 +78,16 @@ void main() {
     float radius = length(p);
     if (radius > 1.0) discard;
 
-    float core = exp(-radius * radius * 19.0) * 1.35;
-    float airy = exp(-radius * radius * 3.9) * 0.20;
-    float cross = (
-        exp(-abs(p.x) * 28.0) + exp(-abs(p.y) * 28.0)
-    ) * exp(-radius * 4.4) * 0.08 * v_bright;
-    float alpha = clamp((core + airy + cross) * v_opacity * 1.28, 0.0, 1.0);
-    vec3 spectralCore = mix(v_color, vec3(1.0), clamp(core * 0.62, 0.0, 0.86));
+    float radius2 = radius * radius;
+    float seeing = pow(1.0 + radius2 * 5.8, -2.35) * 1.08;
+    float core = exp(-radius2 * 22.0) * 0.32;
+    float aureole = exp(-radius2 * 2.7) * 0.055 * v_bright;
+    float alpha = clamp((seeing + core + aureole) * v_opacity, 0.0, 1.0);
+    vec3 spectralCore = mix(
+        v_color,
+        vec3(1.0),
+        clamp(core * v_bright * 0.42, 0.0, 0.22)
+    );
     out_color = vec4(spectralCore, alpha);
 }`;
 
@@ -184,12 +214,12 @@ void main() {
     vec3 lunar_albedo = pow(max(contrast_albedo, vec3(0.012)), vec3(0.96));
     vec3 lit_surface = lunar_albedo * u_light_tint * (0.4 + reflectance * 0.84);
     vec3 dark_surface = lunar_albedo * u_shadow_tint *
-        (0.055 + u_earthshine * (0.58 + surface_normal.z * 0.42));
+        (0.0012 + u_earthshine * (0.24 + surface_normal.z * 0.18));
     vec3 procedural_surface = mix(dark_surface, lit_surface, lit_mask);
 
-    // NASA's hourly LRO/LOLA render supplies the real terrain shadows,
-    // libration and earthshine. Decode it to scene-linear radiance before
-    // atmospheric extinction and the shared photographic output transform.
+    // NASA's hourly LRO/LOLA render supplies real terrain shadows and
+    // libration. Earthshine is added below only when phase and sky contrast
+    // make it physically observable.
     // NASA's square Dial-A-Moon frames include a roughly 7% black border.
     // Sampling the whole image as the disc created a dark annulus and a false
     // outer radius. Crop the texture coordinates to the actual lunar limb.
@@ -199,24 +229,25 @@ void main() {
         0.5 - texture_point.y * PHOTO_DISC_RADIUS
     );
     vec3 photo_srgb = texture(u_photo, photo_uv).rgb;
-    float photo_luminance = dot(photo_srgb, vec3(0.2126, 0.7152, 0.0722));
-    // SVS frames are display-referred JPEGs, not scene-linear plates. A mild
-    // inverse display curve recovers useful shadow/earthshine detail without
-    // double-applying a full gamma and crushing it back to black.
-    vec3 photo_linear = pow(max(photo_srgb, vec3(0.0)), vec3(1.42));
+    // Remove the compressed JPEG black floor before inverse transfer. Without
+    // this, exposure turns the nominally unlit hemisphere into a gray plate.
+    vec3 photo_linear = pow(
+        max((photo_srgb - vec3(0.006)) / 0.994, vec3(0.0)),
+        vec3(2.08)
+    );
     vec3 photographed_surface = photo_linear * u_light_tint;
     float lunar_disc = 1.0 - smoothstep(0.94, 1.0, radial);
-    float shadow_gate = 1.0 - smoothstep(0.11, 0.34, photo_luminance);
+    float shadow_gate = 1.0 - smoothstep(-0.018, 0.035, incidence);
     vec3 earthshine = mix(u_shadow_tint, u_light_tint, 0.24) *
-        u_earthshine * (1.0 - u_fraction) * shadow_gate * lunar_disc * 0.22;
+        u_earthshine * shadow_gate * lunar_disc * 0.16;
     photographed_surface += earthshine;
     vec3 surface = mix(procedural_surface, photographed_surface, u_use_photo);
     surface = tone_map(surface * u_transmittance * u_exposure);
 
     float limb_width = max(fwidth(radial) * 1.15, 0.006);
     float limb = 1.0 - smoothstep(1.0 - limb_width, 1.0, radial);
-    float opposition_bloom = smoothstep(0.88, 1.0, u_fraction) *
-        pow(max(surface_normal.z, 0.0), 5.0) * 0.1;
+    float opposition_bloom = pow(smoothstep(0.985, 1.0, u_fraction), 2.0) *
+        pow(max(surface_normal.z, 0.0), 5.0) * 0.055;
     surface += u_light_tint * opposition_bloom;
     out_color = vec4(surface, limb * u_opacity);
 }`;
@@ -446,14 +477,14 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                         [
                             star.x / 100,
                             star.y / 100,
-                            Math.max(1.8, star.radius * 2.85),
+                            Math.max(1, star.radius * 2.12),
                             star.opacity,
                             color[0],
                             color[1],
                             color[2],
                             star.scintillation,
                             star.phaseOffset,
-                            star.bright ? 1 : 0,
+                            star.chromaticScintillation,
                         ],
                         offset,
                     );
@@ -475,6 +506,7 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                     ["a_color", 3, 4],
                     ["a_scintillation", 1, 7],
                     ["a_phase", 1, 8],
+                    ["a_chromatic", 1, 9],
                 ];
                 attributes.forEach(([name, size, offset]) => {
                     const location = gl.getAttribLocation(starProgram, name);
@@ -496,6 +528,11 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                 gl.uniform1f(
                     uniform(starProgram, "u_global_opacity"),
                     current.starsOpacity,
+                );
+                gl.uniform2f(
+                    uniform(starProgram, "u_viewport"),
+                    width,
+                    height,
                 );
                 gl.blendFuncSeparate(
                     gl.SRC_ALPHA,
