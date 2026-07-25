@@ -101,7 +101,9 @@ const nasaMoonFrameUrl = (date: Date) => {
     const frame = Math.floor((date.getTime() - firstHour) / 3_600_000) + 1;
     if (frame < 1 || frame > 8_760) return undefined;
 
-    return `/api/moon/${frame}`;
+    // Version the proxy URL with the source resolution so old immutable CDN
+    // entries from the former 216 px frames can never be reused.
+    return `/api/moon/${frame}?source=730`;
 };
 
 export interface ProjectedStar {
@@ -173,8 +175,8 @@ export const calculateCelestialScene = ({
     const moonLightPenalty =
         moonAboveHorizon * illumination.fraction ** 1.42 * 1.3;
     const limitingMagnitude =
-        -0.25 +
-        night * 4.15 -
+        -0.1 +
+        night * 4.65 -
         moonLightPenalty -
         Math.max(0, haze - 0.85) * 0.34 -
         cloudDensity * 0.08 +
@@ -226,9 +228,12 @@ export const calculateCelestialScene = ({
             Math.max(0, horizontal.altitude),
         );
         const horizonFade = smoothHorizon(altitudeDegrees);
+        // Perceptual display brightness is deliberately compressed relative
+        // to stellar flux. It preserves the magnitude hierarchy while keeping
+        // threshold stars visible against an emissive display's black floor.
         const magnitudeBrightness = clamp(
-            (limitingMagnitude - apparentMagnitude + 0.45) / 2.8,
-            0.08,
+            ((limitingMagnitude - apparentMagnitude + 0.42) / 4.6) ** 0.68,
+            0.16,
             1,
         );
         const radius = clamp(1.82 - (star.mag + 1.2) * 0.29, 0.52, 2.15);

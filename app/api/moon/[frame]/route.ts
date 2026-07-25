@@ -1,5 +1,5 @@
 const NASA_MOON_FRAMES =
-    "https://svs.gsfc.nasa.gov/vis/a000000/a005500/a005587/frames/216x216_1x1_30p";
+    "https://svs.gsfc.nasa.gov/vis/a000000/a005500/a005587/frames/730x730_1x1_30p";
 
 export const runtime = "edge";
 

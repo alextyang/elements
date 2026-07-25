@@ -35,7 +35,7 @@ void main() {
     gl_PointSize = a_size * u_pixel_ratio * (1.0 + shimmer * a_scintillation * 0.1);
     v_color = clamp(a_color + vec3(chroma * 0.32, -chroma * 0.08, -chroma * 0.24), 0.0, 1.0);
     v_opacity = a_opacity * u_global_opacity * intensity;
-    v_bright = smoothstep(5.2, 10.0, a_size);
+    v_bright = smoothstep(3.2, 5.8, a_size);
 }`;
 
 const STAR_FRAGMENT_SHADER = `#version 300 es
@@ -51,13 +51,13 @@ void main() {
     float radius = length(p);
     if (radius > 1.0) discard;
 
-    float core = exp(-radius * radius * 18.0);
-    float airy = exp(-radius * radius * 3.7) * 0.27;
+    float core = exp(-radius * radius * 19.0) * 1.35;
+    float airy = exp(-radius * radius * 3.9) * 0.20;
     float cross = (
         exp(-abs(p.x) * 28.0) + exp(-abs(p.y) * 28.0)
     ) * exp(-radius * 4.4) * 0.08 * v_bright;
-    float alpha = (core + airy + cross) * v_opacity;
-    vec3 spectralCore = mix(v_color, vec3(1.0), core * 0.76);
+    float alpha = clamp((core + airy + cross) * v_opacity * 1.28, 0.0, 1.0);
+    vec3 spectralCore = mix(v_color, vec3(1.0), clamp(core * 0.62, 0.0, 0.86));
     out_color = vec4(spectralCore, alpha);
 }`;
 
@@ -124,14 +124,19 @@ void main() {
 
     if (radial > 1.0) {
         float separation = radial - 1.0;
-        float near_aureole = exp(-separation * 2.75);
-        float aerosol_forward = pow(1.0 + separation * separation * 0.72, -1.28);
-        float multiple_scatter = exp(-separation * 0.28);
-        float halo = u_halo_opacity * (
-            near_aureole * 0.42 +
-            aerosol_forward * 0.28 +
-            multiple_scatter * 0.035
-        );
+        // The aureole is a broad atmospheric point-spread function, not a
+        // ring attached to the lunar limb. Low amplitudes and slightly
+        // anisotropic falloff prevent a recognizable circular radius stamp.
+        float anisotropic_radius = length(vec2(screen_point.x * 0.94, screen_point.y * 1.06));
+        float anisotropic_separation = max(0.0, anisotropic_radius - 1.0);
+        float angular_variation = 0.94 + 0.06 * cos(atan(screen_point.y, screen_point.x) * 2.0 + 0.7);
+        float near_aureole = exp(-anisotropic_separation * 1.55) * 0.105;
+        float diffuse_scatter = exp(-anisotropic_separation * 0.31) * 0.016;
+        float quad_fade = 1.0 - smoothstep(6.2, 7.8, radial);
+        float halo = u_halo_opacity *
+            (near_aureole + diffuse_scatter) *
+            angular_variation *
+            quad_fade;
         vec3 halo_color = mix(u_light_tint, vec3(0.76, 0.82, 0.94), 0.08);
         out_color = vec4(halo_color, halo * u_opacity);
         return;
@@ -185,9 +190,13 @@ void main() {
     // NASA's hourly LRO/LOLA render supplies the real terrain shadows,
     // libration and earthshine. Decode it to scene-linear radiance before
     // atmospheric extinction and the shared photographic output transform.
+    // NASA's square Dial-A-Moon frames include a roughly 7% black border.
+    // Sampling the whole image as the disc created a dark annulus and a false
+    // outer radius. Crop the texture coordinates to the actual lunar limb.
+    const float PHOTO_DISC_RADIUS = 0.432;
     vec2 photo_uv = vec2(
-        0.5 + texture_point.x * 0.5,
-        0.5 - texture_point.y * 0.5
+        0.5 + texture_point.x * PHOTO_DISC_RADIUS,
+        0.5 - texture_point.y * PHOTO_DISC_RADIUS
     );
     vec3 photo_srgb = texture(u_photo, photo_uv).rgb;
     float photo_luminance = dot(photo_srgb, vec3(0.2126, 0.7152, 0.0722));
@@ -204,7 +213,8 @@ void main() {
     vec3 surface = mix(procedural_surface, photographed_surface, u_use_photo);
     surface = tone_map(surface * u_transmittance * u_exposure);
 
-    float limb = smoothstep(0.0, 0.038, 1.0 - radial);
+    float limb_width = max(fwidth(radial) * 1.15, 0.006);
+    float limb = 1.0 - smoothstep(1.0 - limb_width, 1.0, radial);
     float opposition_bloom = smoothstep(0.88, 1.0, u_fraction) *
         pow(max(surface_normal.z, 0.0), 5.0) * 0.1;
     surface += u_light_tint * opposition_bloom;
@@ -436,7 +446,7 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                         [
                             star.x / 100,
                             star.y / 100,
-                            Math.max(1.35, star.radius * 2.45),
+                            Math.max(1.8, star.radius * 2.85),
                             star.opacity,
                             color[0],
                             color[1],
@@ -506,8 +516,8 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
 
                 const minimumDimension = Math.min(bounds.width, bounds.height);
                 const radiusCss = Math.min(
-                    18,
-                    Math.max(8.5, minimumDimension * 0.0145),
+                    20,
+                    Math.max(10.5, minimumDimension * 0.016),
                 ) * moon.scale;
                 const radius = radiusCss * devicePixelRatio;
                 const centerX = moon.x / 50 - 1;
