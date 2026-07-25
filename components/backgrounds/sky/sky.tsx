@@ -23,6 +23,17 @@ export type SkyMotionStyle =
     | "crosswind"
     | "thermal";
 
+export const SKY_BLOOM_STYLES = [
+    "diffuse",
+    "horizonBand",
+    "sideVeil",
+    "splitScatter",
+    "softHalo",
+    "quiet",
+] as const;
+
+export type SkyBloomStyle = (typeof SKY_BLOOM_STYLES)[number];
+
 export interface SkyPreviewOptions {
     date?: Date;
     timezone?: string;
@@ -41,6 +52,9 @@ export interface SkyPreviewOptions {
     cloudDensity?: number;
     motionSpeed?: number;
     motionAmount?: number;
+    bloomStyle?: SkyBloomStyle;
+    bloomVisibility?: number;
+    bloomScale?: number;
 }
 
 export interface SkySnapshot {
@@ -48,6 +62,7 @@ export interface SkySnapshot {
     familyId: string;
     atmosphereStyle: SkyAtmosphere;
     motionStyle: SkyMotionStyle;
+    bloomStyle: SkyBloomStyle;
 }
 
 interface SkyProps {
@@ -149,7 +164,6 @@ interface SkyVisual {
     mistOpacity: number;
     cloudOffset: number;
     cloudHeight: number;
-    horizonGlow: number;
     nightDepth: number;
     starRotation: number;
     motionDirection: "alternate" | "alternate-reverse";
@@ -165,12 +179,29 @@ interface SkyVisual {
     motionY: number;
     animationDelay: number;
     saturationLow: number;
-    saturationHigh: number;
     edgeOpacityLow: number;
     edgeOpacityHigh: number;
     airglowOpacityLow: number;
     airglowOpacityHigh: number;
-    horizonStrength: number;
+    bloomStyle: SkyBloomStyle;
+    bloomOpacity: number;
+    bloomBandOpacity: number;
+    bloomX: number;
+    bloomY: number;
+    bloomWidth: number;
+    bloomHeight: number;
+    bloomSecondaryX: number;
+    bloomSecondaryY: number;
+    bloomSecondaryWidth: number;
+    bloomSecondaryHeight: number;
+    bloomSecondaryStrength: number;
+    bloomCoreStop: number;
+    bloomMidStop: number;
+    bloomFadeStop: number;
+    bloomTilt: number;
+    bloomPrimary: string;
+    bloomSecondary: string;
+    bloomBand: string;
 }
 
 interface Keyframe {
@@ -460,7 +491,106 @@ const chooseDailyPalettes = (
     return {
         palettes,
         family,
-        randomValues: Array.from({ length: 20 }, () => random()),
+        randomValues: Array.from({ length: 32 }, () => random()),
+    };
+};
+
+const chooseBloomStyle = (value: number): SkyBloomStyle => {
+    // Quiet and diffuse scattering are deliberately most common. More
+    // recognizable halos and split lobes remain occasional natural events.
+    if (value < 0.3) return "quiet";
+    if (value < 0.56) return "diffuse";
+    if (value < 0.74) return "horizonBand";
+    if (value < 0.86) return "sideVeil";
+    if (value < 0.95) return "splitScatter";
+    return "softHalo";
+};
+
+const getBloomGeometry = (
+    style: SkyBloomStyle,
+    randomValues: number[],
+    sunX: number,
+    sunY: number,
+    scale: number,
+) => {
+    const y = clamp(46 + (sunY - 64) * 0.55, 34, 72);
+    const side = sunX < 50 ? -1 : 1;
+    const geometry = (() => {
+        switch (style) {
+            case "horizonBand":
+                return {
+                    width: 68 + randomValues[19] * 24,
+                    height: 13 + randomValues[20] * 10,
+                    secondaryX: 50 + side * (6 + randomValues[21] * 9),
+                    secondaryY: y + 8,
+                    secondaryWidth: 72 + randomValues[22] * 24,
+                    secondaryHeight: 8 + randomValues[23] * 10,
+                    secondaryStrength: 24 + randomValues[24] * 22,
+                };
+            case "sideVeil":
+                return {
+                    width: 34 + randomValues[19] * 20,
+                    height: 56 + randomValues[20] * 29,
+                    secondaryX: side < 0 ? -3 + randomValues[21] * 8 : 103 - randomValues[21] * 8,
+                    secondaryY: 49 + randomValues[22] * 21,
+                    secondaryWidth: 31 + randomValues[23] * 24,
+                    secondaryHeight: 62 + randomValues[24] * 31,
+                    secondaryStrength: 28 + randomValues[25] * 24,
+                };
+            case "splitScatter":
+                return {
+                    width: 22 + randomValues[19] * 18,
+                    height: 27 + randomValues[20] * 23,
+                    secondaryX: clamp(sunX - side * (17 + randomValues[21] * 16), 3, 97),
+                    secondaryY: y + (randomValues[22] * 16 - 8),
+                    secondaryWidth: 22 + randomValues[23] * 22,
+                    secondaryHeight: 25 + randomValues[24] * 28,
+                    secondaryStrength: 38 + randomValues[25] * 28,
+                };
+            case "softHalo":
+                return {
+                    width: 15 + randomValues[19] * 12,
+                    height: 18 + randomValues[20] * 18,
+                    secondaryX: clamp(sunX + side * (5 + randomValues[21] * 8), 2, 98),
+                    secondaryY: y + (randomValues[22] * 8 - 4),
+                    secondaryWidth: 31 + randomValues[23] * 17,
+                    secondaryHeight: 29 + randomValues[24] * 25,
+                    secondaryStrength: 18 + randomValues[25] * 24,
+                };
+            case "quiet":
+                return {
+                    width: 54 + randomValues[19] * 30,
+                    height: 35 + randomValues[20] * 31,
+                    secondaryX: 50 + (randomValues[21] * 18 - 9),
+                    secondaryY: y + 8 + randomValues[22] * 11,
+                    secondaryWidth: 62 + randomValues[23] * 26,
+                    secondaryHeight: 18 + randomValues[24] * 21,
+                    secondaryStrength: 12 + randomValues[25] * 15,
+                };
+            default:
+                return {
+                    width: 42 + randomValues[19] * 25,
+                    height: 39 + randomValues[20] * 31,
+                    secondaryX: clamp(sunX - side * (9 + randomValues[21] * 13), 0, 100),
+                    secondaryY: y + (randomValues[22] * 18 - 4),
+                    secondaryWidth: 45 + randomValues[23] * 29,
+                    secondaryHeight: 29 + randomValues[24] * 34,
+                    secondaryStrength: 21 + randomValues[25] * 26,
+                };
+        }
+    })();
+
+    return {
+        x: style === "sideVeil" ? clamp(sunX + side * 8, 0, 100) : sunX,
+        y,
+        width: geometry.width * scale,
+        height: geometry.height * scale,
+        secondaryX: geometry.secondaryX,
+        secondaryY: geometry.secondaryY,
+        secondaryWidth: geometry.secondaryWidth * scale,
+        secondaryHeight: geometry.secondaryHeight * scale,
+        secondaryStrength: geometry.secondaryStrength,
+        tilt: (randomValues[26] * 2 - 1) * (style === "horizonBand" ? 1.5 : 5.5),
     };
 };
 
@@ -631,18 +761,64 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const cloudDensity = preview?.cloudDensity ?? 1;
     const motionSpeed = preview?.motionSpeed ?? 1;
     const motionAmount = preview?.motionAmount ?? 1;
+    const sunX = clamp(50 + Math.sin(celestial.azimuth) * 47, 2, 98);
+    const sunY = clamp(78 - Math.sin(celestial.altitude) * 69, 8, 84);
+    const horizonGlow = clamp((18 - Math.abs(altitude)) / 18);
+    const bloomStyle =
+        preview?.bloomStyle ?? chooseBloomStyle(daily.randomValues[17]);
+    const bloomScale =
+        (preview?.bloomScale ?? 1) * (0.78 + daily.randomValues[18] * 0.54);
+    const bloomGeometry = getBloomGeometry(
+        bloomStyle,
+        daily.randomValues,
+        sunX,
+        sunY,
+        bloomScale,
+    );
+    const bloomVisibility = preview?.bloomVisibility ?? 1;
+    const quietMultiplier = bloomStyle === "quiet" ? 0.3 : 1;
+    const visibilitySeed = daily.randomValues[16] ** 2.55;
+    const phaseVisibility = 0.1 + horizonGlow * 0.9;
+    const bloomOpacity = clamp(
+        (0.016 + visibilitySeed * 0.4) *
+            phaseVisibility *
+            intensity.glow *
+            quietMultiplier *
+            bloomVisibility,
+        0,
+        0.58,
+    );
+    const bloomBandOpacity = clamp(
+        (0.012 + daily.randomValues[27] ** 2.3 * 0.16) *
+            (0.24 + horizonGlow * 0.76) *
+            intensity.haze *
+            (bloomStyle === "horizonBand" ? 1.3 : 0.72) *
+            bloomVisibility,
+        0,
+        0.28,
+    );
+    const celestialVisibility =
+        (0.13 + daily.randomValues[28] ** 2.25 * 0.64) *
+        (bloomStyle === "softHalo" ? 1.12 : 1) *
+        bloomVisibility;
+    const bloomWarmth = 0.12 + daily.randomValues[29] * 0.5;
+    const sideColor = daily.randomValues[30] > 0.5
+        ? palette.left
+        : palette.right;
 
     return {
         palette,
         familyId: daily.family.id,
         atmosphereStyle,
         motionStyle,
-        sunX: clamp(50 + Math.sin(celestial.azimuth) * 47, 2, 98),
-        sunY: clamp(78 - Math.sin(celestial.altitude) * 69, 8, 84),
-        sunOpacity: celestialOpacity * intensity.glow,
+        sunX,
+        sunY,
+        sunOpacity: celestialOpacity * intensity.glow * celestialVisibility,
         celestialSize: useSun
-            ? 17 + nearHorizon * 5
-            : 9 + moonIllumination.fraction * 6,
+            ? (11 + daily.randomValues[19] * 18 + nearHorizon * 8) *
+              bloomScale
+            : (7 + moonIllumination.fraction * 6 + daily.randomValues[19] * 5) *
+              bloomScale,
         starsOpacity:
             clamp((-altitude - 7) / 14) *
             0.34 *
@@ -664,7 +840,6 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
             cloudDensity,
         cloudOffset: daily.randomValues[1] * 700,
         cloudHeight: 8 + daily.randomValues[2] * 24,
-        horizonGlow: clamp((18 - Math.abs(altitude)) / 18),
         nightDepth: 1 - daylight,
         starRotation: daily.randomValues[3] * 18 - 9,
         motionDirection:
@@ -687,12 +862,29 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
             motionAmount,
         animationDelay: -(12 + daily.randomValues[8] * 64),
         saturationLow: intensity.saturation * 0.96,
-        saturationHigh: intensity.saturation * 1.04,
         edgeOpacityLow: clamp(edgeLow * intensity.edge, 0.12, 0.66),
         edgeOpacityHigh: clamp(edgeHigh * intensity.edge, 0.18, 0.72),
         airglowOpacityLow: clamp(0.13 * intensity.edge, 0.08, 0.2),
         airglowOpacityHigh: clamp(0.22 * intensity.edge, 0.14, 0.32),
-        horizonStrength: intensity.glow,
+        bloomStyle,
+        bloomOpacity,
+        bloomBandOpacity,
+        bloomX: bloomGeometry.x,
+        bloomY: bloomGeometry.y,
+        bloomWidth: bloomGeometry.width,
+        bloomHeight: bloomGeometry.height,
+        bloomSecondaryX: bloomGeometry.secondaryX,
+        bloomSecondaryY: bloomGeometry.secondaryY,
+        bloomSecondaryWidth: bloomGeometry.secondaryWidth,
+        bloomSecondaryHeight: bloomGeometry.secondaryHeight,
+        bloomSecondaryStrength: bloomGeometry.secondaryStrength,
+        bloomCoreStop: 3 + daily.randomValues[21] * 15,
+        bloomMidStop: 27 + daily.randomValues[22] * 20,
+        bloomFadeStop: 70 + daily.randomValues[23] * 25,
+        bloomTilt: bloomGeometry.tilt,
+        bloomPrimary: mixColor(palette.glow, palette.cloudWarm, bloomWarmth),
+        bloomSecondary: mixColor(palette.haze, sideColor, 0.18 + daily.randomValues[31] * 0.42),
+        bloomBand: mixColor(palette.horizon, palette.cloudWarm, 0.22 + bloomWarmth * 0.42),
     };
 };
 
@@ -741,6 +933,7 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
                 familyId: next.familyId,
                 atmosphereStyle: next.atmosphereStyle,
                 motionStyle: next.motionStyle,
+                bloomStyle: next.bloomStyle,
             });
             document
                 .getElementById("theme-color")
@@ -778,10 +971,24 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
         "--cloud-offset": `${visual?.cloudOffset ?? 0}px`,
         "--cloud-low-offset": `${(visual?.cloudOffset ?? 0) * -0.6}px`,
         "--cloud-height": `${visual?.cloudHeight ?? 18}%`,
-        "--horizon-glow": visual?.horizonGlow ?? 0.4,
-        "--horizon-opacity":
-            (0.5 + (visual?.horizonGlow ?? 0.4) * 0.42) *
-            (visual?.horizonStrength ?? 1),
+        "--bloom-opacity": visual?.bloomOpacity ?? 0.04,
+        "--bloom-band-opacity": visual?.bloomBandOpacity ?? 0.025,
+        "--bloom-x": `${visual?.bloomX ?? 50}%`,
+        "--bloom-y": `${visual?.bloomY ?? 58}%`,
+        "--bloom-width": `${visual?.bloomWidth ?? 48}%`,
+        "--bloom-height": `${visual?.bloomHeight ?? 44}%`,
+        "--bloom-secondary-x": `${visual?.bloomSecondaryX ?? 43}%`,
+        "--bloom-secondary-y": `${visual?.bloomSecondaryY ?? 63}%`,
+        "--bloom-secondary-width": `${visual?.bloomSecondaryWidth ?? 54}%`,
+        "--bloom-secondary-height": `${visual?.bloomSecondaryHeight ?? 38}%`,
+        "--bloom-secondary-strength": `${visual?.bloomSecondaryStrength ?? 32}%`,
+        "--bloom-core-stop": `${visual?.bloomCoreStop ?? 10}%`,
+        "--bloom-mid-stop": `${visual?.bloomMidStop ?? 38}%`,
+        "--bloom-fade-stop": `${visual?.bloomFadeStop ?? 82}%`,
+        "--bloom-tilt": `${visual?.bloomTilt ?? 0}deg`,
+        "--bloom-primary": visual?.bloomPrimary ?? palette?.glow,
+        "--bloom-secondary": visual?.bloomSecondary ?? palette?.haze,
+        "--bloom-band": visual?.bloomBand ?? palette?.horizon,
         "--night-depth": visual?.nightDepth ?? 0,
         "--night-vignette": 0.05 + (visual?.nightDepth ?? 0) * 0.12,
         "--star-rotation": `${visual?.starRotation ?? 0}deg`,
@@ -798,7 +1005,6 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
         "--motion-y": `${visual?.motionY ?? 1.1}vmax`,
         "--animation-delay": `${visual?.animationDelay ?? -24}s`,
         "--palette-saturation-low": visual?.saturationLow ?? 1.04,
-        "--palette-saturation-high": visual?.saturationHigh ?? 1.12,
         "--edge-opacity-low": visual?.edgeOpacityLow ?? 0.31,
         "--edge-opacity-high": visual?.edgeOpacityHigh ?? 0.41,
         "--airglow-opacity-low": visual?.airglowOpacityLow ?? 0.13,
@@ -811,6 +1017,7 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
             className={`${styles.background} ${styles[visual?.atmosphereStyle ?? "crystal"]} ${styles[`motion${(visual?.motionStyle ?? "drift").replace(/^./, (letter) => letter.toUpperCase())}`]} ${paused ? styles.paused : ""}`}
             style={customProperties}
             data-sky-family={visual?.familyId ?? "loading"}
+            data-bloom-style={visual?.bloomStyle ?? "loading"}
             aria-hidden="true"
         >
             <div className={styles.base} />

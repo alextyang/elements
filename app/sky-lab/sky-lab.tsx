@@ -9,7 +9,9 @@ import {
 } from "react";
 
 import {
+    SKY_BLOOM_STYLES,
     Sky,
+    SkyBloomStyle,
     SkyMotionStyle,
     SkyPreviewOptions,
     SkySnapshot,
@@ -101,6 +103,7 @@ interface LabSettings {
     phase: "natural" | SkyPhase;
     atmosphere: "auto" | SkyAtmosphere;
     motion: "auto" | SkyMotionStyle;
+    bloom: "auto" | SkyBloomStyle;
     region: "auto" | SkyRegion;
     season: "auto" | SkySeason;
     variant: "auto" | "-1" | "0" | "1";
@@ -118,6 +121,8 @@ interface LabSettings {
     cloudDensity: number;
     motionSpeed: number;
     motionAmount: number;
+    bloomVisibility: number;
+    bloomScale: number;
     paused: boolean;
 }
 
@@ -136,6 +141,7 @@ const DEFAULT_SETTINGS: LabSettings = {
     phase: "natural",
     atmosphere: "auto",
     motion: "auto",
+    bloom: "auto",
     region: "auto",
     season: "auto",
     variant: "auto",
@@ -153,6 +159,8 @@ const DEFAULT_SETTINGS: LabSettings = {
     cloudDensity: 1,
     motionSpeed: 1,
     motionAmount: 1,
+    bloomVisibility: 1,
+    bloomScale: 1,
     paused: false,
 };
 
@@ -251,6 +259,7 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
         "phase",
         "atmosphere",
         "motion",
+        "bloom",
         "region",
         "season",
         "variant",
@@ -268,6 +277,8 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
         "cloudDensity",
         "motionSpeed",
         "motionAmount",
+        "bloomVisibility",
+        "bloomScale",
     ];
 
     strings.forEach((key) => {
@@ -295,6 +306,7 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
     if (next.phase !== "natural" && !isOneOf(PHASE_ORDER, next.phase)) next.phase = "natural";
     if (next.atmosphere !== "auto" && !isOneOf(ATMOSPHERES, next.atmosphere)) next.atmosphere = "auto";
     if (next.motion !== "auto" && !isOneOf(MOTIONS, next.motion)) next.motion = "auto";
+    if (next.bloom !== "auto" && !isOneOf(SKY_BLOOM_STYLES, next.bloom)) next.bloom = "auto";
     if (next.region !== "auto" && !isOneOf(REGIONS, next.region)) next.region = "auto";
     if (next.season !== "auto" && !isOneOf(SEASONS, next.season)) next.season = "auto";
     if (!isOneOf(["auto", "-1", "0", "1"], next.variant)) next.variant = "auto";
@@ -311,6 +323,8 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
     next.cloudDensity = limit(next.cloudDensity, 0, 2);
     next.motionSpeed = limit(next.motionSpeed, 0.25, 3);
     next.motionAmount = limit(next.motionAmount, 0, 2);
+    next.bloomVisibility = limit(next.bloomVisibility, 0, 2);
+    next.bloomScale = limit(next.bloomScale, 0.5, 1.8);
 
     return next;
 };
@@ -440,6 +454,9 @@ export function SkyLab() {
             cloudDensity: settings.cloudDensity,
             motionSpeed: settings.motionSpeed,
             motionAmount: settings.motionAmount,
+            bloomStyle: settings.bloom === "auto" ? undefined : settings.bloom,
+            bloomVisibility: settings.bloomVisibility,
+            bloomScale: settings.bloomScale,
         }),
         [previewDate, settings],
     );
@@ -475,6 +492,7 @@ export function SkyLab() {
                 : PHASE_ORDER[Math.floor(Math.random() * PHASE_ORDER.length)],
             atmosphere: ATMOSPHERES[Math.floor(Math.random() * ATMOSPHERES.length)],
             motion: MOTIONS[Math.floor(Math.random() * MOTIONS.length)],
+            bloom: SKY_BLOOM_STYLES[Math.floor(Math.random() * SKY_BLOOM_STYLES.length)],
             region: REGIONS[Math.floor(Math.random() * REGIONS.length)],
             season: SEASONS[Math.floor(Math.random() * SEASONS.length)],
             variant: (["-1", "0", "1"] as const)[Math.floor(Math.random() * 3)],
@@ -492,6 +510,8 @@ export function SkyLab() {
             cloudDensity: randomStepped(0.34, 1.8, 0.02),
             motionSpeed: randomStepped(0.45, 2.25, 0.05),
             motionAmount: randomStepped(0.44, 1.76, 0.02),
+            bloomVisibility: randomStepped(0.18, 1.7, 0.02),
+            bloomScale: randomStepped(0.5, 1.8, 0.02),
             paused: false,
         }));
     };
@@ -528,7 +548,7 @@ export function SkyLab() {
                 <div className={styles.status}>
                     <strong>{familyLabel}</strong>
                     <span>
-                        {titleCase(snapshot?.atmosphereStyle ?? "loading")} · {titleCase(snapshot?.motionStyle ?? "loading")}
+                        {titleCase(snapshot?.atmosphereStyle ?? "loading")} · {titleCase(snapshot?.motionStyle ?? "loading")} · {titleCase(snapshot?.bloomStyle ?? "loading")}
                     </span>
                 </div>
 
@@ -632,6 +652,12 @@ export function SkyLab() {
 
                 <fieldset>
                     <legend>Texture and motion</legend>
+                    <SelectField label="Solar bloom composition" value={settings.bloom} onChange={(value) => update("bloom", value as LabSettings["bloom"])}>
+                        <option value="auto">Daily seeded</option>
+                        {SKY_BLOOM_STYLES.map((bloom) => <option key={bloom} value={bloom}>{titleCase(bloom)}</option>)}
+                    </SelectField>
+                    <Slider label="Bloom visibility" value={settings.bloomVisibility} min={0} max={2} step={0.02} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("bloomVisibility", value)} />
+                    <Slider label="Bloom scale" value={settings.bloomScale} min={0.5} max={1.8} step={0.02} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("bloomScale", value)} />
                     <Slider label="Cloud / mist density" value={settings.cloudDensity} min={0} max={2} step={0.02} onChange={(value) => update("cloudDensity", value)} />
                     <Slider label="Motion speed" value={settings.motionSpeed} min={0.25} max={3} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("motionSpeed", value)} />
                     <Slider label="Motion distance" value={settings.motionAmount} min={0} max={2} step={0.02} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("motionAmount", value)} />
