@@ -73,6 +73,8 @@ export interface SkySnapshot {
     moonPhase: string;
     moonIllumination: number;
     visibleStars: number;
+    lightingRegime: string;
+    darkness: number;
 }
 
 interface SkyProps {
@@ -171,6 +173,7 @@ interface SkyVisual {
     cloudOffset: number;
     cloudHeight: number;
     nightDepth: number;
+    lightingRegime: string;
     motionDirection: "alternate" | "alternate-reverse";
     baseDuration: number;
     edgeDuration: number;
@@ -218,6 +221,22 @@ const clamp = (value: number, min = 0, max = 1) =>
 const smoothstep = (value: number) => {
     const t = clamp(value);
     return t * t * (3 - 2 * t);
+};
+
+const PHASE_SOLAR_ALTITUDE: Record<SkyPhase, number> = {
+    night: -22,
+    blueHourMorning: -11,
+    preDawn: -7.5,
+    beltOfVenus: -4,
+    sunrise: -0.6,
+    morning: 11,
+    solarNoon: 54,
+    day: 38,
+    golden: 7,
+    sunset: -0.6,
+    afterglow: -3.5,
+    dusk: -6.5,
+    blueHourEvening: -11,
 };
 
 interface OklabColor {
@@ -318,6 +337,139 @@ const mixPalette = (
         result[key] = mixColor(from[key], to[key], amount);
     });
     return result;
+};
+
+const toneColor = (
+    source: string,
+    tint: string,
+    lightness: number,
+    chromaScale: number,
+) => {
+    const original = toOklab(source);
+    const cast = toOklab(tint);
+    const a = original.a * 0.28 + cast.a * 0.72;
+    const b = original.b * 0.28 + cast.b * 0.72;
+    const chroma = Math.hypot(a, b);
+    const maximumChroma = 0.058 * chromaScale;
+    const scale = chroma > maximumChroma ? maximumChroma / chroma : 1;
+
+    return fromOklab({
+        l: clamp(lightness, 0.045, 0.48),
+        a: a * scale,
+        b: b * scale,
+    });
+};
+
+interface PhysicalPaletteResult {
+    palette: SkyPalette;
+    darkness: number;
+    moonlight: number;
+    regime: string;
+}
+
+const applyPhysicalAtmosphere = ({
+    source,
+    family,
+    atmosphere,
+    solarAltitude,
+    moonAltitude,
+    moonFraction,
+    cloudDensity,
+    randomValues,
+}: {
+    source: SkyPalette;
+    family: SkyFamily;
+    atmosphere: SkyAtmosphere;
+    solarAltitude: number;
+    moonAltitude: number;
+    moonFraction: number;
+    cloudDensity: number;
+    randomValues: number[];
+}): PhysicalPaletteResult => {
+    // Natural twilight is logarithmic: the night floor should not be reached
+    // during civil twilight, then settles rapidly through nautical twilight.
+    const darkness = smoothstep((-solarAltitude - 7) / 10.5);
+    const moonAboveHorizon = smoothstep((moonAltitude + 1.5) / 12);
+    const moonlight =
+        darkness * moonAboveHorizon * moonFraction ** 1.45;
+    const optics = family.optics;
+    const cloudy =
+        cloudDensity *
+        ({ crystal: 0.18, cirrus: 0.42, haze: 0.58, mist: 0.78, soft: 0.9 }[atmosphere]);
+    const dailyExposure = (randomValues[28] - 0.5) * 0.038;
+    const naturalAirglow =
+        (0.008 + randomValues[30] ** 2 * 0.026) *
+        (1 - optics.aerosol * 0.48);
+    const groundGlow =
+        optics.artificialGlow *
+        (0.52 + randomValues[31] * 0.78) *
+        (1 + cloudy * 0.7);
+    const humidityLift = optics.humidity * 0.018;
+    const moonZenithLift = moonlight * (0.055 + optics.aerosol * 0.026);
+    const moonHorizonLift = moonlight * (0.068 + optics.humidity * 0.045);
+    const floor = clamp(
+        optics.nightFloor + dailyExposure + naturalAirglow + moonZenithLift,
+        0.062,
+        0.235,
+    );
+    const horizonLift =
+        optics.horizonLift +
+        humidityLift +
+        groundGlow +
+        moonHorizonLift;
+    const overcastCompression = clamp(cloudy - 0.55) * 0.035;
+    const top = floor + overcastCompression;
+    const upper = floor + 0.018 + overcastCompression * 0.8;
+    const middle = floor + 0.04 + humidityLift + overcastCompression * 0.5;
+    const horizon = floor + 0.066 + horizonLift;
+    const low = floor + 0.078 + horizonLift * 1.12;
+    const edgeVariation = (randomValues[24] - 0.5) * 0.025;
+    const cloudLight =
+        middle -
+        0.018 * (1 - moonlight) +
+        moonlight * (0.085 + optics.humidity * 0.035) +
+        groundGlow * 0.72;
+    const warmCloudLight =
+        cloudLight + moonlight * 0.02 + groundGlow * 0.38;
+    const chromaScale = clamp(
+        0.58 + (1 - optics.humidity) * 0.2 + moonlight * 0.08,
+        0.5,
+        0.82,
+    );
+    const target: SkyPalette = {
+        top: toneColor(source.top, optics.nightTint, top, chromaScale),
+        upper: toneColor(source.upper, optics.nightTint, upper, chromaScale),
+        middle: toneColor(source.middle, optics.nightTint, middle, chromaScale),
+        horizon: toneColor(source.horizon, optics.nightTint, horizon, chromaScale),
+        low: toneColor(source.low, optics.nightTint, low, chromaScale * 0.92),
+        left: toneColor(source.left, optics.nightTint, middle + 0.012 + edgeVariation, chromaScale),
+        right: toneColor(source.right, optics.nightTint, middle + 0.012 - edgeVariation, chromaScale),
+        glow: toneColor(source.glow, optics.nightTint, horizon + 0.028 + moonlight * 0.035, chromaScale * 0.72),
+        haze: toneColor(source.haze, optics.nightTint, middle + humidityLift + groundGlow * 0.45, chromaScale * 0.68),
+        cloud: toneColor(source.cloud, optics.nightTint, cloudLight, chromaScale * 0.42),
+        cloudWarm: toneColor(source.cloudWarm, optics.nightTint, warmCloudLight, chromaScale * 0.46),
+    };
+
+    const moonlit = moonlight > 0.13;
+    const clouded = cloudy > 0.7;
+    const regime = moonlit
+        ? clouded
+            ? "Moonlit cloud deck"
+            : `Moonlit ${optics.nightCharacter} sky`
+        : clouded
+          ? groundGlow > 0.045
+              ? "Cloud-amplified skyglow"
+              : "Moonless overcast"
+          : groundGlow > 0.05
+            ? `Low ${optics.nightCharacter} skyglow`
+            : `${optics.nightCharacter[0].toUpperCase()}${optics.nightCharacter.slice(1)} moonless sky`;
+
+    return {
+        palette: mixPalette(source, target, darkness),
+        darkness,
+        moonlight,
+        regime: darkness > 0.04 ? regime : "Solar atmosphere",
+    };
 };
 
 const gradePalette = (
@@ -477,14 +629,13 @@ const chooseDailyPalettes = (
     PHASE_ORDER.forEach((phase) => {
         const choices = SKY_PALETTES[phase];
         const familyIndex = family.phaseIndices[phase];
-        const index =
-            (familyIndex + variantShift + choices.length) % choices.length;
+        const index = familyIndex % choices.length;
         const graded = gradePalette(
             choices[index],
             family,
-            hueJitter,
-            chromaJitter,
-            lightnessJitter,
+            hueJitter + variantShift * 1.15,
+            chromaJitter * (1 + variantShift * 0.035),
+            lightnessJitter + variantShift * 0.006,
         );
         palettes[phase] = flipEdges
             ? { ...graded, left: graded.right, right: graded.left }
@@ -699,7 +850,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         latitude,
         preview,
     );
-    const palette = preview?.phase
+    const rawPalette = preview?.phase
         ? daily.palettes[preview.phase]
         : interpolateKeyframes(
               buildKeyframes(
@@ -715,7 +866,12 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const altitude = sun.altitude * (180 / Math.PI);
     const moon = SunCalc.getMoonPosition(date, latitude, longitude);
     const moonAltitude = moon.altitude * (180 / Math.PI);
+    const moonIllumination = SunCalc.getMoonIllumination(date);
     const daylight = clamp((altitude + 8) / 11);
+    const visualSolarAltitude = preview?.phase
+        ? PHASE_SOLAR_ALTITUDE[preview.phase]
+        : altitude;
+    const visualDaylight = clamp((visualSolarAltitude + 8) / 11);
     const atmosphereStyle =
         preview?.atmosphereStyle ??
         daily.family.atmospheres[
@@ -754,6 +910,17 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const [edgeLow, edgeHigh] = edgeOpacityByAtmosphere[atmosphereStyle];
     const intensity = daily.family.intensity;
     const cloudDensity = preview?.cloudDensity ?? 1;
+    const physicalAtmosphere = applyPhysicalAtmosphere({
+        source: rawPalette,
+        family: daily.family,
+        atmosphere: atmosphereStyle,
+        solarAltitude: visualSolarAltitude,
+        moonAltitude,
+        moonFraction: moonIllumination.fraction,
+        cloudDensity,
+        randomValues: daily.randomValues,
+    });
+    const palette = physicalAtmosphere.palette;
     const motionSpeed = preview?.motionSpeed ?? 1;
     const motionAmount = preview?.motionAmount ?? 1;
     const sunX = clamp(50 + Math.sin(celestial.azimuth) * 47, 2, 98);
@@ -773,7 +940,9 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const bloomVisibility = preview?.bloomVisibility ?? 1;
     const quietMultiplier = bloomStyle === "quiet" ? 0.3 : 1;
     const visibilitySeed = daily.randomValues[16] ** 2.55;
-    const phaseVisibility = 0.1 + horizonGlow * 0.9;
+    const phaseVisibility =
+        (0.025 + horizonGlow * 0.975) *
+        (1 - physicalAtmosphere.darkness * 0.9);
     const bloomOpacity = clamp(
         (0.016 + visibilitySeed * 0.4) *
             phaseVisibility *
@@ -800,7 +969,14 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         date,
         latitude,
         longitude,
-        haze: intensity.haze,
+        haze: clamp(
+            intensity.haze *
+                (0.64 +
+                    daily.family.optics.aerosol * 0.42 +
+                    daily.family.optics.humidity * 0.14),
+            0.42,
+            1.7,
+        ),
         cloudDensity,
         starVisibility: preview?.starVisibility,
         moonVisibility: preview?.moonVisibility,
@@ -815,12 +991,16 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         highCloudOpacity:
             textureByStyle.high *
             textureStrength *
-            (0.76 + daylight * 0.24) *
+            (0.62 +
+                visualDaylight * 0.38 +
+                physicalAtmosphere.moonlight * 0.3) *
             cloudDensity,
         lowCloudOpacity:
             textureByStyle.low *
             textureStrength *
-            (0.76 + daylight * 0.24) *
+            (0.64 +
+                visualDaylight * 0.36 +
+                physicalAtmosphere.moonlight * 0.34) *
             cloudDensity,
         mistOpacity:
             textureByStyle.mist *
@@ -829,7 +1009,8 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
             cloudDensity,
         cloudOffset: daily.randomValues[1] * 700,
         cloudHeight: 8 + daily.randomValues[2] * 24,
-        nightDepth: 1 - daylight,
+        nightDepth: physicalAtmosphere.darkness,
+        lightingRegime: physicalAtmosphere.regime,
         motionDirection:
             daily.randomValues[7] > 0.5 ? "alternate" : "alternate-reverse",
         baseDuration: (26 + daily.randomValues[8] * 20) / motionSpeed,
@@ -847,11 +1028,44 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
                 clamp((18 - Math.abs(celestialAltitude)) / 18) * 0.3) *
             motionAmount,
         animationDelay: -(12 + daily.randomValues[8] * 64),
-        saturationLow: intensity.saturation * 0.96,
-        edgeOpacityLow: clamp(edgeLow * intensity.edge, 0.12, 0.66),
-        edgeOpacityHigh: clamp(edgeHigh * intensity.edge, 0.18, 0.72),
-        airglowOpacityLow: clamp(0.13 * intensity.edge, 0.08, 0.2),
-        airglowOpacityHigh: clamp(0.22 * intensity.edge, 0.14, 0.32),
+        saturationLow:
+            intensity.saturation *
+            0.96 *
+            (1 - physicalAtmosphere.darkness * 0.3) *
+            between(
+                1,
+                daily.family.optics.twilightChroma,
+                clamp(1 - Math.abs(visualSolarAltitude + 4.5) / 10) *
+                    (1 - physicalAtmosphere.darkness),
+            ),
+        edgeOpacityLow: clamp(
+            edgeLow *
+                intensity.edge *
+                (1 - physicalAtmosphere.darkness * 0.54),
+            0.07,
+            0.66,
+        ),
+        edgeOpacityHigh: clamp(
+            edgeHigh *
+                intensity.edge *
+                (1 - physicalAtmosphere.darkness * 0.48),
+            0.1,
+            0.72,
+        ),
+        airglowOpacityLow: clamp(
+            (0.075 + daily.randomValues[30] * 0.055) *
+                intensity.edge *
+                (0.65 + physicalAtmosphere.darkness * 0.35),
+            0.045,
+            0.16,
+        ),
+        airglowOpacityHigh: clamp(
+            (0.12 + daily.randomValues[30] * 0.08) *
+                intensity.edge *
+                (0.68 + physicalAtmosphere.darkness * 0.32),
+            0.07,
+            0.25,
+        ),
         bloomStyle,
         bloomOpacity,
         bloomBandOpacity,
@@ -926,6 +1140,8 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
                     next.celestial.starsOpacity > 0.02
                         ? next.celestial.stars.length
                         : 0,
+                lightingRegime: next.lightingRegime,
+                darkness: next.nightDepth,
             });
             document
                 .getElementById("theme-color")

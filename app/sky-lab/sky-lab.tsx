@@ -565,6 +565,8 @@ export function SkyLab() {
                 </div>
 
                 <div className={styles.astronomyStatus}>
+                    <span>{snapshot?.lightingRegime ?? "Resolving lighting regime"}</span>
+                    <span>{Math.round((snapshot?.darkness ?? 0) * 100)}% nocturnal adaptation</span>
                     <span>{snapshot?.moonPhase ?? "Resolving lunar state"}</span>
                     <span>{Math.round((snapshot?.moonIllumination ?? 0) * 100)}% illuminated</span>
                     <span>{snapshot?.visibleStars ?? 0} visible catalogue stars</span>
