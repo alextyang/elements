@@ -758,6 +758,8 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const bloomGeometry = getBloomGeometry(
         bloomStyle,
         daily.randomValues,
+        sunX,
+        sunY,
         bloomScale,
     );
     const bloomVisibility = preview?.bloomVisibility ?? 1;
@@ -792,8 +794,6 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         familyId: daily.family.id,
         atmosphereStyle,
         motionStyle,
-        sunX,
-        sunY,
         starsOpacity:
             clamp((-altitude - 7) / 14) *
             0.34 *
