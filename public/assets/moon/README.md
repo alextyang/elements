@@ -7,3 +7,10 @@ Lunar Orbiter Laser Altimeter (LOLA) elevation data.
 
 Credit: NASA's Scientific Visualization Studio; visualization by Ernie Wright
 (USRA), with Noah Petro (NASA/GSFC) as scientist.
+
+For 2026, the app also requests the matching frame from NASA SVS's
+[Moon Phase and Libration, 2026](https://svs.gsfc.nasa.gov/5587/) animation.
+Those immutable hourly frames incorporate the observed phase, libration,
+position angle, apparent diameter, LROC surface imagery, LOLA terrain shadows,
+and earthshine. They are cached through the app's same-origin Moon endpoint and
+uploaded into WebGL; the local CGI Moon Kit shader remains the fallback.

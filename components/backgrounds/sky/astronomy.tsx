@@ -93,6 +93,17 @@ const phaseName = (phase: number) => {
     return "Waning crescent";
 };
 
+const nasaMoonFrameUrl = (date: Date) => {
+    const year = date.getUTCFullYear();
+    if (year !== 2026) return undefined;
+
+    const firstHour = Date.UTC(year, 0, 1);
+    const frame = Math.floor((date.getTime() - firstHour) / 3_600_000) + 1;
+    if (frame < 1 || frame > 8_760) return undefined;
+
+    return `/api/moon/${frame}`;
+};
+
 export interface ProjectedStar {
     id: number;
     x: number;
@@ -115,6 +126,10 @@ export interface MoonScene {
     scale: number;
     rotation: number;
     textureRotation: number;
+    atmosphericWarmth: number;
+    transmittance: [number, number, number];
+    exposure: number;
+    photoUrl?: string;
     fraction: number;
     phase: number;
     phaseName: string;
@@ -156,7 +171,7 @@ export const calculateCelestialScene = ({
     const night = clamp((-sunAltitude - 3) / 15);
     const moonAboveHorizon = clamp((moonAltitude + 1.5) / 8);
     const moonLightPenalty =
-        moonAboveHorizon * illumination.fraction ** 1.45 * 0.95;
+        moonAboveHorizon * illumination.fraction ** 1.42 * 1.3;
     const limitingMagnitude =
         -0.25 +
         night * 4.15 -
@@ -253,14 +268,27 @@ export const calculateCelestialScene = ({
         Math.atan2(sunPoint.y - moonPoint.y, directionX) / DEG;
     const moonHorizonFade = clamp((moonAltitude + 1.5) / 5.5);
     const darkness = clamp((-sunAltitude + 1) / 11);
-    const daytimeOpacity = 0.1 + illumination.fraction * 0.16;
-    const nighttimeOpacity = 0.58 + illumination.fraction * 0.35;
+    // Lunar surface brightness changes far less than its illuminated area.
+    // Keeping the lit crescent locally bright avoids the common CG mistake of
+    // dimming the entire Moon as its phase narrows.
+    const daytimeOpacity = 0.11 + illumination.fraction * 0.14;
+    const nighttimeOpacity = 0.82 + illumination.fraction * 0.13;
     const atmosphericClarity = clamp(
-        1 - Math.max(0, haze - 0.8) * 0.1 - cloudDensity * 0.025,
-        0.68,
+        1 - Math.max(0, haze - 0.72) * 0.12 - cloudDensity * 0.065,
+        0.58,
         1,
     );
     const lowAltitudeWarmth = clamp((16 - moonAltitude) / 16);
+    const moonAirmass =
+        moonAltitude <= 0
+            ? 12
+            : 1 /
+              (Math.sin(moon.altitude) +
+                  0.50572 * (moonAltitude + 6.07995) ** -1.6364);
+    const aerosolDepth = 0.012 + haze * 0.018 + cloudDensity * 0.006;
+    const transmittance = [0.026, 0.047, 0.092].map((rayleighDepth) =>
+        Math.exp(-moonAirmass * (rayleighDepth + aerosolDepth)),
+    ) as [number, number, number];
     const distanceScale = clamp(384_400 / (moon.distance ?? 384_400), 0.92, 1.08);
 
     return {
@@ -295,6 +323,13 @@ export const calculateCelestialScene = ({
             scale: distanceScale * (1 + lowAltitudeWarmth * 0.045),
             rotation,
             textureRotation: -(moon.parallacticAngle / DEG),
+            atmosphericWarmth: lowAltitudeWarmth,
+            transmittance,
+            exposure:
+                1.22 +
+                darkness * 1.12 +
+                (1 - illumination.fraction) * 0.42,
+            photoUrl: nasaMoonFrameUrl(date),
             fraction: illumination.fraction,
             phase: illumination.phase,
             phaseName: phaseName(illumination.phase),

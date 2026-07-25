@@ -180,7 +180,9 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
-    mix-blend-mode: normal;
+    /* Celestial radiance is tone-mapped in its shader, then screen-composited
+       over the atmospheric radiance so black texture pixels never form a stamp. */
+    mix-blend-mode: screen;
     mask-image: linear-gradient(to bottom, black 0%, black 70%, transparent 82%);
     display: block;
     contain: strict;
@@ -191,7 +193,9 @@
     width: 144%;
     will-change: transform;
     opacity: var(--cloud-opacity);
-    mix-blend-mode: screen;
+    /* Normal alpha compositing approximates cloud transmittance plus
+       in-scattering, allowing thin clouds to veil celestial contrast. */
+    mix-blend-mode: normal;
     filter: blur(7px) saturate(0.85);
     mask-image: radial-gradient(ellipse 82% 92% at 50% 50%, black 44%, transparent 100%);
     transform: translate3d(var(--cloud-offset), 0, 0);
@@ -270,7 +274,7 @@
         );
     filter: blur(9px) saturate(0.9);
     mask-image: radial-gradient(ellipse 86% 88% at 50% 62%, black 38%, transparent 100%);
-    mix-blend-mode: screen;
+    mix-blend-mode: normal;
     transform-origin: 50% 76%;
     will-change: transform, opacity;
     animation: mistWander var(--mist-duration) ease-in-out infinite alternate;
