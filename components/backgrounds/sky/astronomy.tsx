@@ -8,6 +8,24 @@ const DEG = Math.PI / 180;
 const clamp = (value: number, min = 0, max = 1) =>
     Math.min(max, Math.max(min, value));
 
+/**
+ * Disk-integrated lunar irradiance relative to the full Moon. The illuminated
+ * fraction is not a brightness control: a quarter Moon is only about a tenth
+ * as bright as a full Moon because the lunar regolith is strongly
+ * back-scattering. This is the Krisciunas-Schaefer phase law, with a restrained
+ * ROLO-inspired opposition enhancement inside seven degrees.
+ */
+export const lunarRelativeIrradiance = (fraction: number) => {
+    const phaseAngle = Math.acos(clamp(fraction * 2 - 1, -1, 1)) / DEG;
+    const phaseMagnitude =
+        0.026 * phaseAngle + 4e-9 * phaseAngle ** 4;
+    const oppositionProgress = clamp((7 - phaseAngle) / 7);
+    const oppositionSurge = 1 + oppositionProgress ** 2 * 0.24;
+    return clamp(
+        (10 ** (-0.4 * phaseMagnitude) * oppositionSurge) / 1.24,
+    );
+};
+
 const normalizeDegrees = (value: number) => ((value % 360) + 360) % 360;
 
 const normalizeRadians = (value: number) => {
@@ -161,6 +179,8 @@ export interface MoonScene {
     textureRotation: number;
     atmosphericWarmth: number;
     transmittance: [number, number, number];
+    irradiance: number;
+    altitude: number;
     exposure: number;
     photoUrl?: string;
     fraction: number;
@@ -204,8 +224,9 @@ export const calculateCelestialScene = ({
     const nightLinear = clamp((-sunAltitude - 3) / 15);
     const night = nightLinear * nightLinear * (3 - 2 * nightLinear);
     const moonAboveHorizon = clamp((moonAltitude + 1.5) / 8);
+    const lunarIrradiance = lunarRelativeIrradiance(illumination.fraction);
     const moonLightPenalty =
-        moonAboveHorizon * illumination.fraction ** 1.42 * 1.48;
+        moonAboveHorizon * lunarIrradiance ** 0.38 * 1.48;
     const limitingMagnitude =
         -0.45 +
         night * 6.82 -
@@ -248,7 +269,7 @@ export const calculateCelestialScene = ({
         );
         const moonGlareExtinction =
             moonAboveHorizon *
-            illumination.fraction ** 1.35 *
+            lunarIrradiance ** 0.34 *
             Math.exp(-(separation / DEG) / 11.5) *
             2.15;
         const apparentMagnitude =
@@ -343,6 +364,15 @@ export const calculateCelestialScene = ({
         Math.exp(-moonAirmass * (rayleighDepth + aerosolDepth)),
     ) as [number, number, number];
     const distanceScale = clamp(384_400 / (moon.distance ?? 384_400), 0.92, 1.08);
+    const meanTransmittance =
+        transmittance[0] * 0.2126 +
+        transmittance[1] * 0.7152 +
+        transmittance[2] * 0.0722;
+    const apparentIrradiance = clamp(
+        lunarIrradiance * distanceScale ** 2 * meanTransmittance,
+        0,
+        1.24,
+    );
 
     return {
         stars,
@@ -364,12 +394,13 @@ export const calculateCelestialScene = ({
                 clamp(moonVisibility, 0, 2),
             haloOpacity:
                 clamp(
-                    (0.014 + illumination.fraction * 0.082) *
+                    (0.022 + apparentIrradiance ** 0.42 * 0.15) *
                         darkness *
                         moonHorizonFade *
-                        (0.72 + haze * 0.3 + clamp(cloudDensity / 3) * 0.22),
+                        (0.58 + haze * 0.34 + clamp(cloudDensity / 3) * 0.28) *
+                        clamp(moonVisibility, 0, 2),
                     0,
-                    0.16,
+                    0.24,
                 ),
             earthshineOpacity:
                 clamp((0.3 - illumination.fraction) / 0.26) ** 1.55 *
@@ -382,6 +413,8 @@ export const calculateCelestialScene = ({
             textureRotation: -(moon.parallacticAngle / DEG),
             atmosphericWarmth: lowAltitudeWarmth,
             transmittance,
+            irradiance: apparentIrradiance,
+            altitude: moonAltitude,
             exposure: 1.34 + darkness * 0.62,
             photoUrl: nasaMoonFrameUrl(date),
             fraction: illumination.fraction,

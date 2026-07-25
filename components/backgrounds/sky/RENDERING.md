@@ -29,6 +29,19 @@ small. Regolith shading uses a Lommel-Seeliger/Lambert blend, with the extra
 opposition term limited to the very small phase angles where shadow hiding and
 coherent backscatter are observed.
 
+Illuminated area is never used as a proxy for lunar brightness. Disk-integrated
+irradiance follows the measured nonlinear lunar phase law, including a narrow
+opposition enhancement and Earth-Moon distance. The glow is then split into
+the phenomena that actually produce it: a compact eye/display point-spread
+function around the bright pixels, a spectrally tinted Rayleigh component, a
+two-lobe aerosol forward-scattering aureole, and a weak multiple-scattering
+floor. Source and view airmass both enter the single-scattering transport
+integral. Thin cloud and mist modulate that same angular field with correlated
+density, so humid nights develop broken luminous veils instead of a circular
+gradient stamp. Low-altitude extinction warms both the direct Moon and its
+near-source aerosol scatter while wider molecular scatter remains relatively
+blue.
+
 The star field contains 8,874 real Hipparcos entries through Johnson V=6.5,
 generated reproducibly from CDS VizieR I/239. Apparent magnitude is modified by
 Kasten-Young airmass extinction and local lunar glare, then converted from its
@@ -120,6 +133,10 @@ Primary technical references:
   [A Fitted Radiance and Attenuation Model for Realistic Atmospheres](https://cgg.mff.cuni.cz/publications/skymodel-2021/)
 - Hartmut Winkler,
   [A revised simplified scattering model for the moonlit sky brightness profile](https://academic.oup.com/mnras/article/514/1/208/6589414)
+- Amy Jones et al.,
+  [An advanced scattered moonlight model for Cerro Paranal](https://arxiv.org/abs/1310.7030)
+- Kevin Krisciunas and Bradley Schaefer,
+  [A model of the brightness of moonlight](https://articles.adsabs.harvard.edu/pdf/1991PASP..103.1033K)
 - Henrik Wann Jensen et al.,
   [A Physically-Based Night Sky Model](https://graphics.ucsd.edu/~henrik/papers/nightsky/)
 - CIE,

@@ -12,6 +12,8 @@ export interface SkyRadianceScene {
     solarAltitude: number;
     nightDepth: number;
     moonlight: number;
+    moonTransmittance: [number, number, number];
+    moonLightColor: string;
     aerosol: number;
     humidity: number;
     cloudiness: number;
@@ -45,6 +47,8 @@ uniform vec4 u_optics;
 uniform vec4 u_light;
 uniform vec4 u_seed;
 uniform float u_airglow;
+uniform vec3 u_moon_tint;
+uniform vec3 u_moon_transmittance;
 uniform vec3 u_top;
 uniform vec3 u_upper;
 uniform vec3 u_middle;
@@ -242,10 +246,75 @@ void main() {
         exp(-zodiacal_axis * 8.5) * smoother(0.36, 0.86, y) * (0.002 + u_seed.x * 0.003);
     radiance += srgb_to_linear(vec3(0.48, 0.45, 0.39)) * zodiacal;
 
-    float lunar_mie = henyey_greenstein(moon_cosine, mix(0.61, 0.76, aerosol));
-    float lunar_aureole = moonlight * lunar_mie *
-        (0.018 + aerosol * 0.06 + humidity * 0.025) * (0.38 + aerosol_path);
-    radiance += mix(vec3(0.50, 0.61, 0.82), haze_linear, 0.35) * lunar_aureole;
+    // Scattered moonlight is evaluated as a transported source, not a radial
+    // overlay. The path term is the stable limit of the single-scattering
+    // integral when source and view airmasses converge. A narrow and a broad
+    // aerosol lobe reproduce the measured forward aureole; Rayleigh supplies
+    // the much wider, slightly bluer sky illumination.
+    float moon_elevation_sine = max(0.018, moon_direction.y);
+    float moon_air_mass = 1.0 /
+        (moon_elevation_sine + 0.115 * pow(moon_elevation_sine + 0.035, -0.55));
+    float optical_depth = 0.052 + aerosol * 0.105 + humidity * 0.028;
+    float view_transmission = exp(-optical_depth * air_mass);
+    float source_transmission = exp(-optical_depth * moon_air_mass);
+    float mass_difference = moon_air_mass - air_mass;
+    float scatter_transport = abs(mass_difference) < 0.045
+        ? air_mass * optical_depth * view_transmission
+        : air_mass * (view_transmission - source_transmission) / mass_difference;
+    scatter_transport = max(0.0, scatter_transport);
+
+    float lunar_rayleigh = 0.0597 * (1.0 + moon_cosine * moon_cosine);
+    float coarse_mie = henyey_greenstein(
+        moon_cosine,
+        mix(0.52, 0.76, aerosol * 0.72 + humidity * 0.28)
+    );
+    float fine_mie = henyey_greenstein(
+        moon_cosine,
+        mix(0.78, 0.89, aerosol * 0.46 + humidity * 0.54)
+    );
+    float lunar_mie = mix(coarse_mie, fine_mie, 0.24 + humidity * 0.20);
+
+    float transmission_luminance = max(
+        dot(u_moon_transmittance, vec3(0.2126, 0.7152, 0.0722)),
+        0.025
+    );
+    vec3 normalized_transmission = clamp(
+        u_moon_transmittance / transmission_luminance,
+        vec3(0.42),
+        vec3(1.55)
+    );
+    vec3 lunar_spectrum = srgb_to_linear(u_moon_tint) *
+        mix(vec3(1.0), normalized_transmission, 0.72);
+    vec3 molecular_spectrum = lunar_spectrum * vec3(0.58, 0.78, 1.12);
+    vec3 aerosol_spectrum = mix(lunar_spectrum, haze_linear, 0.10 + humidity * 0.08);
+
+    float rayleigh_scatter = moonlight * scatter_transport * lunar_rayleigh *
+        (0.10 + molecular * 0.14);
+    float aerosol_scatter = moonlight * scatter_transport * lunar_mie *
+        (0.24 + aerosol * 0.48 + humidity * 0.20);
+    radiance += molecular_spectrum * rayleigh_scatter;
+    radiance += aerosol_spectrum * aerosol_scatter;
+
+    // Thin cloud and mist do not create a second halo radius. They modulate
+    // the same angular field with correlated density, producing the broken,
+    // softly luminous veils seen around the Moon in real humid skies.
+    float lunar_separation = acos(clamp(moon_cosine, -1.0, 1.0));
+    float cloud_structure = smoother(
+        0.34,
+        0.78,
+        fbm(density_point * (1.62 + humidity * 0.74) + vec2(9.7, 3.1))
+    );
+    float cloud_forward = exp(-lunar_separation * mix(3.6, 2.25, humidity));
+    float cloud_scatter = moonlight * cloudiness * cloud_structure * cloud_forward *
+        (0.009 + humidity * 0.027 + aerosol * 0.014);
+    radiance += mix(lunar_spectrum, haze_linear, 0.22) * cloud_scatter;
+
+    // Weak multiple-scattering fill connects the aureole to the raised
+    // moonlit sky floor without flattening the pristine zenith.
+    float lunar_multiple = moonlight * (1.0 - view_transmission) *
+        (0.0018 + aerosol * 0.0042 + humidity * 0.0035) *
+        (0.42 + normalized_path * 0.58);
+    radiance += mix(molecular_spectrum, haze_linear, 0.38) * lunar_multiple;
 
     // Deeper clear-night zeniths preserve the range between pristine,
     // moonlit, humid, smoky, and cloud-amplified night instead of lifting all
@@ -413,6 +482,14 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             );
             gl.uniform4fv(uniform("u_seed"), current.seed);
             gl.uniform1f(uniform("u_airglow"), current.airglowStrength);
+            gl.uniform3fv(
+                uniform("u_moon_tint"),
+                parseColor(current.moonLightColor),
+            );
+            gl.uniform3fv(
+                uniform("u_moon_transmittance"),
+                current.moonTransmittance,
+            );
             colorUniforms.forEach(([uniformName, paletteKey]) => {
                 gl.uniform3fv(uniform(uniformName), parseColor(current.palette[paletteKey]));
             });

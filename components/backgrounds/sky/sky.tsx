@@ -5,6 +5,7 @@ import SunCalc from "suncalc";
 
 import {
     calculateCelestialScene,
+    lunarRelativeIrradiance,
     type CelestialScene,
 } from "./astronomy";
 import {
@@ -396,7 +397,9 @@ const applyPhysicalAtmosphere = ({
     const darkness = smoothstep((-solarAltitude - 7) / 10.5);
     const moonAboveHorizon = smoothstep((moonAltitude + 1.5) / 12);
     const moonlight =
-        darkness * moonAboveHorizon * moonFraction ** 1.45;
+        darkness *
+        moonAboveHorizon *
+        lunarRelativeIrradiance(moonFraction);
     const optics = family.optics;
     const cloudy =
         cloudDensity *
@@ -455,7 +458,7 @@ const applyPhysicalAtmosphere = ({
         cloudWarm: toneColor(source.cloudWarm, optics.nightTint, warmCloudLight, chromaScale * 0.46),
     };
 
-    const moonlit = moonlight > 0.13;
+    const moonlit = moonlight > 0.035;
     const clouded = cloudy > 0.7;
     const regime = moonlit
         ? clouded
@@ -1019,6 +1022,8 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
             solarAltitude: visualSolarAltitude,
             nightDepth: physicalAtmosphere.darkness,
             moonlight: physicalAtmosphere.moonlight,
+            moonTransmittance: celestialScene.moon.transmittance,
+            moonLightColor: celestialScene.moon.lightColor,
             aerosol: daily.family.optics.aerosol,
             humidity: daily.family.optics.humidity,
             cloudiness: atmosphericCloudiness,

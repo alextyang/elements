@@ -153,21 +153,28 @@ void main() {
     if (radial > 8.0) discard;
 
     if (radial > 1.0) {
-        float separation = radial - 1.0;
-        // The aureole is a broad atmospheric point-spread function, not a
-        // ring attached to the lunar limb. Low amplitudes and slightly
-        // anisotropic falloff prevent a recognizable circular radius stamp.
-        float anisotropic_radius = length(vec2(screen_point.x * 0.94, screen_point.y * 1.06));
-        float anisotropic_separation = max(0.0, anisotropic_radius - 1.0);
-        float angular_variation = 0.94 + 0.06 * cos(atan(screen_point.y, screen_point.x) * 2.0 + 0.7);
-        float near_aureole = exp(-anisotropic_separation * 1.55) * 0.105;
-        float diffuse_scatter = exp(-anisotropic_separation * 0.31) * 0.016;
+        // This pass contains only the compact optical PSF: diffraction/seeing
+        // close to the limb and the eye/display glare tail. Kilometre-scale
+        // aerosol scattering lives in the atmosphere shader, so there is no
+        // arbitrary second circular halo. The centroid follows the bright
+        // crescent instead of the geometrical centre of the dark hemisphere.
+        vec2 bright_limb = vec2(cos(u_light_angle), sin(u_light_angle));
+        vec2 glare_point = screen_point - bright_limb * (1.0 - u_fraction) * 0.24;
+        float angle = atan(glare_point.y, glare_point.x);
+        float anisotropic_radius = length(vec2(glare_point.x * 0.955, glare_point.y * 1.045));
+        float irregularity = 0.018 * sin(angle * 3.0 + 0.8) +
+            0.011 * sin(angle * 7.0 - 1.4);
+        float separation = max(0.0, anisotropic_radius - 1.0 + irregularity);
+        float near_psf = exp(-separation * 2.72) * 0.39;
+        float ocular_glare = 0.046 / (0.24 + separation * separation * 1.16);
+        float diffuse_tail = exp(-separation * 0.44) * 0.009;
+        float angular_variation = 0.96 + 0.04 * cos(angle * 2.0 + 0.7);
         float quad_fade = 1.0 - smoothstep(6.2, 7.8, radial);
         float halo = u_halo_opacity *
-            (near_aureole + diffuse_scatter) *
+            (near_psf + ocular_glare + diffuse_tail) *
             angular_variation *
             quad_fade;
-        vec3 halo_color = mix(u_light_tint, vec3(0.76, 0.82, 0.94), 0.08);
+        vec3 halo_color = mix(u_light_tint, vec3(0.78, 0.84, 0.96), 0.045);
         out_color = vec4(halo_color, halo * u_opacity);
         return;
     }
