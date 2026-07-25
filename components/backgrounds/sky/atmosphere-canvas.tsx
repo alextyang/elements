@@ -424,6 +424,14 @@ void main() {
         ? air_mass * optical_depth * view_transmission
         : air_mass * (view_transmission - source_transmission) / mass_difference;
     scatter_transport = max(0.0, scatter_transport);
+    float lunar_separation = acos(clamp(moon_cosine, -1.0, 1.0));
+    float source_scatter_transport =
+        moon_air_mass * optical_depth * source_transmission;
+    // Aerosol aureoles are source-local angular fields. Hold their transport
+    // at the Moon's airmass across the forward lobe; its phase function already
+    // supplies the angular falloff. Letting every nearby pixel use its own
+    // airmass stretched a round aureole into a false source-centred column.
+    float aureole_transport = source_scatter_transport;
 
     float lunar_rayleigh = 0.0597 * (1.0 + moon_cosine * moon_cosine);
     float coarse_g = mix(
@@ -466,8 +474,8 @@ void main() {
     );
 
     float rayleigh_scatter = moonlight * scatter_transport * lunar_rayleigh *
-        (0.012 + molecular * 0.018);
-    float aerosol_scatter = moonlight * scatter_transport * lunar_mie *
+        (0.003 + molecular * 0.0045);
+    float aerosol_scatter = moonlight * aureole_transport * lunar_mie *
         (0.026 + aerosol * 0.07 + humidity * 0.032);
     radiance += molecular_spectrum * rayleigh_scatter;
     radiance += aerosol_spectrum * aerosol_scatter;
@@ -475,7 +483,6 @@ void main() {
     // Thin cloud and mist do not create a second halo radius. They modulate
     // the same angular field with correlated density, producing the broken,
     // softly luminous veils seen around the Moon in real humid skies.
-    float lunar_separation = acos(clamp(moon_cosine, -1.0, 1.0));
     float cloud_structure = smoother(
         0.34,
         0.78,
