@@ -42,6 +42,17 @@ gradient stamp. Low-altitude extinction warms both the direct Moon and its
 near-source aerosol scatter while wider molecular scatter remains relatively
 blue.
 
+The textured Moon and every atmospheric lunar term share one screen-space
+projection and one attenuated source irradiance. The wide molecular, aerosol,
+cloud, and multiple-scattering fields stay centred on the ephemeris position;
+only the much smaller ocular PSF follows the centroid and extent of the
+actually illuminated phase. This prevents a detached glow and keeps a bright
+direct Moon coupled to a corresponding atmospheric response.
+
+The transparent celestial pass is composited as emitted radiance. A zero-light
+dark hemisphere is therefore neutral over the atmosphere rather than an opaque
+dark disc; visible earthshine only adds its measured, terrain-shaped signal.
+
 The direct lunar image is also filtered as one scene-linear radiance source.
 NASA texture, terrain, terminator, limb, earthshine, and the opposition term
 all pass through the same atmosphere-dependent point-spread function before

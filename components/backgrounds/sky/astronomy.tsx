@@ -180,6 +180,7 @@ export interface MoonScene {
     atmosphericWarmth: number;
     transmittance: [number, number, number];
     irradiance: number;
+    scatteringRadiance: number;
     altitude: number;
     psfSigma: number;
     psfWing: number;
@@ -432,13 +433,13 @@ export const calculateCelestialScene = ({
                 clamp(moonVisibility, 0, 2),
             haloOpacity:
                 clamp(
-                    (0.022 + apparentIrradiance ** 0.42 * 0.15) *
+                    (0.032 + apparentIrradiance ** 0.38 * 0.27) *
                         darkness *
                         moonHorizonFade *
-                        (0.58 + haze * 0.34 + clamp(cloudDensity / 3) * 0.28) *
+                        (0.66 + haze * 0.38 + clamp(cloudDensity / 3) * 0.34) *
                         clamp(moonVisibility, 0, 2),
                     0,
-                    0.24,
+                    0.42,
                 ),
             earthshineOpacity:
                 clamp((0.34 - illumination.fraction) / 0.31) ** 1.25 *
@@ -452,6 +453,11 @@ export const calculateCelestialScene = ({
             atmosphericWarmth: lowAltitudeWarmth,
             transmittance,
             irradiance: apparentIrradiance,
+            scatteringRadiance:
+                apparentIrradiance *
+                darkness *
+                moonHorizonFade *
+                clamp(moonVisibility, 0, 2),
             altitude: moonAltitude,
             psfSigma,
             psfWing,

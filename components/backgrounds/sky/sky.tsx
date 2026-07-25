@@ -1250,25 +1250,24 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         0.03,
         1.12,
     );
-    const shaderMoonX = clamp(
-        0.5 + Math.sin(moon.azimuth) * 0.47,
-        0.02,
-        0.98,
-    );
-    const shaderMoonY = clamp(
-        0.78 - Math.sin(moon.altitude) * 0.69,
-        0.03,
-        1.12,
-    );
     return {
         palette,
         radiance: {
             palette,
             sun: [sunX / 100, shaderSunY],
-            moon: [shaderMoonX, shaderMoonY],
+            // Every atmospheric lunar term must use the exact same projection
+            // as the textured disc. The former sine approximation could put
+            // the aureole far beside the Moon at large azimuths.
+            moon: [
+                celestialScene.moon.x / 100,
+                celestialScene.moon.y / 100,
+            ],
             solarAltitude: visualSolarAltitude,
             nightDepth: physicalAtmosphere.darkness,
-            moonlight: physicalAtmosphere.moonlight,
+            // Couple scattered sky radiance to the same attenuated source
+            // irradiance as the visible Moon. A brilliant direct source must
+            // produce a corresponding atmospheric response.
+            moonlight: celestialScene.moon.scatteringRadiance,
             moonTransmittance: celestialScene.moon.transmittance,
             moonLightColor: celestialScene.moon.lightColor,
             aerosol: daily.family.optics.aerosol,

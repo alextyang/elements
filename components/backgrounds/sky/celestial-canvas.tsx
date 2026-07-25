@@ -359,15 +359,25 @@ void main() {
     // aureole is evaluated in the full-sky shader, while the direct lunar
     // image—including its limb and terminator—has already received the PSF.
     vec2 bright_limb = vec2(cos(u_light_angle), sin(u_light_angle));
-    vec2 glare_point = screen_point - bright_limb * (1.0 - u_fraction) * 0.24;
-    float angle = atan(glare_point.y, glare_point.x);
-    float anisotropic_radius = length(vec2(glare_point.x * 0.975, glare_point.y * 1.025));
+    vec2 tangent = vec2(-bright_limb.y, bright_limb.x);
+    // Compact ocular/display glare follows the luminous phase, not the centre
+    // of the whole geometric disc. The centroid approaches the bright limb as
+    // the phase narrows while the tall emitter still includes both cusps.
+    float phase_shape = pow(clamp(u_fraction, 0.0, 1.0), 0.42);
+    vec2 luminous_center = bright_limb * (1.0 - u_fraction) * 0.36;
+    vec2 glare_point = screen_point - luminous_center;
+    float axial = dot(glare_point, bright_limb) /
+        mix(0.36, 0.94, phase_shape);
+    float lateral = dot(glare_point, tangent) /
+        mix(0.70, 0.96, phase_shape);
+    float angle = atan(lateral, axial);
+    float anisotropic_radius = length(vec2(axial, lateral));
     float irregularity = 0.006 * sin(angle * 3.0 + 0.8) +
         0.003 * sin(angle * 7.0 - 1.4);
     float separation = max(0.0, anisotropic_radius - 1.0 + irregularity);
-    float near_glare = exp(-separation * 4.4) * 0.075;
-    float ocular_glare = 0.019 / (0.20 + separation * separation * 2.8);
-    float diffuse_tail = exp(-separation * 1.1) * 0.003;
+    float near_glare = exp(-separation * 4.7) * 0.092;
+    float ocular_glare = 0.024 / (0.21 + separation * separation * 2.9);
+    float diffuse_tail = exp(-separation * 1.18) * 0.0035;
     float angular_variation = 0.985 + 0.015 * cos(angle * 2.0 + 0.7);
     float halo_coverage = u_halo_opacity *
         (near_glare + ocular_glare + diffuse_tail) *
