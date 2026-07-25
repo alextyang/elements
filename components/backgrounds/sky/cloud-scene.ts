@@ -235,7 +235,7 @@ const GENUS_PROFILE: Record<CloudGenus, GenusProfile> = {
         anvilAmount: 0,
         iceFraction: 0,
         opticalDepth: 0.74,
-        detailStrength: 0.6,
+        detailStrength: 0.8,
         precipitation: 0.12,
     },
     stratus: {
@@ -257,7 +257,7 @@ const GENUS_PROFILE: Record<CloudGenus, GenusProfile> = {
         anvilAmount: 0,
         iceFraction: 0,
         opticalDepth: 0.82,
-        detailStrength: 0.7,
+        detailStrength: 0.95,
         precipitation: 0.08,
     },
     cumulonimbus: {

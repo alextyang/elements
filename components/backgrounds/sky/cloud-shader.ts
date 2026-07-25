@@ -335,7 +335,8 @@ float cloud_altitude_shaping(
  * the Worley erosion in cloud_density. Trying to get cell structure from the
  * coverage map instead produces large smooth blobs.
  */
-float cloud_local_coverage(vec2 position, CloudLayer layer) {
+float cloud_local_coverage(vec3 position3, CloudLayer layer) {
+    vec2 position = position3.xz;
     // Coverage frequencies, raised from Photon's 500 km / 37 km.
     //
     // Those values suit a first-person game view. Elements renders the whole
@@ -356,6 +357,26 @@ float cloud_local_coverage(vec2 position, CloudLayer layer) {
         texture(u_cloud_weather, p1).x,
         texture(u_cloud_weather, p2).w
     );
+
+    // Three-dimensional cell structure.
+    //
+    // The two lookups above are purely horizontal, and near the zenith a ray
+    // covers almost no horizontal distance: every sample along it reads the
+    // same texel, so the whole zenith takes one coverage value and resolves
+    // into a solid slab. Erosion cannot rescue it either, because the detail
+    // subtraction is scaled by dampen(1 - density) and so approaches zero
+    // exactly where coverage is high.
+    //
+    // Sampling the base volume supplies a genuinely 3D cell field, which varies
+    // both across neighbouring rays and as a single ray climbs through the
+    // layer. This is the role the 3D base volume plays in the Horizon/Nubis
+    // formulation; Photon can lean harder on its 2D map because a first-person
+    // camera never looks straight up through the deck.
+    float cells = texture(
+        u_cloud_base,
+        position3 * (layer.baseScale * 0.25)
+    ).r;
+    noise.y = noise.y * 0.62 + cells * 0.38;
 
     float coverage_cu = 0.0;
     float coverage_st = 0.0;
@@ -411,7 +432,7 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
             across * across_wind;
     }
 
-    float density = cloud_local_coverage(sample_position.xz, layer);
+    float density = cloud_local_coverage(sample_position, layer);
     density = cloud_altitude_shaping(density, altitude_fraction, layer);
     if (density < 1e-4) return 0.0;
 
@@ -604,7 +625,18 @@ CloudResult cloud_march_layer(
     int light_steps = int(u_cloud_quality.y);
 
     float span = far - near;
-    float step_length = span / float(steps);
+
+    // Cap the step against layer depth.
+    //
+    // The per-pixel dither offsets each ray by up to one full step, which is
+    // what prevents banding. Where a step is large that offset becomes a large
+    // depth difference between neighbouring pixels, and the march resolves into
+    // visible crosshatch. Near the horizon an uncapped span/steps reaches well
+    // over a kilometre through a layer only a few hundred metres deep, which is
+    // exactly where the artifact is worst. Capping keeps the near field
+    // properly sampled; rays that then run out of steps are truncated far away,
+    // where aerial perspective has already removed most of the contrast.
+    float step_length = min(span / float(steps), layer.thickness * 0.16);
     float travelled = near + step_length * dither;
 
     float first_hit = -1.0;
@@ -647,17 +679,28 @@ CloudResult cloud_march_layer(
         float step_optical_depth = density * layer.extinction * step_length;
         float step_transmittance = exp(-step_optical_depth);
 
+        // The light marches use a fixed offset, not the per-pixel dither.
+        //
+        // Jittering the view march is necessary: without it the march bands in
+        // depth. Jittering the light march is a different matter, because it
+        // makes the shading of a given point in space depend on which pixel is
+        // looking at it, and with only a handful of geometric steps that lands
+        // as heavy per-pixel crosshatch across smooth surfaces like an overcast
+        // base. Photon absorbs this in temporal upscaling; with a single-shot
+        // pass the deterministic offset is far cleaner, and the slight banding
+        // it trades for is invisible because lighting varies smoothly.
+        const float LIGHT_OFFSET = 0.5;
         float light_depth = cloud_optical_depth(
             point, light_direction, layer, base_radius, top_radius,
-            dither, light_steps
+            LIGHT_OFFSET, light_steps
         );
         float sky_depth = cloud_optical_depth(
             point, vec3(0.0, 1.0, 0.0), layer, base_radius, top_radius,
-            dither, 2
+            LIGHT_OFFSET, 2
         );
         float ground_depth = cloud_optical_depth(
             point, vec3(0.0, -1.0, 0.0), layer, base_radius, top_radius,
-            dither, 2
+            LIGHT_OFFSET, 2
         );
 
         vec3 luminance = cloud_scattering(

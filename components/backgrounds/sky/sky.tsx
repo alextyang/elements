@@ -1633,12 +1633,21 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     // Light reaching the clouds. These are the same physical quantities the
     // atmosphere pass already models, resolved once on the CPU so the cloud
     // march does not repeat the transmittance integral at every sample.
-    const sunElevationSine = Math.max(
-        0.02,
-        Math.sin((visualSolarAltitude * Math.PI) / 180),
+    // Kasten-Young relative optical airmass.
+    //
+    // The atmosphere pass uses a cheaper approximation that saturates near 1.9,
+    // which is fine for the broad sky gradient but useless here: it never
+    // reaches the long slant paths that redden a low Sun, so cloud lit at
+    // sunset came out the same neutral grey as cloud lit at noon. The real
+    // relation gives ~19 airmasses at 2 degrees elevation, and that is what
+    // turns cloud bases orange.
+    const sunElevationDegrees = Math.max(visualSolarAltitude, -4);
+    const sunAirMass = Math.min(
+        40,
+        1 /
+            (Math.sin((sunElevationDegrees * Math.PI) / 180) +
+                0.50572 * (sunElevationDegrees + 6.07995) ** -1.6364),
     );
-    const sunAirMass =
-        1 / (sunElevationSine + 0.115 * (sunElevationSine + 0.035) ** -0.55);
     const sunOpticalDepth =
         0.052 +
         composition.aerosol * (0.09 + composition.aerosolAbsorption * 0.045) +
@@ -1651,11 +1660,14 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         Math.exp(-sunOpticalDepth * sunAirMass * 1.0),
         Math.exp(-sunOpticalDepth * sunAirMass * 1.62),
     ];
-    const sunAbove = clamp((visualSolarAltitude + 6) / 10);
+    // Airmass now supplies the dimming as the Sun sets, so this only needs to
+    // close the source off below the horizon rather than double-count falloff.
+    const sunAbove = clamp((visualSolarAltitude + 4) / 6);
     // Photon's scattering integral divides by the extinction coefficient, so
     // source radiance has to be an order of magnitude above the sky values used
     // elsewhere in this shader for a lit cloud edge to reach display white.
-    const sunStrength = 13 * sunAbove;
+    // The airmass term above removes most of it again at low Sun.
+    const sunStrength = 26 * sunAbove;
     const sunRadiance: [number, number, number] = [
         sunTransmittance[0] * sunStrength,
         sunTransmittance[1] * sunStrength,
