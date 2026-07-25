@@ -7,12 +7,32 @@ Rayleigh/Mie-inspired in-scattering lobe, and applies one photographic tone
 curve. Thin cloud and mist layers render above that result with ordinary alpha
 compositing so they both extinguish celestial contrast and add scattered light.
 
-The implementation is deliberately hybrid. The page's slowly changing sky and
-weather field stays in low-cost CSS, while the small high-frequency celestial
-features use a low-power WebGL2 canvas. The Moon is drawn only when its scene or
+The implementation is deliberately hybrid. A low-power WebGL2 pass evaluates
+the full-screen atmospheric radiance once when the scene or viewport changes;
+it has no animation loop. Slowly moving cloud and moisture fields remain in
+low-cost CSS, while a second transparent WebGL2 canvas handles the small,
+high-frequency celestial features. The Moon is drawn only when its scene or
 texture changes. Only visibly scintillating stars trigger the capped animation
-loop. This avoids the permanent full-screen shader workload that would be
-unreasonable for an ambient background.
+loop. This preserves a physically coherent base without creating a permanent
+full-screen GPU workload.
+
+## Continuous radiance field
+
+The visible sky is no longer the direct interpolation of five CSS gradient
+stops. Palette samples now art-direct one continuous two-dimensional radiance
+field. Its altitude response uses broad zero-slope interpolation combined with
+an airmass curve; its azimuth response uses Rayleigh, forward Mie, reverse
+twilight, lunar, and edge-illumination terms. A wide multiple-scattering fill,
+weak correlated aerosol-density variation, and night-only airglow and zodiacal
+components add structure at different spatial scales without becoming cloud
+stamps or decorative blobs.
+
+All scattering additions are composed in scene-linear RGB and converted back
+to display sRGB only once. A fixed triangular high-frequency dither of one
+8-bit quantisation interval is applied in physical pixel space after the
+display transform. It decorrelates unavoidable browser/display quantisation
+without shimmer. The legacy CSS gradient remains only as a WebGL fallback and
+does not animate behind the opaque radiance canvas.
 
 ## Atmospheric and palette constraints
 
@@ -84,3 +104,9 @@ Primary technical references:
   [Laval HDR Sky Database](https://lvsn.github.io/deepskymodel/)
 - Academy Software Foundation,
   [ACES Output Transforms](https://docs.acescentral.com/system-components/output-transforms/)
+- S. Noll et al.,
+  [An atmospheric radiation model for Cerro Paranal](https://arxiv.org/abs/1205.2003)
+- Eduard Masana et al.,
+  [A multi-band map of the natural night sky brightness](https://arxiv.org/abs/2101.01500)
+- Madhukar Budagavi and Oscar Bici,
+  [Adaptive Debanding Filter](https://arxiv.org/abs/2009.10804)

@@ -7,6 +7,10 @@ import {
     calculateCelestialScene,
     type CelestialScene,
 } from "./astronomy";
+import {
+    AtmosphereCanvas,
+    type SkyRadianceScene,
+} from "./atmosphere-canvas";
 import { CelestialCanvas } from "./celestial-canvas";
 import styles from "./sky.module.css";
 import {
@@ -163,6 +167,7 @@ const TIMEZONE_REGIONS: Partial<Record<string, SkyRegion>> = {
 
 interface SkyVisual {
     palette: SkyPalette;
+    radiance: SkyRadianceScene;
     familyId: string;
     atmosphereStyle: SkyAtmosphere;
     motionStyle: SkyMotionStyle;
@@ -409,8 +414,8 @@ const applyPhysicalAtmosphere = ({
     const moonHorizonLift = moonlight * (0.068 + optics.humidity * 0.045);
     const floor = clamp(
         optics.nightFloor + dailyExposure + naturalAirglow + moonZenithLift,
-        0.062,
-        0.235,
+        0.045,
+        0.21,
     );
     const horizonLift =
         optics.horizonLift +
@@ -981,9 +986,56 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         starVisibility: preview?.starVisibility,
         moonVisibility: preview?.moonVisibility,
     });
+    const shaderSunY = clamp(
+        0.78 - Math.sin((visualSolarAltitude * Math.PI) / 180) * 0.69,
+        0.03,
+        1.12,
+    );
+    const shaderMoonX = clamp(
+        0.5 + Math.sin(moon.azimuth) * 0.47,
+        0.02,
+        0.98,
+    );
+    const shaderMoonY = clamp(
+        0.78 - Math.sin(moon.altitude) * 0.69,
+        0.03,
+        1.12,
+    );
+    const atmosphericCloudiness = clamp(
+        cloudDensity *
+            ({ crystal: 0.08, cirrus: 0.26, haze: 0.38, mist: 0.55, soft: 0.68 }[
+                atmosphereStyle
+            ]),
+        0,
+        1,
+    );
 
     return {
         palette,
+        radiance: {
+            palette,
+            sun: [sunX / 100, shaderSunY],
+            moon: [shaderMoonX, shaderMoonY],
+            solarAltitude: visualSolarAltitude,
+            nightDepth: physicalAtmosphere.darkness,
+            moonlight: physicalAtmosphere.moonlight,
+            aerosol: daily.family.optics.aerosol,
+            humidity: daily.family.optics.humidity,
+            cloudiness: atmosphericCloudiness,
+            edgeStrength: clamp(intensity.edge * 0.82, 0.45, 1.35),
+            horizonStrength: clamp(intensity.haze * 0.88, 0.5, 1.45),
+            airglowStrength: clamp(
+                0.34 + daily.randomValues[30] * 0.66,
+                0.28,
+                1,
+            ),
+            seed: [
+                daily.randomValues[18],
+                daily.randomValues[22],
+                daily.randomValues[27],
+                daily.randomValues[31],
+            ],
+        },
         familyId: daily.family.id,
         atmosphereStyle,
         motionStyle,
@@ -1039,18 +1091,18 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
                     (1 - physicalAtmosphere.darkness),
             ),
         edgeOpacityLow: clamp(
-            edgeLow *
+            edgeLow * 0.54 *
                 intensity.edge *
                 (1 - physicalAtmosphere.darkness * 0.54),
-            0.07,
-            0.66,
+            0.025,
+            0.3,
         ),
         edgeOpacityHigh: clamp(
-            edgeHigh *
+            edgeHigh * 0.54 *
                 intensity.edge *
                 (1 - physicalAtmosphere.darkness * 0.48),
-            0.1,
-            0.72,
+            0.035,
+            0.34,
         ),
         airglowOpacityLow: clamp(
             (0.075 + daily.randomValues[30] * 0.055) *
@@ -1221,6 +1273,7 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
             aria-hidden="true"
         >
             <div className={styles.base} />
+            {visual && <AtmosphereCanvas scene={visual.radiance} />}
             <div className={styles.edgeColor} />
             <div className={styles.horizon} />
             {visual && <CelestialCanvas scene={visual.celestial} paused={paused} />}
