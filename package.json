@@ -6,7 +6,13 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sky:curate": "node scripts/curate-sky-benchmark.mjs && node scripts/curate-eye2sky-night.mjs && node scripts/assemble-sky-benchmark.mjs",
+    "moon:curate": "node scripts/curate-moon-benchmark.mjs && node scripts/curate-eye2sky-night.mjs && node scripts/curate-nasa-lunar-truth.mjs && node scripts/curate-commons-moon.mjs && node scripts/normalize-moon-benchmark.mjs",
+    "moon:render": "bash scripts/render-sky-benchmark.sh",
+    "moon:analyze": "node scripts/analyze-sky-benchmark.mjs",
+    "sky:render": "bash scripts/render-sky-photographs.sh",
+    "sky:analyze": "node scripts/analyze-sky-benchmark.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^0.27.2",
@@ -21,6 +27,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/suncalc": "^1.9.2",
-    "typescript": "^5"
+    "sharp": "^0.34.3",
+    "typescript": "^5",
+    "tz-lookup": "^6.1.25"
   }
 }

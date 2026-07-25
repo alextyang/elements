@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
         root: process.cwd(),
     },
     outputFileTracingRoot: process.cwd(),
+    // Node 25 can leave Next's webpack child idle while compiling the large
+    // generated benchmark manifests. The in-process build is deterministic
+    // and avoids that worker IPC stall.
+    experimental: {
+        webpackBuildWorker: false,
+    },
 };
 
 export default nextConfig;

@@ -2,6 +2,14 @@
 
 import { useEffect, useRef } from "react";
 
+import {
+    CLOUD_COMPOSITE,
+    CLOUD_FUNCTIONS,
+    CLOUD_UNIFORMS,
+    packCloudLayers,
+} from "./cloud-shader";
+import { createCloudNoise } from "./cloud-noise";
+import type { CloudScene } from "./cloud-scene";
 import type { SkyPalette } from "./sky-palettes";
 import styles from "./sky.module.css";
 
@@ -11,6 +19,7 @@ export interface SkyRadianceScene {
     moon: [number, number];
     solarAltitude: number;
     nightDepth: number;
+    nightBlackout: number;
     moonlight: number;
     moonTransmittance: [number, number, number];
     moonLightColor: string;
@@ -24,7 +33,25 @@ export interface SkyRadianceScene {
     stratosphericAerosol: number;
     groundAlbedo: number;
     aerosolTint: [number, number, number];
+    horizontalFov: number;
+    cameraProjection: boolean;
+    viewElevation: number;
+    verticalFov: number;
     cloudiness: number;
+    /** Full meteorological cloud state driving the volumetric renderer. */
+    cloudScene: CloudScene;
+    /** Scene-linear radiance of the Sun after atmospheric transmittance. */
+    sunRadiance: [number, number, number];
+    /** Scene-linear radiance of the Moon after atmospheric transmittance. */
+    moonRadiance: [number, number, number];
+    /** Hemispheric skylight reaching cloud tops. */
+    cloudAmbient: [number, number, number];
+    /** Light returned from the surface to cloud bases. */
+    cloudGroundLight: [number, number, number];
+    /** View march steps, light march steps. */
+    cloudQuality: [number, number];
+    /** Seconds of advection applied to the cloud fields. */
+    cloudTime: number;
     edgeStrength: number;
     horizonStrength: number;
     airglowStrength: number;
@@ -49,6 +76,7 @@ in vec2 v_uv;
 out vec4 out_color;
 
 uniform vec2 u_resolution;
+uniform vec3 u_camera;
 uniform vec2 u_sun;
 uniform vec2 u_moon;
 uniform vec4 u_optics;
@@ -58,6 +86,7 @@ uniform vec3 u_layers;
 uniform vec3 u_aerosol_tint;
 uniform vec4 u_seed;
 uniform float u_airglow;
+uniform float u_blackout;
 uniform vec3 u_moon_tint;
 uniform vec3 u_moon_transmittance;
 uniform vec3 u_top;
@@ -69,6 +98,7 @@ uniform vec3 u_left;
 uniform vec3 u_right;
 uniform vec3 u_glow;
 uniform vec3 u_haze;
+${CLOUD_UNIFORMS}
 
 const float PI = 3.141592653589793;
 
@@ -135,8 +165,10 @@ vec3 sky_spline(float y) {
 }
 
 vec3 view_direction(vec2 uv) {
-    float azimuth = (uv.x - 0.5) * PI * 1.34;
-    float elevation = mix(PI * 0.51, -0.035, pow(uv.y, 0.91));
+    float azimuth = (uv.x - 0.5) * u_camera.x;
+    float elevation = u_camera.z > 0.0
+        ? u_camera.y + (0.5 - uv.y) * u_camera.z
+        : mix(PI * 0.51, -0.035, pow(uv.y, 0.91));
     float cos_elevation = cos(elevation);
     return normalize(vec3(
         sin(azimuth) * cos_elevation,
@@ -146,8 +178,10 @@ vec3 view_direction(vec2 uv) {
 }
 
 vec3 source_direction(vec2 point) {
-    float azimuth = (point.x - 0.5) * PI * 1.34;
-    float elevation = mix(PI * 0.51, -0.035, pow(clamp(point.y, 0.0, 1.15), 0.91));
+    float azimuth = (point.x - 0.5) * u_camera.x;
+    float elevation = u_camera.z > 0.0
+        ? u_camera.y + (0.5 - point.y) * u_camera.z
+        : mix(PI * 0.51, -0.035, pow(clamp(point.y, 0.0, 1.15), 0.91));
     float cos_elevation = cos(elevation);
     return normalize(vec3(
         sin(azimuth) * cos_elevation,
@@ -161,6 +195,7 @@ float henyey_greenstein(float cosine, float g) {
     return (1.0 - g2) /
         max(0.12, 4.0 * PI * pow(1.0 + g2 - 2.0 * g * cosine, 1.5));
 }
+${CLOUD_FUNCTIONS}
 
 void main() {
     // WebGL has a bottom-left texture origin; convert to the screen's top-left.
@@ -362,26 +397,7 @@ void main() {
     vec3 ground_bounce_color = mix(aerosol_white, solar_scatter, low_sun_path * 0.36);
     radiance += ground_bounce_color * ground_bounce;
 
-    // A single static, band-limited optical-depth field integrates very thin
-    // cloud and moisture into the radiance solution. Animated CSS layers still
-    // provide slow movement, while this pass supplies extinction, directional
-    // light, and depth without a permanent full-screen animation loop.
-    vec2 veil_point = vec2(
-        uv.x * (3.4 + u_seed.y * 1.6) + u_seed.w * 17.0,
-        uv.y * (8.0 + u_seed.x * 2.4) + u_seed.z * 13.0
-    );
-    float veil_noise = fbm(veil_point + vec2(uv.y * 1.7, 0.0));
-    float veil_density = cloudiness *
-        pow(smoother(0.46, 0.78, veil_noise), 1.65) *
-        smoother(0.02, 0.24, y) * (1.0 - smoother(0.9, 1.04, y));
-    float veil_extinction = veil_density * (0.032 + humidity * 0.062);
-    vec3 veil_light = mix(
-        srgb_to_linear(vec3(0.72, 0.77, 0.82)),
-        solar_scatter,
-        smoother(-5.0, 12.0, solar_altitude) * 0.36
-    );
-    radiance = radiance * exp(-veil_extinction) +
-        veil_light * veil_density * (0.01 + humidity * 0.02) * (1.0 - night * 0.58);
+${CLOUD_COMPOSITE}
 
     // Natural night is layered rather than uniformly blue: weak airglow,
     // integrated celestial radiance, moon aureole, and near-horizon extinction.
@@ -403,6 +419,7 @@ void main() {
 
     float zodiacal_axis = abs((uv.x - (0.25 + u_seed.z * 0.5)) + (y - 0.76) * (u_seed.y - 0.5));
     float zodiacal = night * (1.0 - moonlight) * (1.0 - aerosol) *
+        (1.0 - u_blackout * 0.86) *
         exp(-zodiacal_axis * 8.5) * smoother(0.36, 0.86, y) * (0.002 + u_seed.x * 0.003);
     radiance += srgb_to_linear(vec3(0.48, 0.45, 0.39)) * zodiacal;
 
@@ -505,7 +522,8 @@ void main() {
     // families toward the same gray-purple floor.
     float zenith_depth = night * (1.0 - aerosol * 0.34) * (1.0 - humidity * 0.22) *
         (1.0 - smoother(0.42, 0.96, y));
-    radiance *= 1.0 - zenith_depth * (0.20 - moonlight * 0.09);
+    radiance *= 1.0 - zenith_depth *
+        (0.20 + u_blackout * 0.34 - moonlight * 0.09);
 
     // A gentle shoulder contains additive scattering in scene-linear space.
     radiance = radiance / (vec3(1.0) + max(radiance - vec3(0.72), vec3(0.0)) * 0.72);
@@ -618,6 +636,14 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             return undefined;
         }
 
+        // Cloud noise volumes are generated once at start. Per-day variation
+        // comes from wind advection and the weather-map offset, not from
+        // regenerating 8 MB of texture on every scene change.
+        const noise = createCloudNoise(gl);
+        if (!noise) {
+            console.warn("Cloud noise unavailable; rendering clear sky");
+        }
+
         const buffer = gl.createBuffer();
         if (!buffer) return undefined;
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -669,6 +695,14 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             gl.enableVertexAttribArray(position);
             gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
             gl.uniform2f(uniform("u_resolution"), width, height);
+            gl.uniform3f(
+                uniform("u_camera"),
+                (current.horizontalFov * Math.PI) / 180,
+                (current.viewElevation * Math.PI) / 180,
+                current.cameraProjection
+                    ? (current.verticalFov * Math.PI) / 180
+                    : 0,
+            );
             gl.uniform2f(uniform("u_sun"), current.sun[0], current.sun[1]);
             gl.uniform2f(uniform("u_moon"), current.moon[0], current.moon[1]);
             gl.uniform4f(
@@ -700,7 +734,62 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             );
             gl.uniform3fv(uniform("u_aerosol_tint"), current.aerosolTint);
             gl.uniform4fv(uniform("u_seed"), current.seed);
+
+            // Volumetric cloud state.
+            const packed = packCloudLayers(
+                current.cloudScene,
+                current.cloudTime,
+            );
+            gl.uniform4fv(uniform("u_layer_geometry"), packed.geometry);
+            gl.uniform4fv(uniform("u_layer_shape"), packed.shape);
+            gl.uniform4fv(uniform("u_layer_motion"), packed.motion);
+            gl.uniform4fv(uniform("u_layer_phase"), packed.phase);
+            gl.uniform4fv(uniform("u_layer_scale"), packed.scale);
+            gl.uniform4fv(uniform("u_layer_drift"), packed.drift);
+            gl.uniform3fv(uniform("u_cloud_sun_radiance"), current.sunRadiance);
+            gl.uniform3fv(uniform("u_cloud_moon_radiance"), current.moonRadiance);
+            gl.uniform3fv(uniform("u_cloud_ambient"), current.cloudAmbient);
+            gl.uniform3fv(
+                uniform("u_cloud_ground_light"),
+                current.cloudGroundLight,
+            );
+            gl.uniform4f(
+                uniform("u_cloud_quality"),
+                current.cloudQuality[0],
+                current.cloudQuality[1],
+                // Aerial-perspective falloff: clouds reach the sky colour over
+                // roughly 70 km, which matches the observed loss of contrast in
+                // a distant horizon deck.
+                1 / 70000,
+                noise && packed.active ? 1 : 0,
+            );
+            // Layer advection is wrapped per layer inside packCloudLayers; this
+            // uniform only drives the noctilucent sheet, so it is reduced here
+            // to keep it away from the precision floor of a raw timestamp.
+            gl.uniform1f(uniform("u_cloud_time"), current.cloudTime % 100000);
+            gl.uniform1f(uniform("u_cloud_fog"), current.cloudScene.fog);
+            gl.uniform1f(
+                uniform("u_cloud_noctilucent"),
+                current.cloudScene.noctilucent,
+            );
+
+            if (noise) {
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_3D, noise.base);
+                gl.uniform1i(uniform("u_cloud_base"), 0);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_3D, noise.detail);
+                gl.uniform1i(uniform("u_cloud_detail"), 1);
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, noise.weather);
+                gl.uniform1i(uniform("u_cloud_weather"), 2);
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, noise.curl);
+                gl.uniform1i(uniform("u_cloud_curl"), 3);
+            }
+
             gl.uniform1f(uniform("u_airglow"), current.airglowStrength);
+            gl.uniform1f(uniform("u_blackout"), current.nightBlackout);
             gl.uniform3fv(
                 uniform("u_moon_tint"),
                 parseColor(current.moonLightColor),
@@ -728,6 +817,7 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             drawRef.current = null;
             resizeObserver.disconnect();
             document.removeEventListener("visibilitychange", visibilityHandler);
+            noise?.dispose();
             gl.deleteBuffer(buffer);
             gl.deleteProgram(program);
         };

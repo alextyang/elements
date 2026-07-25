@@ -26,6 +26,13 @@ import {
     SkySeason,
 } from "@/components/backgrounds/sky/sky-palettes";
 
+import {
+    constrainScene,
+    createLayer,
+    EMPTY_LAYER,
+    type CloudGenus,
+    type CloudScene,
+} from "@/components/backgrounds/sky/cloud-scene";
 import styles from "./sky-lab.module.css";
 
 const TIMEZONES = [
@@ -139,12 +146,25 @@ interface LabSettings {
     stratosphericAerosol: number;
     groundAlbedo: number;
     cloudDensity: number;
+    manualClouds: boolean;
+    lowGenus: string;
+    lowOktas: number;
+    midGenus: string;
+    midOktas: number;
+    highGenus: string;
+    highOktas: number;
+    cloudConvection: number;
+    cloudOpticalDepth: number;
+    cloudWindSpeed: number;
+    cloudWindDirection: number;
     motionSpeed: number;
     motionAmount: number;
     bloomVisibility: number;
     bloomScale: number;
     starVisibility: number;
     moonVisibility: number;
+    manualNightExposure: boolean;
+    nightExposure: number;
     paused: boolean;
 }
 
@@ -154,6 +174,55 @@ const localDate = (date: Date) =>
         String(date.getMonth() + 1).padStart(2, "0"),
         String(date.getDate()).padStart(2, "0"),
     ].join("-");
+
+const LOW_GENERA = [
+    "clear",
+    "cumulus",
+    "stratocumulus",
+    "stratus",
+    "cumulonimbus",
+];
+const MID_GENERA = ["clear", "altocumulus", "altostratus", "nimbostratus"];
+const HIGH_GENERA = ["clear", "cirrus", "cirrocumulus", "cirrostratus"];
+
+/**
+ * Builds an explicit three-layer scene from the manual controls, then runs the
+ * same meteorological constraint pass production uses. Invalid combinations are
+ * therefore corrected rather than rendered, so the laboratory cannot produce a
+ * sky the daily generator could never reach.
+ */
+function buildManualScene(settings: LabSettings, seed: number): CloudScene {
+    const wind = (settings.cloudWindDirection * Math.PI) / 180;
+    const make = (genus: string, oktas: number, index: number) =>
+        genus === "clear" || oktas <= 0
+            ? { ...EMPTY_LAYER }
+            : createLayer({
+                  genus: genus as CloudGenus,
+                  oktas,
+                  latitude: 45,
+                  season: 0.5,
+                  altitudeBias: 0.5,
+                  opticalDepth: settings.cloudOpticalDepth,
+                  convection: settings.cloudConvection,
+                  windSpeed: settings.cloudWindSpeed * (1 + index * 0.6),
+                  windDirection: wind + index * 0.45,
+              });
+
+    return constrainScene({
+        layers: [
+            make(settings.lowGenus, settings.lowOktas, 0),
+            make(settings.midGenus, settings.midOktas, 1),
+            make(settings.highGenus, settings.highOktas, 2),
+        ],
+        totalOktas: 0,
+        convection: settings.cloudConvection,
+        instability: settings.cloudConvection,
+        humidity: settings.humidity,
+        fog: 0,
+        noctilucent: 0,
+        seed: [seed, 0.37, 0.61, 0.19],
+    });
+}
 
 const DEFAULT_SETTINGS: LabSettings = {
     date: "2026-01-01",
@@ -190,12 +259,25 @@ const DEFAULT_SETTINGS: LabSettings = {
     stratosphericAerosol: 0.03,
     groundAlbedo: 0.24,
     cloudDensity: 1,
+    manualClouds: false,
+    lowGenus: "cumulus",
+    lowOktas: 3,
+    midGenus: "clear",
+    midOktas: 0,
+    highGenus: "clear",
+    highOktas: 0,
+    cloudConvection: 0.5,
+    cloudOpticalDepth: 0.8,
+    cloudWindSpeed: 9,
+    cloudWindDirection: 45,
     motionSpeed: 1,
     motionAmount: 1,
     bloomVisibility: 1,
     bloomScale: 1,
     starVisibility: 1,
     moonVisibility: 1,
+    manualNightExposure: false,
+    nightExposure: 0,
     paused: false,
 };
 
@@ -300,6 +382,9 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
         "variant",
         "edgeDirection",
         "aerosolType",
+        "lowGenus",
+        "midGenus",
+        "highGenus",
     ];
     const numbers: (keyof LabSettings)[] = [
         "hue",
@@ -320,12 +405,20 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
         "stratosphericAerosol",
         "groundAlbedo",
         "cloudDensity",
+        "lowOktas",
+        "midOktas",
+        "highOktas",
+        "cloudConvection",
+        "cloudOpticalDepth",
+        "cloudWindSpeed",
+        "cloudWindDirection",
         "motionSpeed",
         "motionAmount",
         "bloomVisibility",
         "bloomScale",
         "starVisibility",
         "moonVisibility",
+        "nightExposure",
     ];
 
     strings.forEach((key) => {
@@ -338,7 +431,7 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
         const value = Number(rawValue);
         if (Number.isFinite(value)) Object.assign(next, { [key]: value });
     });
-    ["manualGrade", "manualIntensity", "manualComposition", "paused"].forEach((key) => {
+    ["manualGrade", "manualIntensity", "manualComposition", "manualClouds", "manualNightExposure", "paused"].forEach((key) => {
         const value = params.get(key);
         if (value !== null) Object.assign(next, { [key]: value === "1" });
     });
@@ -378,12 +471,20 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
     next.stratosphericAerosol = limit(next.stratosphericAerosol, 0, 1);
     next.groundAlbedo = limit(next.groundAlbedo, 0, 1);
     next.cloudDensity = limit(next.cloudDensity, 0, 2);
+    next.lowOktas = limit(next.lowOktas, 0, 8);
+    next.midOktas = limit(next.midOktas, 0, 8);
+    next.highOktas = limit(next.highOktas, 0, 8);
+    next.cloudConvection = limit(next.cloudConvection, 0, 1);
+    next.cloudOpticalDepth = limit(next.cloudOpticalDepth, 0.05, 1);
+    next.cloudWindSpeed = limit(next.cloudWindSpeed, 0, 35);
+    next.cloudWindDirection = limit(next.cloudWindDirection, 0, 350);
     next.motionSpeed = limit(next.motionSpeed, 0.25, 3);
     next.motionAmount = limit(next.motionAmount, 0, 2);
     next.bloomVisibility = limit(next.bloomVisibility, 0, 2);
     next.bloomScale = limit(next.bloomScale, 0.5, 1.8);
     next.starVisibility = limit(next.starVisibility, 0, 2);
     next.moonVisibility = limit(next.moonVisibility, 0, 2);
+    next.nightExposure = limit(next.nightExposure, -1, 1);
 
     return next;
 };
@@ -528,6 +629,9 @@ export function SkyLab() {
                   }
                 : undefined,
             cloudDensity: settings.cloudDensity,
+            cloudScene: settings.manualClouds
+                ? buildManualScene(settings, 0.42)
+                : undefined,
             motionSpeed: settings.motionSpeed,
             motionAmount: settings.motionAmount,
             bloomStyle: settings.bloom === "auto" ? undefined : settings.bloom,
@@ -535,6 +639,9 @@ export function SkyLab() {
             bloomScale: settings.bloomScale,
             starVisibility: settings.starVisibility,
             moonVisibility: settings.moonVisibility,
+            nightExposure: settings.manualNightExposure
+                ? settings.nightExposure
+                : undefined,
         }),
         [previewDate, settings],
     );
@@ -597,12 +704,25 @@ export function SkyLab() {
             stratosphericAerosol: randomStepped(0, 0.86, 0.01),
             groundAlbedo: randomStepped(0.08, 0.92, 0.01),
             cloudDensity: randomStepped(0.34, 1.8, 0.02),
+            manualClouds: true,
+            lowGenus: LOW_GENERA[Math.floor(Math.random() * LOW_GENERA.length)],
+            lowOktas: randomStepped(0, 8, 0.5),
+            midGenus: MID_GENERA[Math.floor(Math.random() * MID_GENERA.length)],
+            midOktas: randomStepped(0, 6, 0.5),
+            highGenus: HIGH_GENERA[Math.floor(Math.random() * HIGH_GENERA.length)],
+            highOktas: randomStepped(0, 6, 0.5),
+            cloudConvection: randomStepped(0, 1, 0.02),
+            cloudOpticalDepth: randomStepped(0.1, 1, 0.02),
+            cloudWindSpeed: randomStepped(1, 30, 0.5),
+            cloudWindDirection: randomStepped(0, 350, 10),
             motionSpeed: randomStepped(0.45, 2.25, 0.05),
             motionAmount: randomStepped(0.44, 1.76, 0.02),
             bloomVisibility: randomStepped(0.18, 1.7, 0.02),
             bloomScale: randomStepped(0.5, 1.8, 0.02),
             starVisibility: randomStepped(0.65, 1.45, 0.05),
             moonVisibility: randomStepped(0.65, 1.45, 0.05),
+            manualNightExposure: Math.random() > 0.6,
+            nightExposure: randomStepped(-1, 1, 0.05),
             paused: false,
         }));
     };
@@ -646,6 +766,7 @@ export function SkyLab() {
                 <div className={styles.astronomyStatus}>
                     <span>{snapshot?.lightingRegime ?? "Resolving lighting regime"}</span>
                     <span>{Math.round((snapshot?.darkness ?? 0) * 100)}% nocturnal adaptation</span>
+                    <span>{Math.round((snapshot?.nightBlackout ?? 0) * 100)}% pristine blackout</span>
                     <span>{titleCase(snapshot?.aerosolType ?? "resolving aerosol")}</span>
                     <span>{Math.round((snapshot?.aerosol ?? 0) * 100)}% aerosol</span>
                     <span>{Math.round((snapshot?.humidity ?? 0) * 100)}% humidity</span>
@@ -786,7 +907,36 @@ export function SkyLab() {
                     <Slider label="Bloom scale" value={settings.bloomScale} min={0.5} max={1.8} step={0.02} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("bloomScale", value)} />
                     <Slider label="Star visibility" value={settings.starVisibility} min={0} max={2} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("starVisibility", value)} />
                     <Slider label="Moon visibility" value={settings.moonVisibility} min={0} max={2} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("moonVisibility", value)} />
-                    <Slider label="Cloud / mist density" value={settings.cloudDensity} min={0} max={2} step={0.02} onChange={(value) => update("cloudDensity", value)} />
+                    <label className={styles.checkRow}>
+                        <input type="checkbox" checked={settings.manualNightExposure} onChange={(event) => update("manualNightExposure", event.target.checked)} />
+                        Override natural night exposure
+                    </label>
+                    <Slider label="Night exposure" value={settings.nightExposure} min={-1} max={1} step={0.02} disabled={!settings.manualNightExposure} format={(value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}`} onChange={(value) => update("nightExposure", value)} />
+                    <Slider label="Cloud / mist density" value={settings.cloudDensity} min={0} max={2} step={0.02} disabled={settings.manualClouds} onChange={(value) => update("cloudDensity", value)} />
+                </fieldset>
+
+                <fieldset>
+                    <legend>Clouds</legend>
+                    <label className={styles.toggle}>
+                        <input type="checkbox" checked={settings.manualClouds} onChange={(event) => update("manualClouds", event.target.checked)} />
+                        <span>Manual cloud state</span>
+                    </label>
+                    <SelectField label="Low genus" value={settings.lowGenus} onChange={(value) => update("lowGenus", value)}>
+                        {LOW_GENERA.map((genus) => <option key={genus} value={genus}>{genus}</option>)}
+                    </SelectField>
+                    <Slider label="Low coverage" value={settings.lowOktas} min={0} max={8} step={0.5} disabled={!settings.manualClouds} format={(value) => `${value.toFixed(1)}/8`} onChange={(value) => update("lowOktas", value)} />
+                    <SelectField label="Middle genus" value={settings.midGenus} onChange={(value) => update("midGenus", value)}>
+                        {MID_GENERA.map((genus) => <option key={genus} value={genus}>{genus}</option>)}
+                    </SelectField>
+                    <Slider label="Middle coverage" value={settings.midOktas} min={0} max={8} step={0.5} disabled={!settings.manualClouds} format={(value) => `${value.toFixed(1)}/8`} onChange={(value) => update("midOktas", value)} />
+                    <SelectField label="High genus" value={settings.highGenus} onChange={(value) => update("highGenus", value)}>
+                        {HIGH_GENERA.map((genus) => <option key={genus} value={genus}>{genus}</option>)}
+                    </SelectField>
+                    <Slider label="High coverage" value={settings.highOktas} min={0} max={8} step={0.5} disabled={!settings.manualClouds} format={(value) => `${value.toFixed(1)}/8`} onChange={(value) => update("highOktas", value)} />
+                    <Slider label="Convection" value={settings.cloudConvection} min={0} max={1} step={0.02} disabled={!settings.manualClouds} onChange={(value) => update("cloudConvection", value)} />
+                    <Slider label="Optical depth" value={settings.cloudOpticalDepth} min={0.05} max={1} step={0.01} disabled={!settings.manualClouds} onChange={(value) => update("cloudOpticalDepth", value)} />
+                    <Slider label="Wind speed" value={settings.cloudWindSpeed} min={0} max={35} step={0.5} disabled={!settings.manualClouds} format={(value) => `${value.toFixed(1)} m/s`} onChange={(value) => update("cloudWindSpeed", value)} />
+                    <Slider label="Wind direction" value={settings.cloudWindDirection} min={0} max={350} step={10} disabled={!settings.manualClouds} format={(value) => `${value.toFixed(0)}°`} onChange={(value) => update("cloudWindDirection", value)} />
                     <Slider label="Motion speed" value={settings.motionSpeed} min={0.25} max={3} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("motionSpeed", value)} />
                     <Slider label="Motion distance" value={settings.motionAmount} min={0} max={2} step={0.02} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("motionAmount", value)} />
                     <label className={styles.checkRow}>

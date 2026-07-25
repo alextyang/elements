@@ -95,10 +95,24 @@ const colorForBv = (
     );
 };
 
-const projectHorizontal = (azimuth: number, altitude: number) => ({
-    x: 50 + (normalizeRadians(azimuth) / Math.PI) * 50,
-    y: 80 - (altitude / (Math.PI / 2)) * 72,
-});
+const projectHorizontal = (
+    azimuth: number,
+    altitude: number,
+    viewAzimuth?: number,
+    horizontalFov = 360,
+    viewElevation?: number,
+    verticalFov = 180,
+) => {
+    const relativeAzimuth = viewAzimuth === undefined
+        ? normalizeRadians(azimuth)
+        : normalizeRadians(azimuth - (viewAzimuth - 180) * DEG);
+    return {
+        x: 50 + (relativeAzimuth / (horizontalFov * DEG)) * 100,
+        y: viewElevation === undefined
+            ? 80 - (altitude / (Math.PI / 2)) * 72
+            : 50 - ((altitude / DEG - viewElevation) / verticalFov) * 100,
+    };
+};
 
 const horizontalPosition = (
     rightAscension: number,
@@ -175,6 +189,8 @@ export interface MoonScene {
     haloOpacity: number;
     earthshineOpacity: number;
     scale: number;
+    physicalScale: boolean;
+    horizontalFov: number;
     rotation: number;
     textureRotation: number;
     atmosphericWarmth: number;
@@ -206,6 +222,11 @@ interface CelestialInput {
     date: Date;
     latitude: number;
     longitude: number;
+    viewAzimuth?: number;
+    horizontalFov?: number;
+    viewElevation?: number;
+    verticalFov?: number;
+    physicalMoonScale?: boolean;
     haze: number;
     cloudDensity: number;
     atmosphericVeil: number;
@@ -217,6 +238,11 @@ export const calculateCelestialScene = ({
     date,
     latitude,
     longitude,
+    viewAzimuth,
+    horizontalFov = 360,
+    viewElevation,
+    verticalFov = 180,
+    physicalMoonScale = false,
     haze,
     cloudDensity,
     atmosphericVeil,
@@ -243,7 +269,14 @@ export const calculateCelestialScene = ({
         (clamp(starVisibility, 0, 2) - 1) * 0.9;
     const siderealTime = localSiderealTime(date, longitude);
     const latitudeRadians = latitude * DEG;
-    const moonPoint = projectHorizontal(moon.azimuth, moon.altitude);
+    const moonPoint = projectHorizontal(
+        moon.azimuth,
+        moon.altitude,
+        viewAzimuth,
+        horizontalFov,
+        viewElevation,
+        verticalFov,
+    );
     const stars = HIPPARCOS_STARS.flatMap<ProjectedStar>((star) => {
         if (star.ra === 0 && star.dec === 0) return [];
 
@@ -286,6 +319,10 @@ export const calculateCelestialScene = ({
         const projected = projectHorizontal(
             horizontal.azimuth,
             Math.max(0, horizontal.altitude),
+            viewAzimuth,
+            horizontalFov,
+            viewElevation,
+            verticalFov,
         );
         const horizonFade = smoothHorizon(altitudeDegrees);
         const thresholdDistance = limitingMagnitude - apparentMagnitude;
@@ -341,7 +378,14 @@ export const calculateCelestialScene = ({
         ];
     });
 
-    const sunPoint = projectHorizontal(sun.azimuth, sun.altitude);
+    const sunPoint = projectHorizontal(
+        sun.azimuth,
+        sun.altitude,
+        viewAzimuth,
+        horizontalFov,
+        viewElevation,
+        verticalFov,
+    );
     let directionX = sunPoint.x - moonPoint.x;
     if (directionX > 50) directionX -= 100;
     if (directionX < -50) directionX += 100;
@@ -464,6 +508,8 @@ export const calculateCelestialScene = ({
                 clamp(earthshineVariability, 0.62, 1) *
                 0.02,
             scale: distanceScale * (1 + lowAltitudeWarmth * 0.045),
+            physicalScale: physicalMoonScale,
+            horizontalFov,
             rotation,
             textureRotation: -(moon.parallacticAngle / DEG),
             atmosphericWarmth: lowAltitudeWarmth,

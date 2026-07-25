@@ -729,10 +729,16 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                 gl.bindVertexArray(moonVertexArray);
 
                 const minimumDimension = Math.min(bounds.width, bounds.height);
-                const radiusCss = Math.min(
-                    22,
-                    Math.max(12.5, minimumDimension * 0.0185),
-                ) * moon.scale;
+                const radiusCss = moon.physicalScale
+                    ? Math.max(
+                          0.55,
+                          bounds.width * (0.2595 * moon.scale) /
+                              Math.max(0.5, moon.horizontalFov),
+                      )
+                    : Math.min(
+                          22,
+                          Math.max(12.5, minimumDimension * 0.0185),
+                      ) * moon.scale;
                 const radius = radiusCss * devicePixelRatio;
                 const centerX = moon.x / 50 - 1;
                 const centerY = 1 - moon.y / 50;
