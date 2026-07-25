@@ -97,6 +97,16 @@
     white-space: nowrap;
 }
 
+.astronomyStatus {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 12px;
+    margin-top: 6px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    letter-spacing: 0.015em;
+}
+
 .swatches {
     display: grid;
     grid-template-columns: repeat(11, 1fr);

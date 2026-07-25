@@ -123,6 +123,8 @@ interface LabSettings {
     motionAmount: number;
     bloomVisibility: number;
     bloomScale: number;
+    starVisibility: number;
+    moonVisibility: number;
     paused: boolean;
 }
 
@@ -161,6 +163,8 @@ const DEFAULT_SETTINGS: LabSettings = {
     motionAmount: 1,
     bloomVisibility: 1,
     bloomScale: 1,
+    starVisibility: 1,
+    moonVisibility: 1,
     paused: false,
 };
 
@@ -279,6 +283,8 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
         "motionAmount",
         "bloomVisibility",
         "bloomScale",
+        "starVisibility",
+        "moonVisibility",
     ];
 
     strings.forEach((key) => {
@@ -325,6 +331,8 @@ const hydrateFromUrl = (defaults: LabSettings): LabSettings => {
     next.motionAmount = limit(next.motionAmount, 0, 2);
     next.bloomVisibility = limit(next.bloomVisibility, 0, 2);
     next.bloomScale = limit(next.bloomScale, 0.5, 1.8);
+    next.starVisibility = limit(next.starVisibility, 0, 2);
+    next.moonVisibility = limit(next.moonVisibility, 0, 2);
 
     return next;
 };
@@ -457,6 +465,8 @@ export function SkyLab() {
             bloomStyle: settings.bloom === "auto" ? undefined : settings.bloom,
             bloomVisibility: settings.bloomVisibility,
             bloomScale: settings.bloomScale,
+            starVisibility: settings.starVisibility,
+            moonVisibility: settings.moonVisibility,
         }),
         [previewDate, settings],
     );
@@ -512,6 +522,8 @@ export function SkyLab() {
             motionAmount: randomStepped(0.44, 1.76, 0.02),
             bloomVisibility: randomStepped(0.18, 1.7, 0.02),
             bloomScale: randomStepped(0.5, 1.8, 0.02),
+            starVisibility: randomStepped(0.65, 1.45, 0.05),
+            moonVisibility: randomStepped(0.65, 1.45, 0.05),
             paused: false,
         }));
     };
@@ -550,6 +562,12 @@ export function SkyLab() {
                     <span>
                         {titleCase(snapshot?.atmosphereStyle ?? "loading")} · {titleCase(snapshot?.motionStyle ?? "loading")} · {titleCase(snapshot?.bloomStyle ?? "loading")}
                     </span>
+                </div>
+
+                <div className={styles.astronomyStatus}>
+                    <span>{snapshot?.moonPhase ?? "Resolving lunar state"}</span>
+                    <span>{Math.round((snapshot?.moonIllumination ?? 0) * 100)}% illuminated</span>
+                    <span>{snapshot?.visibleStars ?? 0} visible catalogue stars</span>
                 </div>
 
                 {snapshot && (
@@ -658,6 +676,8 @@ export function SkyLab() {
                     </SelectField>
                     <Slider label="Bloom visibility" value={settings.bloomVisibility} min={0} max={2} step={0.02} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("bloomVisibility", value)} />
                     <Slider label="Bloom scale" value={settings.bloomScale} min={0.5} max={1.8} step={0.02} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("bloomScale", value)} />
+                    <Slider label="Star visibility" value={settings.starVisibility} min={0} max={2} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("starVisibility", value)} />
+                    <Slider label="Moon visibility" value={settings.moonVisibility} min={0} max={2} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("moonVisibility", value)} />
                     <Slider label="Cloud / mist density" value={settings.cloudDensity} min={0} max={2} step={0.02} onChange={(value) => update("cloudDensity", value)} />
                     <Slider label="Motion speed" value={settings.motionSpeed} min={0.25} max={3} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("motionSpeed", value)} />
                     <Slider label="Motion distance" value={settings.motionAmount} min={0} max={2} step={0.02} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update("motionAmount", value)} />

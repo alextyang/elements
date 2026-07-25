@@ -3,6 +3,11 @@
 import { CSSProperties, useEffect, useState } from "react";
 import SunCalc from "suncalc";
 
+import {
+    calculateCelestialScene,
+    CelestialLayer,
+    type CelestialScene,
+} from "./astronomy";
 import styles from "./sky.module.css";
 import {
     PHASE_ORDER,
@@ -55,6 +60,8 @@ export interface SkyPreviewOptions {
     bloomStyle?: SkyBloomStyle;
     bloomVisibility?: number;
     bloomScale?: number;
+    starVisibility?: number;
+    moonVisibility?: number;
 }
 
 export interface SkySnapshot {
@@ -63,6 +70,9 @@ export interface SkySnapshot {
     atmosphereStyle: SkyAtmosphere;
     motionStyle: SkyMotionStyle;
     bloomStyle: SkyBloomStyle;
+    moonPhase: string;
+    moonIllumination: number;
+    visibleStars: number;
 }
 
 interface SkyProps {
@@ -154,20 +164,18 @@ interface SkyVisual {
     familyId: string;
     atmosphereStyle: SkyAtmosphere;
     motionStyle: SkyMotionStyle;
-    starsOpacity: number;
+    celestial: CelestialScene;
     highCloudOpacity: number;
     lowCloudOpacity: number;
     mistOpacity: number;
     cloudOffset: number;
     cloudHeight: number;
     nightDepth: number;
-    starRotation: number;
     motionDirection: "alternate" | "alternate-reverse";
     baseDuration: number;
     edgeDuration: number;
     horizonDuration: number;
     mistDuration: number;
-    starDuration: number;
     highCloudDuration: number;
     lowCloudDuration: number;
     motionX: number;
@@ -788,16 +796,22 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const sideColor = daily.randomValues[30] > 0.5
         ? palette.left
         : palette.right;
+    const celestialScene = calculateCelestialScene({
+        date,
+        latitude,
+        longitude,
+        haze: intensity.haze,
+        cloudDensity,
+        starVisibility: preview?.starVisibility,
+        moonVisibility: preview?.moonVisibility,
+    });
 
     return {
         palette,
         familyId: daily.family.id,
         atmosphereStyle,
         motionStyle,
-        starsOpacity:
-            clamp((-altitude - 7) / 14) *
-            0.34 *
-            clamp(1.12 - intensity.haze * 0.14, 0.72, 1.04),
+        celestial: celestialScene,
         highCloudOpacity:
             textureByStyle.high *
             textureStrength *
@@ -816,14 +830,12 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         cloudOffset: daily.randomValues[1] * 700,
         cloudHeight: 8 + daily.randomValues[2] * 24,
         nightDepth: 1 - daylight,
-        starRotation: daily.randomValues[3] * 18 - 9,
         motionDirection:
             daily.randomValues[7] > 0.5 ? "alternate" : "alternate-reverse",
         baseDuration: (26 + daily.randomValues[8] * 20) / motionSpeed,
         edgeDuration: (54 + daily.randomValues[9] * 48) / motionSpeed,
         horizonDuration: (64 + daily.randomValues[10] * 58) / motionSpeed,
         mistDuration: (88 + daily.randomValues[12] * 76) / motionSpeed,
-        starDuration: (180 + daily.randomValues[13] * 160) / motionSpeed,
         highCloudDuration:
             (118 + daily.randomValues[14] * 86) / motionSpeed,
         lowCloudDuration:
@@ -908,6 +920,12 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
                 atmosphereStyle: next.atmosphereStyle,
                 motionStyle: next.motionStyle,
                 bloomStyle: next.bloomStyle,
+                moonPhase: next.celestial.moon.phaseName,
+                moonIllumination: next.celestial.moon.fraction,
+                visibleStars:
+                    next.celestial.starsOpacity > 0.02
+                        ? next.celestial.stars.length
+                        : 0,
             });
             document
                 .getElementById("theme-color")
@@ -934,7 +952,6 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
         "--sky-haze": palette?.haze,
         "--sky-cloud": palette?.cloud,
         "--sky-cloud-warm": palette?.cloudWarm,
-        "--stars-opacity": visual?.starsOpacity ?? 0,
         "--cloud-opacity": visual?.highCloudOpacity ?? 0.04,
         "--cloud-low-opacity": visual?.lowCloudOpacity ?? 0.02,
         "--mist-opacity": visual?.mistOpacity ?? 0.03,
@@ -961,13 +978,11 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
         "--bloom-band": visual?.bloomBand ?? palette?.horizon,
         "--night-depth": visual?.nightDepth ?? 0,
         "--night-vignette": 0.05 + (visual?.nightDepth ?? 0) * 0.12,
-        "--star-rotation": `${visual?.starRotation ?? 0}deg`,
         "--motion-direction": visual?.motionDirection ?? "alternate",
         "--base-duration": `${visual?.baseDuration ?? 34}s`,
         "--edge-duration": `${visual?.edgeDuration ?? 74}s`,
         "--horizon-duration": `${visual?.horizonDuration ?? 92}s`,
         "--mist-duration": `${visual?.mistDuration ?? 124}s`,
-        "--star-duration": `${visual?.starDuration ?? 240}s`,
         "--cloud-high-duration": `${visual?.highCloudDuration ?? 150}s`,
         "--cloud-low-duration": `${visual?.lowCloudDuration ?? 210}s`,
         "--motion-x": `${visual?.motionX ?? 2.2}vmax`,
@@ -992,10 +1007,7 @@ export function Sky({ preview, paused = false, onVisualChange }: SkyProps = {}) 
             <div className={styles.base} />
             <div className={styles.edgeColor} />
             <div className={styles.horizon} />
-            <div className={styles.stars}>
-                <div className={styles.starFieldFar} />
-                <div className={styles.starFieldNear} />
-            </div>
+            {visual && <CelestialLayer scene={visual.celestial} paused={paused} />}
             <div className={`${styles.clouds} ${styles.cloudsHigh}`} />
             <div className={`${styles.clouds} ${styles.cloudsLow}`} />
             <div className={styles.mistLayer} />
