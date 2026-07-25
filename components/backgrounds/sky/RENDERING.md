@@ -46,13 +46,18 @@ The direct lunar image is also filtered as one scene-linear radiance source.
 NASA texture, terrain, terminator, limb, earthshine, and the opposition term
 all pass through the same atmosphere-dependent point-spread function before
 tone mapping and compositing. A compact Moffat-like core approximates the
-long-exposure turbulence/optical PSF; a separately weighted outer kernel adds
-the measured non-Gaussian seeing and aerosol wing. Airmass broadens and mildly
-stretches the kernel, cloud and aerosol optical depth transfer more energy into
-its wing, and only very low Moon altitudes introduce a subpixel
-zenith-directed broadband dispersion. Clear, high-altitude Moons therefore
-retain terrain detail, while humid and horizon Moons lose contrast across the
-whole disc and limb rather than acquiring an unrelated circular blur stamp.
+long-exposure turbulence/optical PSF; an isotropic seventeen-tap kernel avoids
+directional sampling artifacts, while a separately weighted outer component
+adds the weaker non-Gaussian seeing wing. Airmass broadens and mildly stretches
+the direct core, but aerosol and thin-cloud optical depth primarily remove
+unscattered contrast and reappear in the additive sky aureole rather than
+turning the Moon into a defocused disc. Only very low Moon altitudes introduce
+a subpixel zenith-directed broadband dispersion. Clear, high-altitude Moons
+therefore retain terrain detail, while humid and horizon Moons lose contrast
+without acquiring an unrelated circular blur stamp. NASA phase frames do not
+contain earthshine, so the registered LROC albedo map supplies subdued maria
+and highland structure on the dark hemisphere when real viewing conditions
+make it visible.
 The much wider moonlit-sky aureole remains in the atmospheric pass because it
 is angular sky radiance, not image blur.
 
@@ -85,11 +90,16 @@ components add structure at different spatial scales without becoming cloud
 stamps or decorative blobs.
 
 All scattering additions are composed in scene-linear RGB and converted back
-to display sRGB only once. A fixed triangular high-frequency dither of one
-8-bit quantisation interval is applied in physical pixel space after the
-display transform. It decorrelates unavoidable browser/display quantisation
-without shimmer. The legacy CSS gradient remains only as a WebGL fallback and
-does not animate behind the opaque radiance canvas.
+to display sRGB only once. A fixed, decorrelated triangular RGB dither of about
+one 8-bit quantisation interval is applied in physical pixel space after the
+display transform, with slightly more amplitude in very dark gradients. The
+compact lunar glare independently uses stochastic alpha quantisation, keeping
+its faint falloff from collapsing into concentric transparency bands. Both
+patterns are fixed in physical pixels and therefore do not shimmer. The
+atmosphere pass renders at native Retina density on ordinary displays and uses
+a total-pixel budget on very large 4K/5K surfaces; it redraws only after a
+scene or viewport change. The legacy CSS gradient remains only as a WebGL
+fallback and does not animate behind the opaque radiance canvas.
 
 ## Atmospheric and palette constraints
 
@@ -100,6 +110,25 @@ the grade inside that regime; they no longer wrap to an adjacent family's base
 palette. The runtime then derives a physical lighting regime from solar
 altitude, lunar altitude and illuminated fraction, cloud density, and the
 family optics.
+
+During daylight and twilight, each graded palette is composed against a
+solar-geometry envelope rather than accepted as a whole-dome tint. Clear,
+moist, and overcast reference domes constrain the zenith, upper sky, horizon,
+cloud, and haze independently in perceptual color space. Moisture and broad
+multiple scattering reduce dome chroma and contrast. Aerosol warmth is kept in
+the forward solar lobe; clean-air pink is kept in the bounded antisolar arch;
+ozone's low-Sun violet contribution is restricted to the optical paths where
+its Chappuis-band absorption matters. Family-specific constraint strengths
+leave already-physical clear and desert skies mostly intact while strongly
+correcting globally aqua, sage, rose, violet, smoke, and overcast combinations.
+
+The WebGL scattering pass follows the same separation. Rayleigh fill, low-Sun
+aerosol scattering, ozone-weighted twilight, and the Belt of Venus use
+independent spectral reference colors in scene-linear space. Palette colors
+provide only a restrained local grade. This prevents a decorative palette hue
+from becoming the color of molecular or aerosol illumination everywhere, while
+preserving the intended day-to-day diversity at the source-facing horizon,
+antisolar edge, cloud deck, and humidity veil.
 
 Deep night is composed after the display palette is selected. Zenith and
 horizon luminance settle nonlinearly from nautical through astronomical
@@ -145,6 +174,10 @@ Primary technical references:
   [A Scalable and Production Ready Sky and Atmosphere Rendering Technique](https://sebh.github.io/publications/egsr2020.pdf)
 - Alexander Wilkie et al.,
   [A Fitted Radiance and Attenuation Model for Realistic Atmospheres](https://cgg.mff.cuni.cz/publications/skymodel-2021/)
+- Sergey Kocifaj et al.,
+  [The influence of tropospheric haze on twilight sky color](https://opg.optica.org/ao/abstract.cfm?URI=AO-56-19-G179)
+- Sergey Kocifaj et al.,
+  [The role of ozone and aerosols in the colouration of the twilight sky](https://acp.copernicus.org/articles/23/14829/2023/)
 - Hartmut Winkler,
   [A revised simplified scattering model for the moonlit sky brightness profile](https://academic.oup.com/mnras/article/514/1/208/6589414)
 - Amy Jones et al.,

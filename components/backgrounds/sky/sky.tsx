@@ -514,6 +514,239 @@ const gradePalette = (
     return result;
 };
 
+// Palette families describe plausible air masses, not global color filters.
+// These reference domes keep the high sky inside measured daylight/twilight
+// families while the source palette still supplies the day's local character.
+const CLEAR_DAY_REFERENCE: SkyPalette = {
+    top: "#236cbb",
+    upper: "#4b91ce",
+    middle: "#7db5da",
+    horizon: "#b6cdd7",
+    low: "#d3d8d4",
+    left: "#689fca",
+    right: "#83b2d2",
+    glow: "#f4e4c8",
+    haze: "#c3cdd0",
+    cloud: "#edf1ef",
+    cloudWarm: "#ddd9d1",
+};
+
+const MOIST_DAY_REFERENCE: SkyPalette = {
+    top: "#548ba7",
+    upper: "#76a6b8",
+    middle: "#9bbbc1",
+    horizon: "#bec9c7",
+    low: "#d4d2c9",
+    left: "#86adb9",
+    right: "#91b3bd",
+    glow: "#e9dfca",
+    haze: "#c4c7c1",
+    cloud: "#e6e8e4",
+    cloudWarm: "#d8d5ce",
+};
+
+const OVERCAST_DAY_REFERENCE: SkyPalette = {
+    top: "#536775",
+    upper: "#71818b",
+    middle: "#919da2",
+    horizon: "#adb4b2",
+    low: "#bdbdb8",
+    left: "#778994",
+    right: "#87969c",
+    glow: "#d1cec5",
+    haze: "#adb2af",
+    cloud: "#c9cdca",
+    cloudWarm: "#c1bfba",
+};
+
+const DEEP_TWILIGHT_REFERENCE: SkyPalette = {
+    top: "#07142c",
+    upper: "#142c50",
+    middle: "#354f70",
+    horizon: "#756f80",
+    low: "#9b7c7d",
+    left: "#3b5476",
+    right: "#6d617e",
+    glow: "#d38c70",
+    haze: "#92798d",
+    cloud: "#929aaa",
+    cloudWarm: "#a08d91",
+};
+
+const CIVIL_TWILIGHT_REFERENCE: SkyPalette = {
+    top: "#376fa7",
+    upper: "#6595bd",
+    middle: "#96b1c7",
+    horizon: "#cfb9aa",
+    low: "#e3b897",
+    left: "#759bb9",
+    right: "#b092a1",
+    glow: "#f3be8d",
+    haze: "#bca1ae",
+    cloud: "#d5d9d8",
+    cloudWarm: "#d8c6ba",
+};
+
+const FAMILY_SOLAR_CONSTRAINT: Record<
+    string,
+    { daylight: number; twilight: number }
+> = {
+    "crystal-azure": { daylight: 0.22, twilight: 0.22 },
+    "marine-pearl": { daylight: 0.52, twilight: 0.42 },
+    "lavender-alpenglow": { daylight: 0.4, twilight: 0.28 },
+    "desert-apricot": { daylight: 0.3, twilight: 0.24 },
+    "storm-slate": { daylight: 0.62, twilight: 0.55 },
+    "smoky-copper": { daylight: 0.58, twilight: 0.38 },
+    "humid-aqua": { daylight: 0.74, twilight: 0.52 },
+    "winter-ice": { daylight: 0.34, twilight: 0.3 },
+    "rose-afterglow": { daylight: 0.52, twilight: 0.3 },
+    "violet-nocturne": { daylight: 0.56, twilight: 0.32 },
+    "sage-haze": { daylight: 0.76, twilight: 0.58 },
+    "cobalt-gold": { daylight: 0.24, twilight: 0.22 },
+};
+
+const capColorChroma = (source: string, maximum: number) => {
+    const color = toOklab(source);
+    const chroma = Math.hypot(color.a, color.b);
+    if (chroma <= maximum) return source;
+    const scale = maximum / chroma;
+    return fromOklab({
+        l: color.l,
+        a: color.a * scale,
+        b: color.b * scale,
+    });
+};
+
+const constrainSolarPalette = ({
+    source,
+    family,
+    atmosphere,
+    solarAltitude,
+    randomValues,
+}: {
+    source: SkyPalette;
+    family: SkyFamily;
+    atmosphere: SkyAtmosphere;
+    solarAltitude: number;
+    randomValues: number[];
+}) => {
+    const styleVeil = {
+        crystal: 0,
+        cirrus: 0.08,
+        haze: 0.24,
+        mist: 0.34,
+        soft: 0.42,
+    }[atmosphere];
+    const moistureVeil = clamp(
+        family.optics.humidity * 0.58 +
+            family.optics.aerosol * 0.26 +
+            styleVeil,
+        0,
+        1,
+    );
+    const overcast = clamp(
+        (family.optics.nightCharacter === "overcast" ? 0.7 : 0) +
+            (atmosphere === "soft" ? 0.18 : 0) +
+            (atmosphere === "mist" ? 0.08 : 0),
+    );
+    const moistDay = mixPalette(
+        CLEAR_DAY_REFERENCE,
+        MOIST_DAY_REFERENCE,
+        moistureVeil,
+    );
+    const dayReference = mixPalette(
+        moistDay,
+        OVERCAST_DAY_REFERENCE,
+        overcast,
+    );
+    const twilightProgress = smoothstep((solarAltitude + 12) / 18);
+    let twilightReference = mixPalette(
+        DEEP_TWILIGHT_REFERENCE,
+        CIVIL_TWILIGHT_REFERENCE,
+        twilightProgress,
+    );
+
+    // Aerosol reddening belongs to the solar lobe. Humidity broadens and
+    // whitens it; clean air preserves the narrower pink antisolar arch.
+    const solarWarmth = clamp(
+        0.28 + family.optics.aerosol * 0.52 - family.optics.humidity * 0.16,
+        0.18,
+        0.76,
+    );
+    twilightReference = {
+        ...twilightReference,
+        glow: mixColor("#f1c3a0", "#ef8958", solarWarmth),
+        haze: mixColor(
+            "#b5a9b7",
+            "#c98291",
+            (1 - family.optics.humidity) * 0.56,
+        ),
+    };
+
+    const daylight = smoothstep((solarAltitude + 1.5) / 14);
+    const twilight =
+        (1 - daylight) *
+        smoothstep((solarAltitude + 14) / 8) *
+        (1 - smoothstep((solarAltitude - 7) / 9));
+    const constraint =
+        FAMILY_SOLAR_CONSTRAINT[family.id] ??
+        ({ daylight: 0.42, twilight: 0.36 } as const);
+    const physicalReference = mixPalette(
+        twilightReference,
+        dayReference,
+        daylight,
+    );
+    const roleWeight: Record<keyof SkyPalette, number> = {
+        top: daylight > 0.5 ? 1 : 0.8,
+        upper: daylight > 0.5 ? 0.94 : 0.74,
+        middle: daylight > 0.5 ? 0.84 : 0.66,
+        horizon: daylight > 0.5 ? 0.62 : 0.68,
+        low: daylight > 0.5 ? 0.54 : 0.65,
+        left: 0.7,
+        right: 0.7,
+        glow: daylight > 0.5 ? 0.44 : 0.68,
+        haze: daylight > 0.5 ? 0.76 : 0.66,
+        cloud: 0.64,
+        cloudWarm: 0.64,
+    };
+    const chromaLimit: Record<keyof SkyPalette, number> = {
+        top: 0.145,
+        upper: 0.12,
+        middle: 0.095,
+        horizon: daylight > 0.5 ? 0.06 : 0.105,
+        low: daylight > 0.5 ? 0.055 : 0.12,
+        left: 0.1,
+        right: 0.1,
+        glow: daylight > 0.5 ? 0.085 : 0.14,
+        haze: daylight > 0.5 ? 0.055 : 0.095,
+        cloud: 0.04,
+        cloudWarm: 0.045,
+    };
+    const solarPresence = smoothstep((solarAltitude + 15) / 6);
+    const dailyVariation = 0.94 + (randomValues[23] - 0.5) * 0.12;
+    const result = {} as SkyPalette;
+
+    PALETTE_KEYS.forEach((key) => {
+        const amount =
+            solarPresence *
+            roleWeight[key] *
+            (daylight * constraint.daylight + twilight * constraint.twilight) *
+            dailyVariation;
+        const physicallyMixed = mixColor(
+            source[key],
+            physicalReference[key],
+            clamp(amount, 0, 0.86),
+        );
+        const veilDesaturation = 1 - moistureVeil * (daylight * 0.22 + 0.08);
+        result[key] = capColorChroma(
+            physicallyMixed,
+            chromaLimit[key] * veilDesaturation,
+        );
+    });
+
+    return result;
+};
+
 const hashString = (value: string) => {
     let hash = 2166136261;
     for (let index = 0; index < value.length; index += 1) {
@@ -918,8 +1151,15 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const [edgeLow, edgeHigh] = edgeOpacityByAtmosphere[atmosphereStyle];
     const intensity = daily.family.intensity;
     const cloudDensity = preview?.cloudDensity ?? 1;
-    const physicalAtmosphere = applyPhysicalAtmosphere({
+    const solarPalette = constrainSolarPalette({
         source: rawPalette,
+        family: daily.family,
+        atmosphere: atmosphereStyle,
+        solarAltitude: visualSolarAltitude,
+        randomValues: daily.randomValues,
+    });
+    const physicalAtmosphere = applyPhysicalAtmosphere({
+        source: solarPalette,
         family: daily.family,
         atmosphere: atmosphereStyle,
         solarAltitude: visualSolarAltitude,
@@ -929,6 +1169,13 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         randomValues: daily.randomValues,
     });
     const palette = physicalAtmosphere.palette;
+    const twilightEdgeEnvelope =
+        0.68 +
+        0.32 *
+            (1 -
+                smoothstep(
+                    Math.abs(visualSolarAltitude + 1.5) / 14,
+                ));
     const motionSpeed = preview?.motionSpeed ?? 1;
     const motionAmount = preview?.motionAmount ?? 1;
     const sunX = clamp(50 + Math.sin(celestial.azimuth) * 47, 2, 98);
@@ -1088,6 +1335,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         saturationLow:
             intensity.saturation *
             0.96 *
+            (1 - daily.family.optics.humidity * visualDaylight * 0.08) *
             (1 - physicalAtmosphere.darkness * 0.3) *
             between(
                 1,
@@ -1098,6 +1346,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         edgeOpacityLow: clamp(
             edgeLow * 0.54 *
                 intensity.edge *
+                twilightEdgeEnvelope *
                 (1 - physicalAtmosphere.darkness * 0.54),
             0.025,
             0.3,
@@ -1105,6 +1354,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         edgeOpacityHigh: clamp(
             edgeHigh * 0.54 *
                 intensity.edge *
+                twilightEdgeEnvelope *
                 (1 - physicalAtmosphere.darkness * 0.48),
             0.035,
             0.34,

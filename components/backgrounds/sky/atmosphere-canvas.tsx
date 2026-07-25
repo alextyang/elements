@@ -187,6 +187,8 @@ void main() {
     float reverse_phase = henyey_greenstein(-sun_cosine, 0.38);
     float sun_available = smoother(-15.0, 6.0, solar_altitude);
     float twilight = 1.0 - smoother(-5.0, 11.0, abs(solar_altitude + 2.0));
+    float low_sun_path = 1.0 - smoother(-3.0, 18.0, solar_altitude);
+    float ozone_path = twilight * (1.0 - humidity * 0.28);
     float forward_scatter = sun_available * mie_phase *
         (0.026 + aerosol * 0.085) * (0.35 + aerosol_path * 0.92);
     float molecular_fill = sun_available * rayleigh_phase *
@@ -196,9 +198,23 @@ void main() {
 
     vec3 glow_linear = srgb_to_linear(u_glow);
     vec3 haze_linear = srgb_to_linear(u_haze);
-    radiance += glow_linear * forward_scatter * (1.0 - night * 0.84);
-    radiance += mix(haze_linear, glow_linear, 0.28) * molecular_fill * (1.0 - night * 0.72);
-    radiance += mix(srgb_to_linear(u_middle), haze_linear, 0.64) * antisolar;
+    vec3 rayleigh_blue = srgb_to_linear(vec3(0.30, 0.56, 0.94));
+    vec3 ozone_violet = srgb_to_linear(vec3(0.48, 0.40, 0.76));
+    vec3 molecular_color = mix(rayleigh_blue, ozone_violet, ozone_path * 0.28);
+    vec3 aerosol_white = srgb_to_linear(vec3(0.91, 0.88, 0.80));
+    vec3 sunset_red = srgb_to_linear(vec3(0.96, 0.31, 0.12));
+    vec3 solar_scatter = mix(aerosol_white, sunset_red, low_sun_path * (0.48 + aerosol * 0.38));
+    solar_scatter = mix(solar_scatter, glow_linear, 0.18);
+    vec3 venus_rose = srgb_to_linear(vec3(0.79, 0.43, 0.55));
+    vec3 humid_neutral = srgb_to_linear(vec3(0.66, 0.65, 0.66));
+    vec3 antisolar_color = mix(venus_rose, humid_neutral, humidity * 0.62 + aerosol * 0.14);
+
+    // Scattering tint is spectral and geometry-dependent. Palette colors only
+    // provide a restrained local grade, preventing green/purple theme colors
+    // from becoming physically impossible illumination across the whole dome.
+    radiance += solar_scatter * forward_scatter * (1.0 - night * 0.84);
+    radiance += mix(molecular_color, haze_linear, 0.16) * molecular_fill * (1.0 - night * 0.72);
+    radiance += antisolar_color * antisolar;
 
     // Horizontal anisotropy wraps around the screen edges as atmospheric
     // illumination, not as a pair of recognizable radial stamps.
@@ -206,9 +222,10 @@ void main() {
         smoother(0.18, 0.94, y);
     float right_field = exp(-pow((1.07 - uv.x) / 0.49, 2.0)) *
         smoother(0.16, 0.93, y);
-    float edge_fade = (1.0 - night * 0.58) * edge_strength;
-    radiance = mix(radiance, srgb_to_linear(u_left), left_field * edge_fade * 0.16);
-    radiance = mix(radiance, srgb_to_linear(u_right), right_field * edge_fade * 0.16);
+    float edge_fade = (1.0 - night * 0.58) * edge_strength *
+        mix(0.72, 1.0, twilight);
+    radiance = mix(radiance, srgb_to_linear(u_left), left_field * edge_fade * 0.105);
+    radiance = mix(radiance, srgb_to_linear(u_right), right_field * edge_fade * 0.105);
 
     // Correlated low-frequency density variation gives clean skies depth and
     // makes aerosol fields non-uniform. The amplitude stays below cloud form.
@@ -227,7 +244,12 @@ void main() {
         mix(0.31, 0.20, aerosol), 2.0));
     float multi_scatter = horizon_volume * horizon_strength *
         (0.015 + aerosol * 0.024 + humidity * 0.018) * (1.0 - night * 0.72);
-    radiance += haze_linear * multi_scatter;
+    vec3 multi_scatter_color = mix(
+        mix(haze_linear, aerosol_white, 0.42),
+        solar_scatter,
+        twilight * 0.34
+    );
+    radiance += multi_scatter_color * multi_scatter;
 
     // Natural night is layered rather than uniformly blue: weak airglow,
     // integrated celestial radiance, moon aureole, and near-horizon extinction.
@@ -327,9 +349,24 @@ void main() {
     radiance = radiance / (vec3(1.0) + max(radiance - vec3(0.72), vec3(0.0)) * 0.72);
     vec3 display = linear_to_srgb(radiance);
 
-    // One quantisation-level triangular dither removes 8-bit contouring. It is
-    // fixed in physical pixel space, so the static pass never shimmers.
-    float dither = (hash21(gl_FragCoord.xy + 17.0) + hash21(gl_FragCoord.yx + 83.0) - 1.0) / 255.0;
+    // Decorrelated triangular RGB dither removes low-luminance contouring
+    // without turning the Moon's aureole into monochrome rings. Dark gradients
+    // receive slightly more than one code value; the pattern is fixed in
+    // physical pixels, so this static pass never shimmers.
+    float display_luminance = dot(display, vec3(0.2126, 0.7152, 0.0722));
+    float dither_strength = mix(
+        1.18,
+        0.68,
+        smoother(0.025, 0.42, display_luminance)
+    ) / 255.0;
+    vec3 dither = vec3(
+        hash21(gl_FragCoord.xy + vec2(17.0, 61.0)) +
+            hash21(gl_FragCoord.yx + vec2(83.0, 11.0)) - 1.0,
+        hash21(gl_FragCoord.xy + vec2(109.0, 29.0)) +
+            hash21(gl_FragCoord.yx + vec2(47.0, 137.0)) - 1.0,
+        hash21(gl_FragCoord.xy + vec2(71.0, 151.0)) +
+            hash21(gl_FragCoord.yx + vec2(193.0, 43.0)) - 1.0
+    ) * dither_strength;
     display = clamp(display + dither, 0.0, 1.0);
     out_color = vec4(display, 1.0);
 }`;
@@ -446,9 +483,15 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             if (document.hidden) return;
             const current = sceneRef.current;
             const bounds = canvas.getBoundingClientRect();
-            // The field is deliberately low-frequency, so 1.5x DPR is visually
-            // lossless while halving fill cost on dense laptop displays.
-            const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+            // Match Retina density on ordinary displays so faint lunar
+            // gradients and fixed-pixel dither survive compositing. A pixel
+            // budget keeps 4K/5K canvases from turning a static quality gain
+            // into a large allocation or sustained thermal cost.
+            const nativePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+            const pixelBudgetRatio = Math.sqrt(
+                8_500_000 / Math.max(1, bounds.width * bounds.height),
+            );
+            const pixelRatio = Math.min(nativePixelRatio, pixelBudgetRatio);
             const width = Math.max(1, Math.round(bounds.width * pixelRatio));
             const height = Math.max(1, Math.round(bounds.height * pixelRatio));
             if (canvas.width !== width || canvas.height !== height) {

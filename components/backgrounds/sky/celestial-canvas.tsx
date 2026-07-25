@@ -101,7 +101,7 @@ out vec2 v_disc;
 
 void main() {
     gl_Position = vec4(u_center + a_position * u_extent, 0.0, 1.0);
-    v_disc = a_position * 8.0;
+    v_disc = a_position * 5.0;
 }`;
 
 const MOON_FRAGMENT_SHADER = `#version 300 es
@@ -150,6 +150,12 @@ vec3 tone_map(vec3 color) {
     );
 }
 
+float hash21(vec2 point) {
+    vec3 p3 = fract(vec3(point.xyx) * vec3(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
 struct LunarSample {
     vec3 radiance;
     float coverage;
@@ -173,6 +179,10 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
     vec3 surface_normal = normalize(vec3(screen_point, z));
     vec2 texture_point = rotate2d(screen_point, u_texture_angle);
     vec3 texture_normal = normalize(vec3(texture_point, z));
+    vec2 uv = vec2(
+        0.5 + atan(texture_normal.x, texture_normal.z) / (2.0 * PI),
+        0.5 - asin(clamp(texture_normal.y, -1.0, 1.0)) / PI
+    );
 
     float phase_depth = u_fraction * 2.0 - 1.0;
     float transverse = sqrt(max(0.0, 1.0 - phase_depth * phase_depth));
@@ -200,13 +210,20 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
         );
         surface = photo_linear * u_light_tint;
         float shadow_gate = 1.0 - smoothstep(-0.018, 0.035, incidence);
-        surface += mix(u_shadow_tint, u_light_tint, 0.24) *
-            u_earthshine * shadow_gate * 0.16;
+        if (u_earthshine > 0.0005) {
+            // NASA's phase render intentionally contains no earthshine. Reuse
+            // the registered LROC albedo so the dark hemisphere retains maria
+            // and highland structure instead of becoming a flat gray plate.
+            vec3 earthshine_albedo = pow(
+                max(texture(u_albedo, uv).rgb, vec3(0.012)),
+                vec3(0.96)
+            );
+            earthshine_albedo = mix(vec3(0.72), earthshine_albedo, 0.42);
+            surface += earthshine_albedo *
+                mix(u_shadow_tint, u_light_tint, 0.18) *
+                u_earthshine * shadow_gate * 0.50;
+        }
     } else {
-        vec2 uv = vec2(
-            0.5 + atan(texture_normal.x, texture_normal.z) / (2.0 * PI),
-            0.5 - asin(clamp(texture_normal.y, -1.0, 1.0)) / PI
-        );
         vec3 albedo = texture(u_albedo, uv).rgb;
         float height_left = texture(u_elevation, uv - vec2(u_texel.x, 0.0)).r;
         float height_right = texture(u_elevation, uv + vec2(u_texel.x, 0.0)).r;
@@ -250,36 +267,52 @@ LunarSample sample_lunar_radiance(vec2 requested_point) {
 }
 
 LunarSample convolve_lunar(vec2 point) {
-    // A compact Moffat-like kernel: the central nine taps carry the
-    // turbulence/optical core and four wider taps carry the measured power-law
-    // seeing/scatter wing. All accumulation remains in scene-linear radiance.
+    // An isotropic seventeen-tap Moffat-like kernel. Eight evenly distributed
+    // core taps avoid the cross-shaped blur produced by cardinal-only samples;
+    // eight wider taps hold the much weaker aerosol/seeing wing. Accumulation
+    // remains in scene-linear, premultiplied radiance.
     vec2 sigma = vec2(u_psf_sigma, u_psf_sigma * u_psf_stretch);
     LunarSample center = sample_lunar_radiance(point);
-    vec3 core_radiance = center.radiance * 0.28;
-    float core_coverage = center.coverage * 0.28;
+    vec3 core_radiance = center.radiance * 0.36;
+    float core_coverage = center.coverage * 0.36;
 
-    LunarSample c0 = sample_lunar_radiance(point + vec2(sigma.x * 0.86, 0.0));
-    LunarSample c1 = sample_lunar_radiance(point - vec2(sigma.x * 0.86, 0.0));
-    LunarSample c2 = sample_lunar_radiance(point + vec2(0.0, sigma.y * 0.86));
-    LunarSample c3 = sample_lunar_radiance(point - vec2(0.0, sigma.y * 0.86));
-    core_radiance += (c0.radiance + c1.radiance + c2.radiance + c3.radiance) * 0.115;
-    core_coverage += (c0.coverage + c1.coverage + c2.coverage + c3.coverage) * 0.115;
+    vec2 inner_axis = sigma * 0.88;
+    vec2 inner_diag = inner_axis * 0.70710678;
+    LunarSample c0 = sample_lunar_radiance(point + vec2(inner_axis.x, 0.0));
+    LunarSample c1 = sample_lunar_radiance(point - vec2(inner_axis.x, 0.0));
+    LunarSample c2 = sample_lunar_radiance(point + vec2(0.0, inner_axis.y));
+    LunarSample c3 = sample_lunar_radiance(point - vec2(0.0, inner_axis.y));
+    LunarSample c4 = sample_lunar_radiance(point + inner_diag);
+    LunarSample c5 = sample_lunar_radiance(point + vec2(inner_diag.x, -inner_diag.y));
+    LunarSample c6 = sample_lunar_radiance(point + vec2(-inner_diag.x, inner_diag.y));
+    LunarSample c7 = sample_lunar_radiance(point - inner_diag);
+    core_radiance += (
+        c0.radiance + c1.radiance + c2.radiance + c3.radiance +
+        c4.radiance + c5.radiance + c6.radiance + c7.radiance
+    ) * 0.08;
+    core_coverage += (
+        c0.coverage + c1.coverage + c2.coverage + c3.coverage +
+        c4.coverage + c5.coverage + c6.coverage + c7.coverage
+    ) * 0.08;
 
-    vec2 diagonal = sigma * 0.78;
-    LunarSample d0 = sample_lunar_radiance(point + diagonal);
-    LunarSample d1 = sample_lunar_radiance(point + vec2(diagonal.x, -diagonal.y));
-    LunarSample d2 = sample_lunar_radiance(point + vec2(-diagonal.x, diagonal.y));
-    LunarSample d3 = sample_lunar_radiance(point - diagonal);
-    core_radiance += (d0.radiance + d1.radiance + d2.radiance + d3.radiance) * 0.065;
-    core_coverage += (d0.coverage + d1.coverage + d2.coverage + d3.coverage) * 0.065;
-
-    vec2 wing = sigma * vec2(2.35, 2.35);
-    LunarSample w0 = sample_lunar_radiance(point + vec2(wing.x, 0.0));
-    LunarSample w1 = sample_lunar_radiance(point - vec2(wing.x, 0.0));
-    LunarSample w2 = sample_lunar_radiance(point + vec2(0.0, wing.y));
-    LunarSample w3 = sample_lunar_radiance(point - vec2(0.0, wing.y));
-    vec3 wing_radiance = (w0.radiance + w1.radiance + w2.radiance + w3.radiance) * 0.25;
-    float wing_coverage = (w0.coverage + w1.coverage + w2.coverage + w3.coverage) * 0.25;
+    vec2 wing_axis = sigma * 2.35;
+    vec2 wing_diag = wing_axis * 0.70710678;
+    LunarSample w0 = sample_lunar_radiance(point + vec2(wing_axis.x, 0.0));
+    LunarSample w1 = sample_lunar_radiance(point - vec2(wing_axis.x, 0.0));
+    LunarSample w2 = sample_lunar_radiance(point + vec2(0.0, wing_axis.y));
+    LunarSample w3 = sample_lunar_radiance(point - vec2(0.0, wing_axis.y));
+    LunarSample w4 = sample_lunar_radiance(point + wing_diag);
+    LunarSample w5 = sample_lunar_radiance(point + vec2(wing_diag.x, -wing_diag.y));
+    LunarSample w6 = sample_lunar_radiance(point + vec2(-wing_diag.x, wing_diag.y));
+    LunarSample w7 = sample_lunar_radiance(point - wing_diag);
+    vec3 wing_radiance = (
+        w0.radiance + w1.radiance + w2.radiance + w3.radiance +
+        w4.radiance + w5.radiance + w6.radiance + w7.radiance
+    ) * 0.125;
+    float wing_coverage = (
+        w0.coverage + w1.coverage + w2.coverage + w3.coverage +
+        w4.coverage + w5.coverage + w6.coverage + w7.coverage
+    ) * 0.125;
 
     return LunarSample(
         mix(core_radiance, wing_radiance, u_psf_wing),
@@ -292,7 +325,7 @@ void main() {
     // applied to the complete lunar radiance image before display tonemapping.
     vec2 screen_point = vec2(v_disc.x, -v_disc.y);
     float radial = length(screen_point);
-    if (radial > 8.0) discard;
+    if (radial > 5.0) discard;
 
     LunarSample red_sample = LunarSample(vec3(0.0), 0.0);
     LunarSample green_sample = LunarSample(vec3(0.0), 0.0);
@@ -328,19 +361,26 @@ void main() {
     vec2 bright_limb = vec2(cos(u_light_angle), sin(u_light_angle));
     vec2 glare_point = screen_point - bright_limb * (1.0 - u_fraction) * 0.24;
     float angle = atan(glare_point.y, glare_point.x);
-    float anisotropic_radius = length(vec2(glare_point.x * 0.955, glare_point.y * 1.045));
-    float irregularity = 0.018 * sin(angle * 3.0 + 0.8) +
-        0.011 * sin(angle * 7.0 - 1.4);
+    float anisotropic_radius = length(vec2(glare_point.x * 0.975, glare_point.y * 1.025));
+    float irregularity = 0.006 * sin(angle * 3.0 + 0.8) +
+        0.003 * sin(angle * 7.0 - 1.4);
     float separation = max(0.0, anisotropic_radius - 1.0 + irregularity);
-    float near_glare = exp(-separation * 2.72) * 0.13;
-    float ocular_glare = 0.046 / (0.24 + separation * separation * 1.16);
-    float diffuse_tail = exp(-separation * 0.44) * 0.009;
-    float angular_variation = 0.96 + 0.04 * cos(angle * 2.0 + 0.7);
+    float near_glare = exp(-separation * 4.4) * 0.052;
+    float ocular_glare = 0.012 / (0.19 + separation * separation * 2.8);
+    float diffuse_tail = exp(-separation * 1.1) * 0.002;
+    float angular_variation = 0.985 + 0.015 * cos(angle * 2.0 + 0.7);
     float halo_coverage = u_halo_opacity *
         (near_glare + ocular_glare + diffuse_tail) *
         angular_variation *
-        (1.0 - smoothstep(6.2, 7.8, radial));
+        (1.0 - smoothstep(3.2, 4.4, radial));
     halo_coverage *= 1.0 - disc_coverage;
+    // Stochastic alpha quantisation prevents the few available 8-bit alpha
+    // levels in a very faint compact glare from becoming concentric bands.
+    // The pattern is fixed in physical pixels, so it never shimmers.
+    halo_coverage = floor(
+        clamp(halo_coverage, 0.0, 1.0) * 255.0 +
+        hash21(gl_FragCoord.xy + vec2(41.0, 113.0))
+    ) / 255.0;
     vec3 halo_color = mix(u_light_tint, vec3(0.78, 0.84, 0.96), 0.045);
 
     float combined_coverage = disc_coverage + halo_coverage;
@@ -654,8 +694,8 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
 
                 const minimumDimension = Math.min(bounds.width, bounds.height);
                 const radiusCss = Math.min(
-                    20,
-                    Math.max(10.5, minimumDimension * 0.016),
+                    22,
+                    Math.max(12.5, minimumDimension * 0.0185),
                 ) * moon.scale;
                 const radius = radiusCss * devicePixelRatio;
                 const centerX = moon.x / 50 - 1;
@@ -663,8 +703,8 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                 gl.uniform2f(uniform(moonProgram, "u_center"), centerX, centerY);
                 gl.uniform2f(
                     uniform(moonProgram, "u_extent"),
-                    (radius * 8 * 2) / width,
-                    (radius * 8 * 2) / height,
+                    (radius * 5 * 2) / width,
+                    (radius * 5 * 2) / height,
                 );
                 gl.uniform1f(uniform(moonProgram, "u_fraction"), moon.fraction);
                 gl.uniform1f(

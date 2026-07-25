@@ -380,35 +380,36 @@ export const calculateCelestialScene = ({
         1.24,
     );
     const seeingPath = clamp((moonAirmass - 1) / 7.5);
-    // Delivered lunar image quality is a convolution of turbulence, the
-    // optical system, and scattered aerosol/cloud light. Values are CSS-pixel
-    // sigmas; the canvas converts them to angular lunar-radius units so the PSF
-    // remains stable across DPR and viewport sizes.
+    // The unscattered lunar image keeps a narrow seeing/optical core. Aerosol
+    // and thin-cloud energy belongs mostly in the additive PSF wing and sky
+    // aureole; allowing it to inflate the core made ordinary humid nights look
+    // like badly defocused photographs. Values are CSS-pixel sigmas and remain
+    // stable across DPR and viewport sizes.
     const psfSigma = clamp(
-        0.24 +
-            seeingPath ** 0.68 * 0.58 +
-            atmosphericVeil * 0.62 +
-            Math.max(0, haze - 0.72) * 0.18,
-        0.24,
-        1.48,
+        0.12 +
+            seeingPath ** 0.68 * 0.34 +
+            atmosphericVeil * 0.08 +
+            Math.max(0, haze - 0.78) * 0.06,
+        0.12,
+        0.66,
     );
     const psfWing = clamp(
-        0.055 +
-            seeingPath * 0.075 +
-            atmosphericVeil * 0.17 +
-            Math.max(0, haze - 0.8) * 0.045,
-        0.045,
-        0.3,
+        0.016 +
+            seeingPath * 0.032 +
+            atmosphericVeil * 0.068 +
+            Math.max(0, haze - 0.82) * 0.014,
+        0.014,
+        0.12,
     );
-    const psfStretch = 1 + seeingPath * 0.16 + atmosphericVeil * 0.045;
+    const psfStretch = 1 + seeingPath * 0.09 + atmosphericVeil * 0.018;
     // Broadband differential refraction is minute except close to the
     // horizon. Keeping it subpixel avoids a decorative RGB fringe while still
     // reproducing the slight zenith-directed chromatic softness of real
     // low-altitude lunar photographs.
     const dispersion = clamp(
-        seeingPath ** 1.55 * (0.035 + lowAltitudeWarmth * 0.22),
+        seeingPath ** 1.7 * (0.012 + lowAltitudeWarmth * 0.08),
         0,
-        0.24,
+        0.085,
     );
 
     return {
@@ -440,11 +441,11 @@ export const calculateCelestialScene = ({
                     0.24,
                 ),
             earthshineOpacity:
-                clamp((0.3 - illumination.fraction) / 0.26) ** 1.55 *
+                clamp((0.34 - illumination.fraction) / 0.31) ** 1.25 *
                 darkness ** 1.35 *
                 moonHorizonFade *
                 atmosphericClarity *
-                0.052,
+                0.092,
             scale: distanceScale * (1 + lowAltitudeWarmth * 0.045),
             rotation,
             textureRotation: -(moon.parallacticAngle / DEG),

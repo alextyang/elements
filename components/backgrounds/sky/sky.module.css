@@ -120,7 +120,7 @@
         );
     opacity: 0.36;
     mix-blend-mode: screen;
-    filter: saturate(1.4) blur(5px);
+    filter: saturate(1.16) blur(6px);
     transform-origin: 50% 68%;
     will-change: transform, opacity;
     animation: edgeDrift var(--edge-duration) ease-in-out infinite alternate;
@@ -295,7 +295,7 @@
 
 .crystal .edgeColor {
     opacity: 0.52;
-    filter: saturate(1.54) blur(5px);
+    filter: saturate(1.28) blur(6px);
 }
 
 .crystal {
