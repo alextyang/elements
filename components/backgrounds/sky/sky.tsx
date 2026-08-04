@@ -4,24 +4,49 @@ import { CSSProperties, useEffect, useState } from "react";
 import SunCalc from "suncalc";
 
 import {
+    FULL_MOON_TO_SOLAR_IRRADIANCE_RATIO,
+    calculateSkyAdaptation,
     calculateCelestialScene,
-    lunarRelativeIrradiance,
+    directAtmosphericTransmittance,
+    lunarTopOfAtmosphereIrradiance,
     type CelestialScene,
 } from "./astronomy";
 import {
-    AtmosphereCanvas,
-    type SkyRadianceScene,
-} from "./atmosphere-canvas";
-import { CelestialCanvas } from "./celestial-canvas";
+    AEROSOL_AUTHORING_PRIORS,
+    aerosolAngstromExponent,
+    aerosolOpticalDepth550,
+    climatologicalOzoneColumnDobson,
+    constrainPhysicalSkyComposition,
+    createPhysicalAtmosphereStateFromComposition,
+    observerAltitudeKm,
+    ozoneColumnScale,
+    resolveEnvironmentGroundAlbedo,
+    type GroundAlbedoRgb,
+} from "./atmospheric-composition";
+import type { SkyRadianceScene } from "./atmosphere-canvas";
+import type { PhysicalAtmosphereState } from "./physical-atmosphere";
+import type { ProductionWeatherSceneAuthoring } from "./weather-scene";
 import {
     createDailyCloudScene,
     sceneFromLegacy,
     type CloudScene,
 } from "./cloud-scene";
+import type { HydrometeorSceneOverrides } from "./hydrometeor-system";
 import styles from "./sky.module.css";
+import {
+    type SkyDebugView,
+    type SkyCloudComposition,
+    type SkyCloudEditorialRegime,
+    type SkyCloudPerspective,
+    type SkyRendererPreference,
+    type SkyRendererQuality,
+    type SkyRendererStats,
+} from "./renderer-types";
+import { SkyRendererCanvas } from "./sky-renderer-canvas";
 import {
     PHASE_ORDER,
     SKY_FAMILIES,
+    SKY_FAMILY_ENVIRONMENTS,
     SKY_PALETTES,
     SkyAerosolType,
     SkyAtmosphere,
@@ -30,6 +55,7 @@ import {
     SkyPhase,
     SkyRegion,
     SkySeason,
+    skyFamilySelectionWeight,
 } from "./sky-palettes";
 
 export type SkyMotionStyle =
@@ -60,6 +86,8 @@ export interface SkyCompositionControls {
     inversion: number;
     stratosphericAerosol: number;
     groundAlbedo: number;
+    /** Optional linear RGB Lambertian reflectance; scalar remains the default. */
+    groundAlbedoRgb?: GroundAlbedoRgb;
 }
 
 export type SkyCloudType =
@@ -111,17 +139,41 @@ export interface SkyPreviewOptions {
      * that needs direct control of layering.
      */
     cloudScene?: CloudScene;
+    /** Exact per-layer hydrometeor and surface-obscuration authoring state. */
+    hydrometeors?: HydrometeorSceneOverrides;
+    /** Finite world-space optical/electrical phenomenon authoring. */
+    weather?: ProductionWeatherSceneAuthoring;
     motionSpeed?: number;
     motionAmount?: number;
     bloomStyle?: SkyBloomStyle;
     bloomVisibility?: number;
     bloomScale?: number;
+    /** Catalogue depth/detection threshold, independent from emitted energy. */
     starVisibility?: number;
+    /** Scene-linear stellar exposure after physical extinction. */
+    stellarExposure?: number;
+    /** Strength of the wide atmospheric/optical stellar PSF. */
+    stellarGlow?: number;
     moonVisibility?: number;
     /** Artistic camera adaptation for night only: -1 is extremely dark, +1 lifted. */
     nightExposure?: number;
     composition?: Partial<SkyCompositionControls>;
     aerosolType?: SkyAerosolType;
+    /** Renderer selection; auto prefers WebGPU and falls back to WebGL2. */
+    rendererPreference?: SkyRendererPreference;
+    rendererQuality?: SkyRendererQuality;
+    rendererDebugView?: SkyDebugView;
+    cloudResolutionScale?: number;
+    cloudUpdateRate?: number;
+    temporalClouds?: boolean;
+    /** Art-directed 2D placement applied to physically lit cloud volumes. */
+    cloudComposition?: SkyCloudComposition;
+    /** Cloud-only lens staging; photographic camera views default to natural. */
+    cloudPerspective?: SkyCloudPerspective;
+    /** Lab override for automatic genus-specific weather-system placement. */
+    cloudEditorialRegime?: SkyCloudEditorialRegime;
+    /** Seconds added to the astronomical moment for weather-evolution inspection. */
+    cloudTimeOffset?: number;
 }
 
 export interface SkySnapshot {
@@ -143,11 +195,14 @@ export interface SkySnapshot {
     stratosphericAerosol: number;
 }
 
-interface SkyProps {
+export interface SkyProps {
     preview?: SkyPreviewOptions;
     paused?: boolean;
     contained?: boolean;
+    /** Stable qualification identity; changing it invalidates renderer history. */
+    rendererSceneKey?: string;
     onVisualChange?: (snapshot: SkySnapshot) => void;
+    onRendererStats?: (stats: SkyRendererStats) => void;
 }
 
 const PALETTE_KEYS: (keyof SkyPalette)[] = [
@@ -231,6 +286,7 @@ const TIMEZONE_REGIONS: Partial<Record<string, SkyRegion>> = {
 interface ResolvedAtmosphericComposition extends SkyCompositionControls {
     aerosolType: SkyAerosolType;
     aerosolTint: [number, number, number];
+    groundAlbedoRgb: GroundAlbedoRgb;
 }
 
 interface SkyVisual {
@@ -240,6 +296,7 @@ interface SkyVisual {
     atmosphereStyle: SkyAtmosphere;
     motionStyle: SkyMotionStyle;
     celestial: CelestialScene;
+    physicalAtmosphereState: PhysicalAtmosphereState;
     highCloudOpacity: number;
     lowCloudOpacity: number;
     mistOpacity: number;
@@ -358,18 +415,27 @@ const AEROSOL_TINTS: Record<SkyAerosolType, [number, number, number]> = {
 const resolveAtmosphericComposition = ({
     family,
     atmosphere,
+    latitude,
+    season,
     randomValues,
     override,
     aerosolTypeOverride,
 }: {
     family: SkyFamily;
     atmosphere: SkyAtmosphere;
+    latitude: number;
+    season: SkySeason;
     randomValues: number[];
     override?: Partial<SkyCompositionControls>;
     aerosolTypeOverride?: SkyAerosolType;
 }): ResolvedAtmosphericComposition => {
     const optics = family.optics;
     const aerosolType = aerosolTypeOverride ?? optics.aerosolType ?? "clean";
+    const authoredAerosolType = optics.aerosolType ?? "clean";
+    const typeWasReplaced =
+        aerosolTypeOverride !== undefined && aerosolType !== authoredAerosolType;
+    const aerosolPrior = AEROSOL_AUTHORING_PRIORS[aerosolType];
+    const environment = SKY_FAMILY_ENVIRONMENTS[family.id];
     const styleBias = {
         crystal: { aerosol: -0.06, humidity: -0.08, inversion: -0.08 },
         cirrus: { aerosol: -0.01, humidity: 0.02, inversion: -0.02 },
@@ -379,63 +445,80 @@ const resolveAtmosphericComposition = ({
     }[atmosphere];
     const observerAltitude = clamp(
         override?.observerAltitude ??
-            (optics.observerAltitude ?? 0.08) + (randomValues[2] - 0.5) * 0.08,
+            (optics.observerAltitude ?? 0.08) +
+                (randomValues[32] - 0.5) * 0.08,
     );
     const aerosol = clamp(
         override?.aerosol ??
-            (optics.aerosol +
+            ((typeWasReplaced ? aerosolPrior.aerosol : optics.aerosol) +
                 styleBias.aerosol +
-                (randomValues[25] - 0.5) * 0.12) *
+                (randomValues[33] - 0.5) * 0.12) *
                 (1 - observerAltitude * 0.24),
         0.015,
         1,
     );
     const humidity = clamp(
         override?.humidity ??
-            (optics.humidity +
+            ((typeWasReplaced ? aerosolPrior.humidity : optics.humidity) +
                 styleBias.humidity +
-                (randomValues[26] - 0.5) * 0.1) *
+                (randomValues[34] - 0.5) * 0.1) *
                 (1 - observerAltitude * 0.14),
     );
 
-    return {
-        aerosolType,
-        aerosolTint: AEROSOL_TINTS[aerosolType],
+    const ozone = override?.ozone ??
+        climatologicalOzoneColumnDobson({
+            latitude,
+            season,
+            variability: randomValues[37],
+        }) / 300;
+
+    const constrained = constrainPhysicalSkyComposition({
         aerosol,
         humidity,
         aerosolSize: clamp(
             override?.aerosolSize ??
-                (optics.aerosolSize ?? 0.3) + (randomValues[27] - 0.5) * 0.08,
+                (typeWasReplaced
+                    ? aerosolPrior.size
+                    : (optics.aerosolSize ?? 0.3)) +
+                    (randomValues[35] - 0.5) * 0.08,
         ),
         aerosolAbsorption: clamp(
             override?.aerosolAbsorption ??
-                (optics.aerosolAbsorption ?? 0.04) +
-                    (randomValues[28] - 0.5) * 0.04,
+                (typeWasReplaced
+                    ? aerosolPrior.absorption
+                    : (optics.aerosolAbsorption ?? 0.04)) +
+                    (randomValues[36] - 0.5) * 0.04,
         ),
-        ozone: clamp(
-            override?.ozone ??
-                (optics.ozone ?? 1) + (randomValues[29] - 0.5) * 0.1,
-            0.65,
-            1.35,
-        ),
+        ozone: clamp(ozone, 230 / 300, 430 / 300),
         observerAltitude,
         inversion: clamp(
             override?.inversion ??
                 (optics.inversion ?? 0.08) +
                     styleBias.inversion +
-                    (randomValues[24] - 0.5) * 0.1,
+                    (randomValues[38] - 0.5) * 0.1,
         ),
         stratosphericAerosol: clamp(
             override?.stratosphericAerosol ??
                 (optics.stratosphericAerosol ?? 0.03) +
-                    (atmosphere === "cirrus" ? 0.025 : 0) +
-                    (randomValues[30] - 0.5) * 0.04,
+                    (randomValues[39] - 0.5) * 0.04,
         ),
         groundAlbedo: clamp(
             override?.groundAlbedo ??
                 (optics.groundAlbedo ?? 0.24) +
-                    (randomValues[31] - 0.5) * 0.06,
+                    (randomValues[40] - 0.5) * 0.06,
         ),
+        groundAlbedoRgb:
+            override?.groundAlbedoRgb ??
+            resolveEnvironmentGroundAlbedo(
+                environment?.surface ?? "vegetation",
+                randomValues[40],
+            ),
+    }, aerosolType);
+
+    return {
+        ...constrained,
+        aerosolType,
+        aerosolTint: AEROSOL_TINTS[aerosolType],
     };
 };
 
@@ -596,30 +679,73 @@ const applyPhysicalAtmosphere = ({
     // during civil twilight, then settles rapidly through nautical twilight.
     const darkness = smoothstep((-solarAltitude - 7) / 10.5);
     const moonAboveHorizon = smoothstep((moonAltitude + 1.5) / 12);
+    const lunarToaIrradiance = lunarTopOfAtmosphereIrradiance(moonFraction);
+    const lunarTransmittance = directAtmosphericTransmittance({
+        apparentAltitudeDegrees: moonAltitude,
+        aerosolOpticalDepth550: aerosolOpticalDepth550(composition),
+        angstromExponent: aerosolAngstromExponent(composition.aerosolType),
+        observerAltitudeKm: observerAltitudeKm(composition),
+        ozoneScale: ozoneColumnScale(composition),
+    });
+    const lunarBeamTransmission =
+        lunarTransmittance[0] * 0.2126 +
+        lunarTransmittance[1] * 0.7152 +
+        lunarTransmittance[2] * 0.0722;
     const moonlight =
         darkness *
         moonAboveHorizon *
-        lunarRelativeIrradiance(moonFraction);
+        lunarToaIrradiance *
+        lunarBeamTransmission;
     const optics = family.optics;
     const cloudy =
         cloudDensity *
         ({ crystal: 0.18, cirrus: 0.42, haze: 0.58, mist: 0.78, soft: 0.9 }[atmosphere]);
+    const adaptation = calculateSkyAdaptation({
+        solarAltitudeDegrees: solarAltitude,
+        apparentLunarIrradiance: moonlight,
+        artificialGlow: optics.artificialGlow,
+        cloudAmplification: cloudy,
+    });
     const pristineSite = clamp(
         1 - composition.aerosol * 1.35 - optics.artificialGlow * 5.5,
     );
+    const characterExposure: Record<SkyFamily["optics"]["nightCharacter"], number> = {
+        pristine: -0.22,
+        alpine: -0.28,
+        desert: -0.2,
+        polar: -0.18,
+        airglow: -0.08,
+        marine: 0.06,
+        humid: 0.1,
+        overcast: -0.03,
+        smoky: 0.12,
+    };
+    const blackNightChance: Record<SkyFamily["optics"]["nightCharacter"], number> = {
+        pristine: 0.2,
+        alpine: 0.22,
+        desert: 0.18,
+        polar: 0.14,
+        airglow: 0.07,
+        marine: 0.035,
+        humid: 0.025,
+        overcast: 0.055,
+        smoky: 0.015,
+    };
     const rareBlackNight =
-        randomValues[20] < 0.065 &&
-        pristineSite > 0.62 &&
+        randomValues[42] < blackNightChance[optics.nightCharacter] &&
+        pristineSite > 0.48 &&
         moonlight < 0.025;
     const naturalExposure = rareBlackNight
-        ? -0.065 - randomValues[28] * 0.028
-        : (randomValues[28] - 0.5) * 0.052;
+        ? -0.74 - randomValues[41] * 0.26
+        : characterExposure[optics.nightCharacter] +
+            (randomValues[41] - 0.5) * 0.72 +
+            optics.artificialGlow * 2.2;
     const nightExposure = clamp(
-        nightExposureOverride ?? naturalExposure / 0.09,
+        nightExposureOverride ?? naturalExposure,
         -1,
         1,
     );
-    const exposureBias = nightExposure * 0.09;
+    const exposureBias = nightExposure * 0.038;
     const blackout = clamp(
         ((-nightExposure - 0.52) / 0.48) *
             pristineSite *
@@ -627,27 +753,46 @@ const applyPhysicalAtmosphere = ({
             darkness,
     );
     const naturalAirglow =
-        (0.008 + randomValues[30] ** 2 * 0.026) *
+        (0.0025 + randomValues[43] ** 2 * 0.0095) *
         (1 - composition.aerosol * 0.48);
     const groundGlow =
         optics.artificialGlow *
-        (0.52 + randomValues[31] * 0.78) *
+        (0.52 + randomValues[44] * 0.78) *
         (1 + cloudy * 0.7);
     const humidityLift = composition.humidity * 0.018;
     const moonZenithLift = moonlight * (0.055 + composition.aerosol * 0.026);
     const moonHorizonLift = moonlight * (0.068 + composition.humidity * 0.045);
+    // Authored family floors are mood coordinates, not literal radiance. Map
+    // them into a bounded physical night range so pristine moonless states can
+    // become truly dark while humid/urban families retain their identity.
+    const authoredFloorIntent = clamp((optics.nightFloor - 0.045) / 0.07);
+    const physicalBaseFloor = 0.006 + authoredFloorIntent * 0.019;
+    const adaptationLift =
+        clamp((Math.log10(adaptation.luminanceCdM2) + 3.8) / 3.2) * 0.005;
     const floor = clamp(
-        optics.nightFloor + exposureBias + naturalAirglow + moonZenithLift,
-        0.006,
-        0.23,
+        physicalBaseFloor +
+            exposureBias +
+            naturalAirglow +
+            moonZenithLift +
+            groundGlow * 0.2 +
+            adaptationLift,
+        0.0045,
+        0.115,
     );
     const horizonLift =
-        optics.horizonLift +
+        optics.horizonLift * 0.62 +
         humidityLift +
         groundGlow +
         moonHorizonLift;
-    const overcastCompression = clamp(cloudy - 0.55) * 0.035;
-    const darknessContrast = 0.88 + randomValues[22] * 0.34 +
+    const deckOpacity = smoothstep((cloudy - 0.48) / 0.78);
+    const deckIllumination = clamp(moonlight * 1.7 + groundGlow * 5.5);
+    // A cloud deck has no intrinsic night emission. It brightens and flattens
+    // the dome only when moonlight or ground light illuminates it; a remote,
+    // moonless overcast instead removes the natural celestial background.
+    const overcastCompression =
+        deckOpacity *
+        (deckIllumination * 0.035 - (1 - deckIllumination) * 0.011);
+    const darknessContrast = 0.88 + randomValues[45] * 0.34 +
         Math.max(0, -nightExposure) * 0.24;
     // A truly dark, pristine exposure must suppress the entire atmospheric
     // field rather than leave a conspicuous bright gradient at the horizon.
@@ -669,7 +814,7 @@ const applyPhysicalAtmosphere = ({
     const low =
         floor +
         (0.073 * darknessContrast + horizonLift * 1.12) * horizonTransmission;
-    const edgeVariation = (randomValues[24] - 0.5) * 0.025;
+    const edgeVariation = (randomValues[46] - 0.5) * 0.025;
     const cloudLight =
         middle -
         0.018 * (1 - moonlight) +
@@ -1070,11 +1215,8 @@ const weightedFamily = (
     season: SkySeason,
     region: SkyRegion,
 ) => {
-    const weights = SKY_FAMILIES.map(
-        (family) =>
-            family.seasonWeights[season] *
-            (family.regionWeights[region] ?? 1),
-    );
+    const weights = SKY_FAMILIES.map((family) =>
+        skyFamilySelectionWeight(family, season, region));
     const total = weights.reduce((sum, weight) => sum + weight, 0);
     let cursor = randomValue * total;
 
@@ -1149,7 +1291,7 @@ const chooseDailyPalettes = (
     return {
         palettes,
         family,
-        randomValues: Array.from({ length: 32 }, () => random()),
+        randomValues: Array.from({ length: 48 }, () => random()),
     };
 };
 
@@ -1347,6 +1489,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const [defaultLatitude, defaultLongitude] = getCoordinates(date, timezone);
     const latitude = preview?.latitude ?? defaultLatitude;
     const longitude = preview?.longitude ?? defaultLongitude;
+    const season = preview?.season ?? getSeason(date, latitude);
     const daily = chooseDailyPalettes(date, timezone, latitude, preview);
     const previousDate = new Date(date);
     previousDate.setDate(previousDate.getDate() - 1);
@@ -1415,14 +1558,49 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     };
     const [edgeLow, edgeHigh] = edgeOpacityByAtmosphere[atmosphereStyle];
     const intensity = daily.family.intensity;
-    const cloudDensity = preview?.cloudDensity ?? 1;
     const composition = resolveAtmosphericComposition({
         family: daily.family,
         atmosphere: atmosphereStyle,
+        latitude,
+        season,
         randomValues: daily.randomValues,
         override: preview?.composition,
         aerosolTypeOverride: preview?.aerosolType,
     });
+    // Production cloud cover must vary with the same deterministic daily
+    // character as the palette and atmospheric composition. The former
+    // constant of 1 pinned most regimes near 4/8 and made otherwise diverse
+    // days repeat one cloud composition. This correlated roll spans genuine
+    // clear spells through overcast while retaining each regime's climatology.
+    const synopticCloudRoll = clamp(
+        daily.randomValues[0] * 0.38 +
+            daily.randomValues[21] * 0.34 +
+            daily.randomValues[28] * 0.16 +
+            composition.humidity * 0.12,
+    );
+    const rawGeneratedCloudDensity = (() => {
+        switch (atmosphereStyle) {
+            case "crystal":
+                return 0.03 + synopticCloudRoll ** 2.35 * 0.82;
+            case "cirrus":
+                return 0.18 + synopticCloudRoll * 1.3;
+            case "haze":
+                return 0.42 + synopticCloudRoll * 1.18;
+            case "mist":
+                return 0.58 + synopticCloudRoll * 1.22;
+            case "soft":
+            default:
+                return 0.16 + synopticCloudRoll * 1.66;
+        }
+    })();
+    const cloudDensityEnvelope = SKY_FAMILY_ENVIRONMENTS[daily.family.id]
+        ?.cloudDensityRange ?? [0.01, 2];
+    const generatedCloudDensity = clamp(
+        rawGeneratedCloudDensity,
+        cloudDensityEnvelope[0],
+        cloudDensityEnvelope[1],
+    );
+    const cloudDensity = preview?.cloudDensity ?? generatedCloudDensity;
     const solarPalette = constrainSolarPalette({
         source: rawPalette,
         family: daily.family,
@@ -1459,6 +1637,29 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     const verticalFov = clamp(preview?.verticalFov ?? 48, 2, 160);
     const sunCompassAzimuth =
         ((sun.azimuth * 180) / Math.PI + 540) % 360;
+    const moonCompassAzimuth =
+        ((moon.azimuth * 180) / Math.PI + 540) % 360;
+    const rendererViewAzimuth = preview?.viewAzimuth ?? 180;
+    const localDirection = (
+        compassAzimuth: number,
+        elevationDegrees: number,
+    ): [number, number, number] => {
+        // Celestial directions are camera-local (world compass heading minus
+        // viewAzimuth). WebGPU/cloud transport applies the shared 180°
+        // reference yaw when converting this packet back to Earth-local.
+        const relativeAzimuth =
+            ((((compassAzimuth - rendererViewAzimuth) % 360) + 540) % 360 - 180) *
+            (Math.PI / 180);
+        const elevation = elevationDegrees * (Math.PI / 180);
+        const horizontal = Math.cos(elevation);
+        return [
+            Math.sin(relativeAzimuth) * horizontal,
+            Math.sin(elevation),
+            Math.cos(relativeAzimuth) * horizontal,
+        ];
+    };
+    const sunDirection = localDirection(sunCompassAzimuth, visualSolarAltitude);
+    const moonDirection = localDirection(moonCompassAzimuth, moonAltitude);
     const relativeSunAzimuth = preview?.viewAzimuth === undefined
         ? undefined
         : ((sunCompassAzimuth - preview.viewAzimuth + 540) % 360) - 180;
@@ -1598,6 +1799,16 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
                   solarDepression: -visualSolarAltitude,
               }));
 
+    const physicalAtmosphereState =
+        createPhysicalAtmosphereStateFromComposition(
+            composition,
+            composition.aerosolType,
+        );
+    const meanSolarTopOfAtmosphereIrradiance: [number, number, number] = [
+        3.2,
+        3.2,
+        3.2,
+    ];
     const astronomicalScene = calculateCelestialScene({
         date,
         latitude,
@@ -1618,67 +1829,77 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         ),
         cloudDensity,
         atmosphericVeil: atmosphericCloudiness,
+        aerosolOpticalDepth550: aerosolOpticalDepth550(composition),
+        aerosolAngstromExponent: aerosolAngstromExponent(
+            composition.aerosolType,
+        ),
+        observerAltitudeKm: observerAltitudeKm(composition),
+        ozoneScale: ozoneColumnScale(composition),
+        physicalAtmosphereState,
+        solarTopOfAtmosphereIrradianceRgb:
+            meanSolarTopOfAtmosphereIrradiance,
+        artificialGlow: daily.family.optics.artificialGlow,
+        seeingQuality: clamp(
+            0.84 -
+                composition.inversion * 0.34 -
+                composition.humidity * 0.14 +
+                composition.observerAltitude * 0.2,
+            0.18,
+            0.94,
+        ),
         starVisibility: preview?.starVisibility,
+        stellarExposure: preview?.stellarExposure,
+        stellarGlow: preview?.stellarGlow,
         moonVisibility: preview?.moonVisibility,
+        solarAltitudeOverride: visualSolarAltitude,
     });
-    const celestialScene: CelestialScene = preview?.phase
-        ? {
-              ...astronomicalScene,
-              starsOpacity:
-                  astronomicalScene.starsOpacity *
-                  physicalAtmosphere.darkness,
-          }
-        : astronomicalScene;
+    const celestialScene: CelestialScene = astronomicalScene;
 
-    // Light reaching the clouds. These are the same physical quantities the
-    // atmosphere pass already models, resolved once on the CPU so the cloud
-    // march does not repeat the transmittance integral at every sample.
-    // Kasten-Young relative optical airmass.
-    //
-    // The atmosphere pass uses a cheaper approximation that saturates near 1.9,
-    // which is fine for the broad sky gradient but useless here: it never
-    // reaches the long slant paths that redden a low Sun, so cloud lit at
-    // sunset came out the same neutral grey as cloud lit at noon. The real
-    // relation gives ~19 airmasses at 2 degrees elevation, and that is what
-    // turns cloud bases orange.
-    const sunElevationDegrees = Math.max(visualSolarAltitude, -4);
-    const sunAirMass = Math.min(
-        40,
-        1 /
-            (Math.sin((sunElevationDegrees * Math.PI) / 180) +
-                0.50572 * (sunElevationDegrees + 6.07995) ** -1.6364),
-    );
-    const sunOpticalDepth =
-        0.052 +
-        composition.aerosol * (0.09 + composition.aerosolAbsorption * 0.045) +
-        composition.humidity * 0.028;
-    // Rayleigh optical depth scales roughly as the inverse fourth power of
-    // wavelength, so a low Sun reaching cloud base is strongly reddened. This
-    // is what colours sunset cloud, rather than a tint applied to the clouds.
-    const sunTransmittance: [number, number, number] = [
-        Math.exp(-sunOpticalDepth * sunAirMass * 0.72),
-        Math.exp(-sunOpticalDepth * sunAirMass * 1.0),
-        Math.exp(-sunOpticalDepth * sunAirMass * 1.62),
+    // Physical sources are expressed at the top of the atmosphere. They do
+    // not contain a horizon gate, aerosol color, cloud visibility, or camera
+    // adaptation; each of those belongs to transport or final exposure.
+    const solarTopOfAtmosphereIrradiance: [number, number, number] = [
+        ...celestialScene.sun.source.topOfAtmosphereIrradianceRgb,
     ];
+    const moonVisibility = clamp(preview?.moonVisibility ?? 1, 0, 2);
+    const moonTopOfAtmosphereIrradiance: [number, number, number] =
+        celestialScene.moon.radianceContract.topOfAtmosphereIrradianceRgb.map(
+            (channel) => channel * moonVisibility,
+        ) as [number, number, number];
+
+    // Unattenuated solar exposure is passed to cloud transport. The shader
+    // samples the shared atmosphere transmittance LUT at each cloud sample's
+    // real altitude, so a high cirrus deck and a low cumulus field no longer
+    // receive the same pre-baked sea-level sunset colour.
     // Airmass now supplies the dimming as the Sun sets, so this only needs to
     // close the source off below the horizon rather than double-count falloff.
     const sunAbove = clamp((visualSolarAltitude + 4) / 6);
-    // Photon's scattering integral divides by the extinction coefficient, so
-    // source radiance has to be an order of magnitude above the sky values used
-    // elsewhere in this shader for a lit cloud edge to reach display white.
-    // The airmass term above removes most of it again at low Sun.
-    const sunStrength = 62 * sunAbove;
+    // The transport march integrates absorbed radiance per segment directly.
+    // Keep the source in the same scene-linear exposure domain as the sky;
+    // carrying over Photon's pre-integral multiplier clips every illuminated
+    // lobe and erases the internal contrast that makes cloud volume readable.
+    // The shader's altitude-aware atmospheric path removes low-Sun irradiance.
+    // A modest exposure-domain compensation preserves the warm light that
+    // remains on cloud-facing surfaces without tinting the cloud material or
+    // changing the surrounding sky. It tapers completely by 14° elevation.
+    const lowSunCloudExposure =
+        1 + clamp((14 - visualSolarAltitude) / 16) * 0.62;
+    // HG phase lobes are normalized per steradian. Cloud transport needs the
+    // exposure-domain solar irradiance, not a disc-radiance-like multiplier;
+    // the larger value clipped whole backlit systems before the photographic
+    // shoulder could preserve their optical-depth structure.
+    const sunStrength = 3.2 * sunAbove * lowSunCloudExposure;
     const sunRadiance: [number, number, number] = [
-        sunTransmittance[0] * sunStrength,
-        sunTransmittance[1] * sunStrength,
-        sunTransmittance[2] * sunStrength,
+        sunStrength,
+        sunStrength,
+        sunStrength,
     ];
 
     // Moonlight uses the same transport path; only its magnitude differs.
     // Night visibility is handled by exposure, not by an invented blue tint.
     const moonStrength =
         celestialScene.moon.scatteringRadiance *
-        0.38 *
+        0.95 *
         clamp((moonAltitude + 4) / 10);
     const moonRadiance: [number, number, number] = [
         celestialScene.moon.transmittance[0] * moonStrength,
@@ -1689,7 +1910,8 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     // Hemispheric skylight on cloud tops, taken from the palette's upper sky so
     // cloud ambient always agrees with the dome rendered behind it.
     const upperSky = parseSkyColor(palette.upper);
-    const skyAmbientScale = 9.0 * (0.12 + sunAbove * 0.88) + moonStrength * 0.5;
+    const skyAmbientScale =
+        1.28 * (0.18 + sunAbove * 0.82) + moonStrength * 0.38;
     const cloudAmbient: [number, number, number] = [
         upperSky[0] * skyAmbientScale,
         upperSky[1] * skyAmbientScale,
@@ -1699,15 +1921,12 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     // Ground bounce into cloud bases. Snow and desert return far more than
     // forest or ocean, which is why overcast bases differ so much by terrain.
     const groundScale =
-        composition.groundAlbedo *
-        5.0 *
-        sunAbove *
-        (1 - physicalAtmosphere.darkness * 0.8);
+        1.45 * sunAbove * (1 - physicalAtmosphere.darkness * 0.8);
     const horizonColor = parseSkyColor(palette.horizon);
     const cloudGroundLight: [number, number, number] = [
-        horizonColor[0] * groundScale,
-        horizonColor[1] * groundScale,
-        horizonColor[2] * groundScale,
+        horizonColor[0] * groundScale * composition.groundAlbedoRgb[0],
+        horizonColor[1] * groundScale * composition.groundAlbedoRgb[1],
+        horizonColor[2] * groundScale * composition.groundAlbedoRgb[2],
     ];
 
     // Advection clock. Cloud fields evolve continuously across the 60-second
@@ -1751,30 +1970,35 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
             inversion: composition.inversion,
             stratosphericAerosol: composition.stratosphericAerosol,
             groundAlbedo: composition.groundAlbedo,
+            groundAlbedoRgb: composition.groundAlbedoRgb,
             aerosolTint: composition.aerosolTint,
+            // Keep the public heading on the shared scene packet.  CPU
+            // ephemeris directions remain camera-relative; the WebGPU/world
+            // passes apply the contract's explicit 180° reference yaw.
+            viewAzimuth: rendererViewAzimuth,
             horizontalFov,
             cameraProjection,
             viewElevation,
             verticalFov,
             cloudiness: atmosphericCloudiness,
             cloudScene,
+            hydrometeors: preview?.hydrometeors,
+            weather: preview?.weather,
+            solarTopOfAtmosphereIrradiance,
+            moonTopOfAtmosphereIrradiance,
+            adaptationExposure: celestialScene.adaptationExposure,
             sunRadiance,
+            sunDirection,
             moonRadiance,
+            moonDirection,
             cloudAmbient,
             cloudGroundLight,
-            // View and light march budgets. This pass is one-shot — it redraws
-            // on scene change, roughly once a minute, not every frame — so it
-            // can afford a high primary step count. That matters because the
-            // march has no temporal history to hide undersampling behind, and
-            // the per-pixel dither that prevents banding turns into visible
-            // crosshatch if steps are too few. The light march stays short and
-            // leans on the eight-octave approximation for interior transport.
-            cloudQuality: [64, 6],
             cloudTime,
+            cloudTimeOffset: preview?.cloudTimeOffset ?? 0,
             edgeStrength: clamp(intensity.edge * 0.82, 0.45, 1.35),
             horizonStrength: clamp(intensity.haze * 0.88, 0.5, 1.45),
             airglowStrength: clamp(
-                (0.18 + daily.randomValues[30] * 0.82) *
+                (0.18 + daily.randomValues[43] * 0.82) *
                     (1 - physicalAtmosphere.blackout * 0.96),
                 0.006,
                 1,
@@ -1790,6 +2014,7 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         atmosphereStyle,
         motionStyle,
         celestial: celestialScene,
+        physicalAtmosphereState,
         highCloudOpacity:
             textureByStyle.high *
             textureStrength *
@@ -1898,7 +2123,9 @@ export function Sky({
     preview,
     paused = false,
     contained = false,
+    rendererSceneKey,
     onVisualChange,
+    onRendererStats,
 }: SkyProps = {}) {
     const [visual, setVisual] = useState<SkyVisual | null>(null);
 
@@ -1947,10 +2174,7 @@ export function Sky({
                 bloomStyle: next.bloomStyle,
                 moonPhase: next.celestial.moon.phaseName,
                 moonIllumination: next.celestial.moon.fraction,
-                visibleStars:
-                    next.celestial.starsOpacity > 0.02
-                        ? next.celestial.stars.length
-                        : 0,
+                visibleStars: next.celestial.perceptibleStars,
                 lightingRegime: next.lightingRegime,
                 darkness: next.nightDepth,
                 nightBlackout: next.radiance.nightBlackout,
@@ -2038,16 +2262,36 @@ export function Sky({
             aria-hidden="true"
         >
             <div className={styles.base} />
-            {visual && <AtmosphereCanvas scene={visual.radiance} />}
-            <div className={styles.edgeColor} />
-            <div className={styles.horizon} />
-            {visual && <CelestialCanvas scene={visual.celestial} paused={paused} />}
-            {/* The blurred CSS cloud layers are retired: cloud is now solved
-                volumetrically in the atmosphere pass, in the same scene-linear
-                space as the sky and celestial radiance. Keeping them would
-                overlay flat gradient ellipses on top of lit cloud geometry. */}
-            <div className={styles.atmosphere} />
-            <div className={styles.grain} />
+            {visual && (
+                <SkyRendererCanvas
+                    radiance={visual.radiance}
+                    celestial={visual.celestial}
+                    physicalAtmosphereState={visual.physicalAtmosphereState}
+                    sceneKey={rendererSceneKey}
+                    paused={paused}
+                    options={{
+                        preference: preview?.rendererPreference,
+                        quality: preview?.rendererQuality,
+                        debugView: preview?.rendererDebugView,
+                        resolutionScale: preview?.cloudResolutionScale,
+                        updateRate: preview?.cloudUpdateRate,
+                        temporal: preview?.temporalClouds,
+                        cloudComposition:
+                            preview?.cloudComposition ??
+                            (visual.radiance.cameraProjection
+                                ? "physical"
+                                : undefined),
+                        cloudPerspective:
+                            preview?.cloudPerspective ??
+                            (visual.radiance.cameraProjection
+                                ? "natural"
+                                : undefined),
+                        cloudEditorialRegime:
+                            preview?.cloudEditorialRegime,
+                    }}
+                    onStats={onRendererStats}
+                />
+            )}
         </div>
     );
 }

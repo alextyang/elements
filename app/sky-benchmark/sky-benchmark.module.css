@@ -126,6 +126,29 @@
     width: 100%;
 }
 
+.stepSelect {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) 30px;
+    gap: 5px;
+}
+
+.stepSelect button {
+    min-width: 0;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9px;
+    color: rgba(255, 255, 255, 0.84);
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+}
+
+.cueList {
+    display: grid;
+    gap: 5px;
+    margin: 0;
+    padding-left: 16px;
+}
+
 .filters select {
     height: 36px;
     padding: 0 9px;

@@ -1,0 +1,19 @@
+{
+  "browser": {
+    "launchOptions": {
+      "headless": false,
+      "args": [
+        "--window-position=-10000,0",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-background-timer-throttling",
+        "--disable-renderer-backgrounding"
+      ]
+    },
+    "contextOptions": {
+      "viewport": {
+        "width": 800,
+        "height": 500
+      }
+    }
+  }
+}

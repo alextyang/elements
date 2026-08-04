@@ -1,0 +1,4289 @@
+{
+  "schema": "elements-cloud-macro-atlas",
+  "version": 1,
+  "generatorVersion": "2.5.0",
+  "deterministicSeed": 1853186665,
+  "coordinateSystem": {
+    "axes": {
+      "x": "crosswind",
+      "y": "altitude",
+      "z": "downwind"
+    },
+    "handedness": "right-handed",
+    "localDomain": {
+      "minimum": [
+        0,
+        0,
+        0
+      ],
+      "maximum": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  "atlas": {
+    "url": "/assets/sky/cloud-macro-atlas-v1-rgba8-48.bin",
+    "file": "cloud-macro-atlas-v1-rgba8-48.bin",
+    "format": "rgba8unorm",
+    "dimensions": {
+      "width": 48,
+      "height": 48,
+      "depthOrArrayLayers": 1600
+    },
+    "volumeResolution": 48,
+    "volumeCount": 32,
+    "zStride": 50,
+    "paddingZ": 1,
+    "byteLength": 14745600,
+    "channels": {
+      "r": {
+        "semantic": "macro-density",
+        "decode": "unorm",
+        "description": "Authoritative coarse condensate support/density."
+      },
+      "g": {
+        "semantic": "detail-type",
+        "decode": "unorm",
+        "endpoints": [
+          "billowy-liquid",
+          "fibrous-wispy"
+        ],
+        "anchors": {
+          "billowyLiquid": 0.12,
+          "laminarSheet": 0.34,
+          "precipitationOrVirga": 0.68,
+          "fibrousIce": 0.92
+        }
+      },
+      "b": {
+        "semantic": "ice-fraction",
+        "decode": "unorm",
+        "endpoints": [
+          "liquid",
+          "ice"
+        ]
+      },
+      "a": {
+        "semantic": "conservative-signed-distance",
+        "decode": "(sample * 255 - 128) / 127 * 12",
+        "unit": "voxels",
+        "sign": "negative-inside",
+        "rangeVoxels": 12,
+        "conservatism": "magnitude is rounded toward zero after subtracting the voxel-cell circumradius"
+      }
+    }
+  },
+  "majorants": {
+    "url": "/assets/sky/cloud-macro-majorants-v1-r8-6.bin",
+    "file": "cloud-macro-majorants-v1-r8-6.bin",
+    "format": "r8unorm",
+    "dimensions": {
+      "width": 6,
+      "height": 6,
+      "depthOrArrayLayers": 192
+    },
+    "brickSize": 8,
+    "gridSize": 6,
+    "byteLength": 6912,
+    "semantic": "conservative-density-majorant",
+    "filtering": "nearest",
+    "conservatism": "maximum encoded density over each brick plus a one-voxel trilinear halo"
+  },
+  "occupancy": {
+    "densityByteThreshold": 16,
+    "connectivity": "six-neighbor"
+  },
+  "volumes": [
+    {
+      "id": "cu-humilis",
+      "label": "Cumulus humilis",
+      "classification": {
+        "genus": "cumulus",
+        "species": "humilis",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "parcel-thermal-tree",
+        "materialModel": "liquid-convective",
+        "topologyPolicy": "single-connected",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 0,
+      "seed": 2968536236,
+      "zOffset": 1,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.0009375
+        ]
+      },
+      "majorantZOffset": 0,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.0026041666666666665
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 2417,
+        "occupancyFraction": 0.021855107060185185,
+        "connectedComponentCount": 1,
+        "largestComponentFraction": 1,
+        "dominantComponentFractions": [
+          1
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.2765957446808511,
+            0.10638297872340426,
+            0.2765957446808511
+          ],
+          "maximum": [
+            0.7021276595744681,
+            0.5319148936170213,
+            0.7021276595744681
+          ]
+        },
+        "meanDensity": 0.5474977082268572,
+        "meanDetailType": 0.12904508100302595,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.439387670666115,
+        "denseCoreFraction": 0.3434009102192801,
+        "denseCoreMeanDensity": 0.8930025986298133,
+        "diluteFringeFraction": 0.23500206868018203,
+        "meanOccupiedNeighborCount": 5.1286719073231275,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.47551317375763874,
+        "projectedMirrorSimilarity": 0.5729320307484079,
+        "meanDensityPathCrosswind": 0.0960933818011992,
+        "meanDensityPathVertical": 0.10545078976685902,
+        "meanDensityPathDownwind": 0.09810230267509187,
+        "p90DensityPathVertical": 0.22227784730913638,
+        "projectedAxisAutocorrelationPeak": 0.063709652246221,
+        "projectedDiagonalAutocorrelationPeak": 0.1978321951700659,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.44525288473099783,
+        "verticalSilhouetteMirrorSimilarity": 0.7544752020607395,
+        "baseHorizontalSpan": 0.4375,
+        "middleBodyHorizontalSpan": 0.4166666666666667,
+        "crownHorizontalSpan": 0.32140101292794815,
+        "middleBodyToBaseSpanRatio": 0.9523809523809523,
+        "crownToMiddleBodySpanRatio": 0.7,
+        "broadBaseThicknessFraction": 0.19047619047619047,
+        "middleSliceSingleComponentFraction": 0.6,
+        "middleSliceSingleMajorComponentFraction": 0.6,
+        "middleSliceMeanComponentCount": 1.5,
+        "middleSliceDominantComponentFraction": 0.8402501289989681,
+        "lowerBoundaryRoughness": 0.018801872237515352,
+        "lowerBoundaryRange": 0.08333333333333333,
+        "lowerBoundaryDistinctLevels": 5,
+        "lowerThirdMassFraction": 0.7048529821421162,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.6809057919472808,
+        "primitiveCount": 75,
+        "formationGroupCount": 3,
+        "ownerSpacingCoefficientVariation": 0.45629192241448396,
+        "ownerAngularEntropy": 0.5283208335737187,
+        "entrainmentCavityCount": 10,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 51,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 5,
+        "convectiveCrownLobeCount": 57,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 4,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0.17242365103381033
+      }
+    },
+    {
+      "id": "cu-mediocris",
+      "label": "Cumulus mediocris",
+      "classification": {
+        "genus": "cumulus",
+        "species": "mediocris",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "growing"
+      },
+      "formation": {
+        "mechanism": "parcel-thermal-tree",
+        "materialModel": "liquid-convective",
+        "topologyPolicy": "single-connected",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 1,
+      "seed": 1118800051,
+      "zOffset": 51,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.0321875
+        ]
+      },
+      "majorantZOffset": 6,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.033854166666666664
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 2729,
+        "occupancyFraction": 0.02467628761574074,
+        "connectedComponentCount": 3,
+        "largestComponentFraction": 0.9992671308171491,
+        "dominantComponentFractions": [
+          0.9992671308171491,
+          0.00036643459142543056,
+          0.00036643459142543056
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.2553191489361702,
+            0.1276595744680851,
+            0.2978723404255319
+          ],
+          "maximum": [
+            0.7021276595744681,
+            0.6808510638297872,
+            0.6808510638297872
+          ]
+        },
+        "meanDensity": 0.53523591921195,
+        "meanDetailType": 0.14748345655594594,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.4789300109930377,
+        "denseCoreFraction": 0.34005130084279955,
+        "denseCoreMeanDensity": 0.8997887085868831,
+        "diluteFringeFraction": 0.2641993404177354,
+        "meanOccupiedNeighborCount": 5.024551117625504,
+        "trilinearCoreFraction": 0.9996335654085746,
+        "projectedFootprintCompactness": 0.48085601840660097,
+        "projectedMirrorSimilarity": 0.6770186335403726,
+        "meanDensityPathCrosswind": 0.092219131481117,
+        "meanDensityPathVertical": 0.11510313818198678,
+        "meanDensityPathDownwind": 0.07968678797214464,
+        "p90DensityPathVertical": 0.255819774718398,
+        "projectedAxisAutocorrelationPeak": 0.14716416790824546,
+        "projectedDiagonalAutocorrelationPeak": 0.12421057105562833,
+        "projectedGridAutocorrelationScore": 0.022953596852617136,
+        "projectedAxisAutocorrelationPeakLag": 14,
+        "verticalSilhouetteCompactness": 0.2812720695362762,
+        "verticalSilhouetteMirrorSimilarity": 0.5925,
+        "baseHorizontalSpan": 0.41614550740496203,
+        "middleBodyHorizontalSpan": 0.385275875185561,
+        "crownHorizontalSpan": 0.3227486121839514,
+        "middleBodyToBaseSpanRatio": 0.9047619047619048,
+        "crownToMiddleBodySpanRatio": 0.6666666666666666,
+        "broadBaseThicknessFraction": 0.18518518518518517,
+        "middleSliceSingleComponentFraction": 0.5384615384615384,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 1.4615384615384615,
+        "middleSliceDominantComponentFraction": 0.9839149399998541,
+        "lowerBoundaryRoughness": 0.01498768342516464,
+        "lowerBoundaryRange": 0.0625,
+        "lowerBoundaryDistinctLevels": 4,
+        "lowerThirdMassFraction": 0.5037184402418463,
+        "upperThirdMassFraction": 0.004883641010771395,
+        "verticalProfileCoefficientVariation": 0.6389377959773864,
+        "primitiveCount": 109,
+        "formationGroupCount": 4,
+        "ownerSpacingCoefficientVariation": 0.212084347067556,
+        "ownerAngularEntropy": 0.6666666666666667,
+        "entrainmentCavityCount": 16,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 78,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 5,
+        "convectiveCrownLobeCount": 63,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 7,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0.14170403522952957
+      }
+    },
+    {
+      "id": "cu-congestus",
+      "label": "Cumulus congestus",
+      "classification": {
+        "genus": "cumulus",
+        "species": "congestus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "growing"
+      },
+      "formation": {
+        "mechanism": "parcel-thermal-tree",
+        "materialModel": "liquid-convective",
+        "topologyPolicy": "single-connected",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 2,
+      "seed": 2536135176,
+      "zOffset": 101,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.0634375
+        ]
+      },
+      "majorantZOffset": 12,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.06510416666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 10308,
+        "occupancyFraction": 0.09320746527777778,
+        "connectedComponentCount": 4,
+        "largestComponentFraction": 0.9996119518820333,
+        "dominantComponentFractions": [
+          0.9996119518820333,
+          0.00019402405898331392,
+          0.00009701202949165696,
+          0.00009701202949165696
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.23404255319148937,
+            0.0851063829787234,
+            0.19148936170212766
+          ],
+          "maximum": [
+            0.7872340425531915,
+            0.8723404255319149,
+            0.8085106382978723
+          ]
+        },
+        "meanDensity": 0.7082117829669703,
+        "meanDetailType": 0.14930341558431676,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.28705859526581295,
+        "denseCoreFraction": 0.5885719829258829,
+        "denseCoreMeanDensity": 0.9450237058726574,
+        "diluteFringeFraction": 0.14648816453240202,
+        "meanOccupiedNeighborCount": 5.447031431897555,
+        "trilinearCoreFraction": 0.9998059759410167,
+        "projectedFootprintCompactness": 0.45099035163837853,
+        "projectedMirrorSimilarity": 0.6825721724606593,
+        "meanDensityPathCrosswind": 0.19711218972954786,
+        "meanDensityPathVertical": 0.26415715222259134,
+        "meanDensityPathDownwind": 0.19887888029050388,
+        "p90DensityPathVertical": 0.5976637463496035,
+        "projectedAxisAutocorrelationPeak": 0.18830384093103775,
+        "projectedDiagonalAutocorrelationPeak": 0.17446345617708853,
+        "projectedGridAutocorrelationScore": 0.01384038475394922,
+        "projectedAxisAutocorrelationPeakLag": 12,
+        "verticalSilhouetteCompactness": 0.339596382346523,
+        "verticalSilhouetteMirrorSimilarity": 0.779080205690209,
+        "baseHorizontalSpan": 0.45643546458763845,
+        "middleBodyHorizontalSpan": 0.5609546674098441,
+        "crownHorizontalSpan": 0.5204164998665332,
+        "middleBodyToBaseSpanRatio": 1.0416666666666667,
+        "crownToMiddleBodySpanRatio": 0.896551724137931,
+        "broadBaseThicknessFraction": 0.21052631578947367,
+        "middleSliceSingleComponentFraction": 0.5555555555555556,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 1.6666666666666667,
+        "middleSliceDominantComponentFraction": 0.993736695469395,
+        "lowerBoundaryRoughness": 0.025861508427871546,
+        "lowerBoundaryRange": 0.16666666666666666,
+        "lowerBoundaryDistinctLevels": 9,
+        "lowerThirdMassFraction": 0.24594010516968806,
+        "upperThirdMassFraction": 0.1739119224006923,
+        "verticalProfileCoefficientVariation": 0.48810667616893455,
+        "primitiveCount": 252,
+        "formationGroupCount": 5,
+        "ownerSpacingCoefficientVariation": 0.3005510074916527,
+        "ownerAngularEntropy": 0.5073093649624542,
+        "entrainmentCavityCount": 30,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 141,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 5,
+        "convectiveCrownLobeCount": 90,
+        "convectiveMergedBodyLobeCount": 50,
+        "convectiveEvaporatingFlankCount": 14,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0.2567345417202943
+      }
+    },
+    {
+      "id": "cb-calvus",
+      "label": "Cumulonimbus calvus",
+      "classification": {
+        "genus": "cumulonimbus",
+        "species": "calvus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "deep-convective-detrainment",
+        "materialModel": "deep-mixed-phase",
+        "topologyPolicy": "single-connected",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 3,
+      "seed": 3269443847,
+      "zOffset": 151,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.0946875
+        ]
+      },
+      "majorantZOffset": 18,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.09635416666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 12052,
+        "occupancyFraction": 0.1089771412037037,
+        "connectedComponentCount": 1,
+        "largestComponentFraction": 1,
+        "dominantComponentFractions": [
+          1
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.14893617021276595,
+            0.06382978723404255,
+            0.1702127659574468
+          ],
+          "maximum": [
+            0.7872340425531915,
+            0.9361702127659575,
+            0.7659574468085106
+          ]
+        },
+        "meanDensity": 0.733341468017675,
+        "meanDetailType": 0.21174192876619616,
+        "meanIceFraction": 0.16389501701775963,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.2672585462993694,
+        "denseCoreFraction": 0.6189844009293063,
+        "denseCoreMeanDensity": 0.956511591231667,
+        "diluteFringeFraction": 0.13599402588781945,
+        "meanOccupiedNeighborCount": 5.477928974444076,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.43488355336557927,
+        "projectedMirrorSimilarity": 0.7954545454545454,
+        "meanDensityPathCrosswind": 0.22766038258072793,
+        "meanDensityPathVertical": 0.33165339684599854,
+        "meanDensityPathDownwind": 0.19983791287107464,
+        "p90DensityPathVertical": 0.6982895285773886,
+        "projectedAxisAutocorrelationPeak": 0.055955681392307464,
+        "projectedDiagonalAutocorrelationPeak": 0.1363638074280159,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.40916798436373636,
+        "verticalSilhouetteMirrorSimilarity": 0.8227812360465422,
+        "baseHorizontalSpan": 0.4773516348912333,
+        "middleBodyHorizontalSpan": 0.57282196186948,
+        "crownHorizontalSpan": 0.6027281725620597,
+        "middleBodyToBaseSpanRatio": 1.12,
+        "crownToMiddleBodySpanRatio": 1,
+        "broadBaseThicknessFraction": 0.23809523809523808,
+        "middleSliceSingleComponentFraction": 0.8,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 1.2,
+        "middleSliceDominantComponentFraction": 0.9994646422932757,
+        "lowerBoundaryRoughness": 0.033925694096819455,
+        "lowerBoundaryRange": 0.1875,
+        "lowerBoundaryDistinctLevels": 10,
+        "lowerThirdMassFraction": 0.24541109058728366,
+        "upperThirdMassFraction": 0.23357259393126742,
+        "verticalProfileCoefficientVariation": 0.4699753847200598,
+        "primitiveCount": 261,
+        "formationGroupCount": 5,
+        "ownerSpacingCoefficientVariation": 0.15649767938903947,
+        "ownerAngularEntropy": 0.5073093649624542,
+        "entrainmentCavityCount": 34,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 153,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 5,
+        "convectiveCrownLobeCount": 69,
+        "convectiveMergedBodyLobeCount": 47,
+        "convectiveEvaporatingFlankCount": 16,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0.2510105159639372
+      }
+    },
+    {
+      "id": "cb-capillatus",
+      "label": "Cumulonimbus capillatus",
+      "classification": {
+        "genus": "cumulonimbus",
+        "species": "capillatus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "glaciating"
+      },
+      "formation": {
+        "mechanism": "deep-convective-detrainment",
+        "materialModel": "deep-mixed-phase",
+        "topologyPolicy": "single-connected",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 4,
+      "seed": 597306374,
+      "zOffset": 201,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.1259375
+        ]
+      },
+      "majorantZOffset": 24,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.12760416666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 10990,
+        "occupancyFraction": 0.09937427662037036,
+        "connectedComponentCount": 4,
+        "largestComponentFraction": 0.9993630573248408,
+        "dominantComponentFractions": [
+          0.9993630573248408,
+          0.000272975432211101,
+          0.000272975432211101,
+          0.00009099181073703367
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.2127659574468085,
+            0.0851063829787234,
+            0.1702127659574468
+          ],
+          "maximum": [
+            0.8936170212765957,
+            0.9787234042553191,
+            0.7659574468085106
+          ]
+        },
+        "meanDensity": 0.6960716515905726,
+        "meanDetailType": 0.25550250673517816,
+        "meanIceFraction": 0.2536501989330764,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.3131938125568699,
+        "denseCoreFraction": 0.5701546860782529,
+        "denseCoreMeanDensity": 0.9467696813803721,
+        "diluteFringeFraction": 0.1565059144676979,
+        "meanOccupiedNeighborCount": 5.3949044585987265,
+        "trilinearCoreFraction": 0.999727024567789,
+        "projectedFootprintCompactness": 0.38318733923543324,
+        "projectedMirrorSimilarity": 0.7819905213270142,
+        "meanDensityPathCrosswind": 0.1994635860184709,
+        "meanDensityPathVertical": 0.2885856138139579,
+        "meanDensityPathDownwind": 0.17501321095814226,
+        "p90DensityPathVertical": 0.6627450980392156,
+        "projectedAxisAutocorrelationPeak": 0.13842979499271146,
+        "projectedDiagonalAutocorrelationPeak": 0.18845071208073874,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.31702269616303247,
+        "verticalSilhouetteMirrorSimilarity": 0.7254545595361337,
+        "baseHorizontalSpan": 0.46770717334674267,
+        "middleBodyHorizontalSpan": 0.6137883276106765,
+        "crownHorizontalSpan": 0.6123724356957946,
+        "middleBodyToBaseSpanRatio": 1.2916666666666667,
+        "crownToMiddleBodySpanRatio": 0.9642857142857143,
+        "broadBaseThicknessFraction": 0.23255813953488372,
+        "middleSliceSingleComponentFraction": 0.5238095238095238,
+        "middleSliceSingleMajorComponentFraction": 0.8095238095238095,
+        "middleSliceMeanComponentCount": 1.5238095238095237,
+        "middleSliceDominantComponentFraction": 0.9681169578993957,
+        "lowerBoundaryRoughness": 0.020395929227952414,
+        "lowerBoundaryRange": 0.10416666666666667,
+        "lowerBoundaryDistinctLevels": 6,
+        "lowerThirdMassFraction": 0.2261222347191222,
+        "upperThirdMassFraction": 0.25897598100380065,
+        "verticalProfileCoefficientVariation": 0.5039609099995398,
+        "primitiveCount": 315,
+        "formationGroupCount": 6,
+        "ownerSpacingCoefficientVariation": 0.14465436717819272,
+        "ownerAngularEntropy": 0.5283208335737187,
+        "entrainmentCavityCount": 36,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 208,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 5,
+        "convectiveCrownLobeCount": 80,
+        "convectiveMergedBodyLobeCount": 51,
+        "convectiveEvaporatingFlankCount": 16,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0.2957351922693811
+      }
+    },
+    {
+      "id": "cb-capillatus-incus",
+      "label": "Cumulonimbus capillatus incus",
+      "classification": {
+        "genus": "cumulonimbus",
+        "species": "capillatus",
+        "supplementaryFeature": "incus",
+        "speciesAliases": [],
+        "lifecycle": "glaciating"
+      },
+      "formation": {
+        "mechanism": "deep-convective-detrainment",
+        "materialModel": "deep-mixed-phase",
+        "topologyPolicy": "single-connected",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 5,
+      "seed": 1525115482,
+      "zOffset": 251,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.1571875
+        ]
+      },
+      "majorantZOffset": 30,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.15885416666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 8443,
+        "occupancyFraction": 0.07634367766203703,
+        "connectedComponentCount": 2,
+        "largestComponentFraction": 0.9983418216273836,
+        "dominantComponentFractions": [
+          0.9983418216273836,
+          0.0016581783726163685
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.23404255319148937,
+            0.0851063829787234,
+            0.2553191489361702
+          ],
+          "maximum": [
+            0.8723404255319149,
+            0.9787234042553191,
+            0.8723404255319149
+          ]
+        },
+        "meanDensity": 0.6624455111903816,
+        "meanDetailType": 0.3026105858664679,
+        "meanIceFraction": 0.29429182545930843,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.3675233921591851,
+        "denseCoreFraction": 0.5222077460618264,
+        "denseCoreMeanDensity": 0.9461466963741723,
+        "diluteFringeFraction": 0.18938765841525523,
+        "meanOccupiedNeighborCount": 5.289825891270875,
+        "trilinearCoreFraction": 0.9994077934383513,
+        "projectedFootprintCompactness": 0.22515288258552885,
+        "projectedMirrorSimilarity": 0.6661490683229814,
+        "meanDensityPathCrosswind": 0.1574081799780589,
+        "meanDensityPathVertical": 0.2144154667809237,
+        "meanDensityPathDownwind": 0.14875073007926565,
+        "p90DensityPathVertical": 0.5768043387567793,
+        "projectedAxisAutocorrelationPeak": 0.11313065210099084,
+        "projectedDiagonalAutocorrelationPeak": 0.11288572927905967,
+        "projectedGridAutocorrelationScore": 0.00024492282193117054,
+        "projectedAxisAutocorrelationPeakLag": 7,
+        "verticalSilhouetteCompactness": 0.31729252908368066,
+        "verticalSilhouetteMirrorSimilarity": 0.6729522308028622,
+        "baseHorizontalSpan": 0.4166666666666667,
+        "middleBodyHorizontalSpan": 0.4791666666666667,
+        "crownHorizontalSpan": 0.5799754544614606,
+        "middleBodyToBaseSpanRatio": 1.15,
+        "crownToMiddleBodySpanRatio": 1.0869565217391304,
+        "broadBaseThicknessFraction": 0.2558139534883721,
+        "middleSliceSingleComponentFraction": 0.8571428571428571,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 1.1904761904761905,
+        "middleSliceDominantComponentFraction": 0.992566676975057,
+        "lowerBoundaryRoughness": 0.028746573805234637,
+        "lowerBoundaryRange": 0.16666666666666666,
+        "lowerBoundaryDistinctLevels": 9,
+        "lowerThirdMassFraction": 0.28553759512894905,
+        "upperThirdMassFraction": 0.217775353346113,
+        "verticalProfileCoefficientVariation": 0.4875220015715335,
+        "primitiveCount": 316,
+        "formationGroupCount": 6,
+        "ownerSpacingCoefficientVariation": 0.2687171065941954,
+        "ownerAngularEntropy": 0.6394319446848299,
+        "entrainmentCavityCount": 38,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 195,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 5,
+        "convectiveCrownLobeCount": 74,
+        "convectiveMergedBodyLobeCount": 51,
+        "convectiveEvaporatingFlankCount": 16,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0.27843479725712605
+      }
+    },
+    {
+      "id": "cb-dissipating",
+      "label": "Dissipating cumulonimbus",
+      "classification": {
+        "genus": "cumulonimbus",
+        "species": "capillatus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "decaying"
+      },
+      "formation": {
+        "mechanism": "deep-convective-detrainment",
+        "materialModel": "deep-mixed-phase",
+        "topologyPolicy": "single-connected",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 6,
+      "seed": 3656595751,
+      "zOffset": 301,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.1884375
+        ]
+      },
+      "majorantZOffset": 36,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.19010416666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 6096,
+        "occupancyFraction": 0.055121527777777776,
+        "connectedComponentCount": 8,
+        "largestComponentFraction": 0.9983595800524935,
+        "dominantComponentFractions": [
+          0.9983595800524935,
+          0.00032808398950131233,
+          0.00032808398950131233,
+          0.00032808398950131233,
+          0.00016404199475065617,
+          0.00016404199475065617,
+          0.00016404199475065617,
+          0.00016404199475065617
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.2553191489361702,
+            0.10638297872340426,
+            0.2978723404255319
+          ],
+          "maximum": [
+            0.723404255319149,
+            0.9361702127659575,
+            0.851063829787234
+          ]
+        },
+        "meanDensity": 0.3362011733827389,
+        "meanDetailType": 0.6014654418197726,
+        "meanIceFraction": 0.41700825999691216,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.46948818897637795,
+        "denseCoreFraction": 0.047900262467191604,
+        "denseCoreMeanDensity": 0.8164249261348374,
+        "diluteFringeFraction": 0.4360236220472441,
+        "meanOccupiedNeighborCount": 5.058070866141732,
+        "trilinearCoreFraction": 0.9993438320209974,
+        "projectedFootprintCompactness": 0.4476120441974218,
+        "projectedMirrorSimilarity": 0.7379032258064516,
+        "meanDensityPathCrosswind": 0.06479347326803377,
+        "meanDensityPathVertical": 0.10117403134428476,
+        "meanDensityPathDownwind": 0.0693259260880552,
+        "p90DensityPathVertical": 0.22828535669586977,
+        "projectedAxisAutocorrelationPeak": 0.22270716647085473,
+        "projectedDiagonalAutocorrelationPeak": 0.032777878245352846,
+        "projectedGridAutocorrelationScore": 0.18992928822550187,
+        "projectedAxisAutocorrelationPeakLag": 8,
+        "verticalSilhouetteCompactness": 0.28684305111162434,
+        "verticalSilhouetteMirrorSimilarity": 0.7328349713505105,
+        "baseHorizontalSpan": 0.3958333333333333,
+        "middleBodyHorizontalSpan": 0.41614550740496203,
+        "crownHorizontalSpan": 0.4885849749816073,
+        "middleBodyToBaseSpanRatio": 1,
+        "crownToMiddleBodySpanRatio": 1.1578947368421053,
+        "broadBaseThicknessFraction": 0.175,
+        "middleSliceSingleComponentFraction": 0.35,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 2.4,
+        "middleSliceDominantComponentFraction": 0.9684643703629986,
+        "lowerBoundaryRoughness": 0.027884044183099362,
+        "lowerBoundaryRange": 0.14583333333333334,
+        "lowerBoundaryDistinctLevels": 8,
+        "lowerThirdMassFraction": 0.30175768917258877,
+        "upperThirdMassFraction": 0.2782108538167457,
+        "verticalProfileCoefficientVariation": 0.548321157217392,
+        "primitiveCount": 264,
+        "formationGroupCount": 5,
+        "ownerSpacingCoefficientVariation": 0.12247227027378854,
+        "ownerAngularEntropy": 0.6406426982957876,
+        "entrainmentCavityCount": 48,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 150,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 5,
+        "convectiveCrownLobeCount": 47,
+        "convectiveMergedBodyLobeCount": 47,
+        "convectiveEvaporatingFlankCount": 22,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0.2419782882759256
+      }
+    },
+    {
+      "id": "ci-fibratus",
+      "label": "Cirrus fibratus",
+      "classification": {
+        "genus": "cirrus",
+        "species": "fibratus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "sheared-ice-sedimentation",
+        "materialModel": "fibrous-ice",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "sheared-fiber-bundles"
+      },
+      "index": 7,
+      "seed": 1226289663,
+      "zOffset": 351,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.2196875
+        ]
+      },
+      "majorantZOffset": 42,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.22135416666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 769,
+        "occupancyFraction": 0.006953486689814815,
+        "connectedComponentCount": 22,
+        "largestComponentFraction": 0.1859557867360208,
+        "dominantComponentFractions": [
+          0.1859557867360208,
+          0.1599479843953186,
+          0.15474642392717816,
+          0.14044213263979194,
+          0.13133940182054615,
+          0.12613784135240572,
+          0.014304291287386216,
+          0.014304291287386216
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.14893617021276595,
+            0.3829787234042553,
+            0.0851063829787234
+          ],
+          "maximum": [
+            0.7659574468085106,
+            0.723404255319149,
+            0.8085106382978723
+          ]
+        },
+        "meanDensity": 0.27121548229174636,
+        "meanDetailType": 0.9411764705882353,
+        "meanIceFraction": 1,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 1,
+        "denseCoreFraction": 0,
+        "denseCoreMeanDensity": 0,
+        "diluteFringeFraction": 0.48764629388816644,
+        "meanOccupiedNeighborCount": 2.907672301690507,
+        "trilinearCoreFraction": 0.9440832249674902,
+        "projectedFootprintCompactness": 0.02833638899116029,
+        "projectedMirrorSimilarity": 0.45026770104895103,
+        "meanDensityPathCrosswind": 0.016195426765208326,
+        "meanDensityPathVertical": 0.00826358833085118,
+        "meanDensityPathDownwind": 0.036373335521861325,
+        "p90DensityPathVertical": 0.014851898206090945,
+        "projectedAxisAutocorrelationPeak": 0.34833859817617935,
+        "projectedDiagonalAutocorrelationPeak": 0.09851699712222785,
+        "projectedGridAutocorrelationScore": 0.24982160105395151,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.049493066081864,
+        "verticalSilhouetteMirrorSimilarity": 0.24907043728724798,
+        "baseHorizontalSpan": 0.535218024111047,
+        "middleBodyHorizontalSpan": 0.6555055301063447,
+        "crownHorizontalSpan": 0.4061164310337068,
+        "middleBodyToBaseSpanRatio": 1,
+        "crownToMiddleBodySpanRatio": 0.6060606060606061,
+        "broadBaseThicknessFraction": 0.11764705882352941,
+        "middleSliceSingleComponentFraction": 0.25,
+        "middleSliceSingleMajorComponentFraction": 0.25,
+        "middleSliceMeanComponentCount": 3.375,
+        "middleSliceDominantComponentFraction": 0.6723283029244307,
+        "lowerBoundaryRoughness": 0.009820927516479826,
+        "lowerBoundaryRange": 0.020833333333333332,
+        "lowerBoundaryDistinctLevels": 2,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.19716456077015643,
+        "verticalProfileCoefficientVariation": 0.8654015879303758,
+        "primitiveCount": 270,
+        "formationGroupCount": 6,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 27,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ci-uncinus",
+      "label": "Cirrus uncinus",
+      "classification": {
+        "genus": "cirrus",
+        "species": "uncinus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "precipitating"
+      },
+      "formation": {
+        "mechanism": "sheared-ice-sedimentation",
+        "materialModel": "fibrous-ice",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "sheared-fiber-bundles"
+      },
+      "index": 8,
+      "seed": 2669174516,
+      "zOffset": 401,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.2509375
+        ]
+      },
+      "majorantZOffset": 48,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.2526041666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 312,
+        "occupancyFraction": 0.0028211805555555555,
+        "connectedComponentCount": 4,
+        "largestComponentFraction": 0.3814102564102564,
+        "dominantComponentFractions": [
+          0.3814102564102564,
+          0.22435897435897437,
+          0.20192307692307693,
+          0.19230769230769232
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.2127659574468085,
+            0.3829787234042553,
+            0.2127659574468085
+          ],
+          "maximum": [
+            0.8936170212765957,
+            0.7446808510638298,
+            0.6382978723404256
+          ]
+        },
+        "meanDensity": 0.31748366013071894,
+        "meanDetailType": 0.913901458019105,
+        "meanIceFraction": 1,
+        "meanPrecipitationStructure": 0.49029663147310204,
+        "surfaceVoxelFraction": 0.9006410256410257,
+        "denseCoreFraction": 0.16025641025641027,
+        "denseCoreMeanDensity": 0.8134901960784313,
+        "diluteFringeFraction": 0.5705128205128205,
+        "meanOccupiedNeighborCount": 3.217948717948718,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.06498968036766338,
+        "projectedMirrorSimilarity": 0.08946468165980362,
+        "meanDensityPathCrosswind": 0.017275009061873788,
+        "meanDensityPathVertical": 0.01377484382711505,
+        "meanDensityPathDownwind": 0.016594890594870886,
+        "p90DensityPathVertical": 0.036378806841885686,
+        "projectedAxisAutocorrelationPeak": 0.30756899764985746,
+        "projectedDiagonalAutocorrelationPeak": 0.1063963774229962,
+        "projectedGridAutocorrelationScore": 0.20117262022686128,
+        "projectedAxisAutocorrelationPeakLag": 13,
+        "verticalSilhouetteCompactness": 0.06234097921967246,
+        "verticalSilhouetteMirrorSimilarity": 0.14423701298701297,
+        "baseHorizontalSpan": 0.35355339059327373,
+        "middleBodyHorizontalSpan": 0.3656235161413384,
+        "crownHorizontalSpan": 0.30190368221228,
+        "middleBodyToBaseSpanRatio": 0.875,
+        "crownToMiddleBodySpanRatio": 0.75,
+        "broadBaseThicknessFraction": 0.2222222222222222,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 3.2222222222222223,
+        "middleSliceDominantComponentFraction": 0.4236346523369227,
+        "lowerBoundaryRoughness": 0.010309826235529031,
+        "lowerBoundaryRange": 0.020833333333333332,
+        "lowerBoundaryDistinctLevels": 2,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.5530306029534028,
+        "verticalProfileCoefficientVariation": 0.9937945860202464,
+        "primitiveCount": 54,
+        "formationGroupCount": 2,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 5,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 9,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 9,
+        "cirrusTaperedFallstreakCount": 3,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0.7104541747322314,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0.194427345363268,
+        "cirrusFallstreakDirectionSpread": 1.1954093721594847,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ci-spissatus",
+      "label": "Cirrus spissatus",
+      "classification": {
+        "genus": "cirrus",
+        "species": "spissatus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "sheared-ice-sedimentation",
+        "materialModel": "granular-ice",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "sheared-fiber-bundles"
+      },
+      "index": 9,
+      "seed": 1948071480,
+      "zOffset": 451,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.2821875
+        ]
+      },
+      "majorantZOffset": 54,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.2838541666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 3830,
+        "occupancyFraction": 0.03463179976851852,
+        "connectedComponentCount": 4,
+        "largestComponentFraction": 0.997911227154047,
+        "dominantComponentFractions": [
+          0.997911227154047,
+          0.0010443864229765013,
+          0.000783289817232376,
+          0.0002610966057441253
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.10638297872340426,
+            0.3617021276595745,
+            0.3191489361702128
+          ],
+          "maximum": [
+            0.851063829787234,
+            0.6595744680851063,
+            0.9361702127659575
+          ]
+        },
+        "meanDensity": 0.61792863359443,
+        "meanDetailType": 0.773402959094865,
+        "meanIceFraction": 1,
+        "meanPrecipitationStructure": 0.00835713920032765,
+        "surfaceVoxelFraction": 0.46475195822454307,
+        "denseCoreFraction": 0.5451697127937337,
+        "denseCoreMeanDensity": 0.8146401472466381,
+        "diluteFringeFraction": 0.15744125326370756,
+        "meanOccupiedNeighborCount": 5.11331592689295,
+        "trilinearCoreFraction": 0.9997389033942559,
+        "projectedFootprintCompactness": 0.21024891922412603,
+        "projectedMirrorSimilarity": 0.5693846048633704,
+        "meanDensityPathCrosswind": 0.17919790010348047,
+        "meanDensityPathVertical": 0.0709219858156029,
+        "meanDensityPathDownwind": 0.1530535256202979,
+        "p90DensityPathVertical": 0.14209428452231954,
+        "projectedAxisAutocorrelationPeak": 0.1348374930755621,
+        "projectedDiagonalAutocorrelationPeak": 0.10519716498703129,
+        "projectedGridAutocorrelationScore": 0.0296403280885308,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.2777704872429567,
+        "verticalSilhouetteMirrorSimilarity": 0.6831396870256974,
+        "baseHorizontalSpan": 0.429490169335173,
+        "middleBodyHorizontalSpan": 0.6444878457607508,
+        "crownHorizontalSpan": 0.5951190357119042,
+        "middleBodyToBaseSpanRatio": 1.32,
+        "crownToMiddleBodySpanRatio": 0.8275862068965517,
+        "broadBaseThicknessFraction": 0.26666666666666666,
+        "middleSliceSingleComponentFraction": 0.14285714285714285,
+        "middleSliceSingleMajorComponentFraction": 0.5714285714285714,
+        "middleSliceMeanComponentCount": 2,
+        "middleSliceDominantComponentFraction": 0.791052355561634,
+        "lowerBoundaryRoughness": 0.010106288925525701,
+        "lowerBoundaryRange": 0.041666666666666664,
+        "lowerBoundaryDistinctLevels": 3,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.680172917391655,
+        "primitiveCount": 106,
+        "formationGroupCount": 5,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 10,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 26,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ci-floccus",
+      "label": "Cirrus floccus",
+      "classification": {
+        "genus": "cirrus",
+        "species": "floccus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "decaying"
+      },
+      "formation": {
+        "mechanism": "sheared-ice-sedimentation",
+        "materialModel": "granular-ice",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "sheared-fiber-bundles"
+      },
+      "index": 10,
+      "seed": 3449370831,
+      "zOffset": 501,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.3134375
+        ]
+      },
+      "majorantZOffset": 60,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.3151041666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 809,
+        "occupancyFraction": 0.007315176504629629,
+        "connectedComponentCount": 13,
+        "largestComponentFraction": 0.23856613102595797,
+        "dominantComponentFractions": [
+          0.23856613102595797,
+          0.20395550061804696,
+          0.12855377008652658,
+          0.10630407911001236,
+          0.10012360939431397,
+          0.09147095179233622,
+          0.0865265760197775,
+          0.012360939431396786
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.1702127659574468,
+            0.40425531914893614,
+            0.14893617021276595
+          ],
+          "maximum": [
+            0.8723404255319149,
+            0.851063829787234,
+            0.8297872340425532
+          ]
+        },
+        "meanDensity": 0.44573547589616813,
+        "meanDetailType": 0.8042754308150949,
+        "meanIceFraction": 1,
+        "meanPrecipitationStructure": 0.2550910104462057,
+        "surfaceVoxelFraction": 0.8108776266996292,
+        "denseCoreFraction": 0,
+        "denseCoreMeanDensity": 0,
+        "diluteFringeFraction": 0.2669962917181706,
+        "meanOccupiedNeighborCount": 3.7354758961681087,
+        "trilinearCoreFraction": 0.9975278121137207,
+        "projectedFootprintCompactness": 0.04079214242235499,
+        "projectedMirrorSimilarity": 0.24974858579509746,
+        "meanDensityPathCrosswind": 0.02895222802087515,
+        "meanDensityPathVertical": 0.028103811082534493,
+        "meanDensityPathDownwind": 0.030206064667448462,
+        "p90DensityPathVertical": 0.06157697121401752,
+        "projectedAxisAutocorrelationPeak": 0.1106391497411842,
+        "projectedDiagonalAutocorrelationPeak": 0.1258174129470587,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 6,
+        "verticalSilhouetteCompactness": 0.08480864427801121,
+        "verticalSilhouetteMirrorSimilarity": 0.29337262200165426,
+        "baseHorizontalSpan": 0.3656235161413384,
+        "middleBodyHorizontalSpan": 0.6102424381615338,
+        "crownHorizontalSpan": 0.5103103630798288,
+        "middleBodyToBaseSpanRatio": 1.1785714285714286,
+        "crownToMiddleBodySpanRatio": 0.7272727272727273,
+        "broadBaseThicknessFraction": 0.2727272727272727,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 6.454545454545454,
+        "middleSliceDominantComponentFraction": 0.3416793245740614,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.5989907887725251,
+        "verticalProfileCoefficientVariation": 0.8227943446049631,
+        "primitiveCount": 121,
+        "formationGroupCount": 8,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 13,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 30,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ci-castellanus",
+      "label": "Cirrus castellanus",
+      "classification": {
+        "genus": "cirrus",
+        "species": "castellanus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "growing"
+      },
+      "formation": {
+        "mechanism": "elevated-convective-ice",
+        "materialModel": "granular-ice",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "sheared-fiber-bundles"
+      },
+      "index": 11,
+      "seed": 1226732892,
+      "zOffset": 551,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.3446875
+        ]
+      },
+      "majorantZOffset": 66,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.3463541666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 674,
+        "occupancyFraction": 0.006094473379629629,
+        "connectedComponentCount": 4,
+        "largestComponentFraction": 0.3516320474777448,
+        "dominantComponentFractions": [
+          0.3516320474777448,
+          0.33382789317507416,
+          0.2655786350148368,
+          0.04896142433234421
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.0851063829787234,
+            0.40425531914893614,
+            0.1702127659574468
+          ],
+          "maximum": [
+            0.9361702127659575,
+            0.6808510638297872,
+            0.7872340425531915
+          ]
+        },
+        "meanDensity": 0.4365683365334264,
+        "meanDetailType": 0.7153080816896491,
+        "meanIceFraction": 1,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.9391691394658753,
+        "denseCoreFraction": 0.19881305637982197,
+        "denseCoreMeanDensity": 0.7562774363476733,
+        "diluteFringeFraction": 0.29821958456973297,
+        "meanOccupiedNeighborCount": 3.456973293768546,
+        "trilinearCoreFraction": 0.9851632047477745,
+        "projectedFootprintCompactness": 0.039269908169872414,
+        "projectedMirrorSimilarity": 0.18650328330206378,
+        "meanDensityPathCrosswind": 0.04065308908863353,
+        "meanDensityPathVertical": 0.02555337028428393,
+        "meanDensityPathDownwind": 0.023714301968369555,
+        "p90DensityPathVertical": 0.0719232373800584,
+        "projectedAxisAutocorrelationPeak": 0.4743793787966797,
+        "projectedDiagonalAutocorrelationPeak": 0.07838979958605727,
+        "projectedGridAutocorrelationScore": 0.3959895792106224,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.045507844200148445,
+        "verticalSilhouetteMirrorSimilarity": 0.5322061191626409,
+        "baseHorizontalSpan": 0.7006321550333432,
+        "middleBodyHorizontalSpan": 0.7306532465312575,
+        "crownHorizontalSpan": 0.6718548123582124,
+        "middleBodyToBaseSpanRatio": 1.0344827586206897,
+        "crownToMiddleBodySpanRatio": 0.8666666666666667,
+        "broadBaseThicknessFraction": 0.07142857142857142,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0.14285714285714285,
+        "middleSliceMeanComponentCount": 10.714285714285714,
+        "middleSliceDominantComponentFraction": 0.30636652749806637,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 1,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.002732131195607266,
+        "verticalProfileCoefficientVariation": 0.6752883992962196,
+        "primitiveCount": 36,
+        "formationGroupCount": 3,
+        "ownerSpacingCoefficientVariation": 0.1850053415047471,
+        "ownerAngularEntropy": 0.8870754187565966,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 3,
+        "secondaryLobeCount": 13,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "cs-veil",
+      "label": "Cirrostratus veil",
+      "classification": {
+        "genus": "cirrostratus",
+        "species": null,
+        "supplementaryFeature": null,
+        "speciesAliases": [
+          "fibratus",
+          "nebulosus"
+        ],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "frontal-ascent-sheet",
+        "materialModel": "fibrous-ice",
+        "topologyPolicy": "continuous-sheet",
+        "boundaryModel": "curved-frontal-swath"
+      },
+      "index": 12,
+      "seed": 3512989523,
+      "zOffset": 601,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.3759375
+        ]
+      },
+      "majorantZOffset": 72,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.3776041666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 4245,
+        "occupancyFraction": 0.038384331597222224,
+        "connectedComponentCount": 1,
+        "largestComponentFraction": 1,
+        "dominantComponentFractions": [
+          1
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0,
+            0.6170212765957447,
+            0.1276595744680851
+          ],
+          "maximum": [
+            1,
+            0.6808510638297872,
+            0.9148936170212766
+          ]
+        },
+        "meanDensity": 0.35406637566687454,
+        "meanDetailType": 0.8784313725490196,
+        "meanIceFraction": 1,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.6972909305064782,
+        "denseCoreFraction": 0,
+        "denseCoreMeanDensity": 0,
+        "diluteFringeFraction": 0.0779740871613663,
+        "meanOccupiedNeighborCount": 5.191048292108363,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.4618834680204902,
+        "projectedMirrorSimilarity": 0.7932247888995685,
+        "meanDensityPathCrosswind": 0.26873087157265924,
+        "meanDensityPathVertical": 0.022647998383248172,
+        "meanDensityPathDownwind": 0.21462398467883506,
+        "p90DensityPathVertical": 0.02519816437213183,
+        "projectedAxisAutocorrelationPeak": 0.15528139547903477,
+        "projectedDiagonalAutocorrelationPeak": 0.01738876708825563,
+        "projectedGridAutocorrelationScore": 0.13789262839077915,
+        "projectedAxisAutocorrelationPeakLag": 16,
+        "verticalSilhouetteCompactness": 0.17311290879618313,
+        "verticalSilhouetteMirrorSimilarity": 0.7435741341991342,
+        "baseHorizontalSpan": 0.8897565210026093,
+        "middleBodyHorizontalSpan": 0.8897565210026093,
+        "crownHorizontalSpan": 0.10416666666666667,
+        "middleBodyToBaseSpanRatio": 1,
+        "crownToMiddleBodySpanRatio": 0.10416666666666667,
+        "broadBaseThicknessFraction": 0.25,
+        "middleSliceSingleComponentFraction": 1,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 1,
+        "middleSliceDominantComponentFraction": 1,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.0007514324180469019,
+        "verticalProfileCoefficientVariation": 0.5797053843657523,
+        "primitiveCount": 0,
+        "formationGroupCount": 1,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 2,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "cc-stratiformis",
+      "label": "Cirrocumulus stratiformis",
+      "classification": {
+        "genus": "cirrocumulus",
+        "species": "stratiformis",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "cellular-convective-colony",
+        "materialModel": "granular-ice",
+        "topologyPolicy": "cellular-colony",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 13,
+      "seed": 1377915633,
+      "zOffset": 651,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.4071875
+        ]
+      },
+      "majorantZOffset": 78,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.4088541666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 737,
+        "occupancyFraction": 0.006664134837962963,
+        "connectedComponentCount": 5,
+        "largestComponentFraction": 0.28900949796472186,
+        "dominantComponentFractions": [
+          0.28900949796472186,
+          0.27951153324287653,
+          0.16960651289009498,
+          0.15332428765264586,
+          0.10854816824966079
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.10638297872340426,
+            0.5319148936170213,
+            0.10638297872340426
+          ],
+          "maximum": [
+            0.9361702127659575,
+            0.6382978723404256,
+            0.7659574468085106
+          ]
+        },
+        "meanDensity": 0.3716657354936547,
+        "meanDetailType": 0.6267220049485195,
+        "meanIceFraction": 0.9607843137254902,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.7191316146540027,
+        "denseCoreFraction": 0,
+        "denseCoreMeanDensity": 0,
+        "diluteFringeFraction": 0.32157394843962006,
+        "meanOccupiedNeighborCount": 4.439620081411126,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.10546585650259177,
+        "projectedMirrorSimilarity": 0.07272862453531598,
+        "meanDensityPathCrosswind": 0.05067856559830223,
+        "meanDensityPathVertical": 0.02096415483383006,
+        "meanDensityPathDownwind": 0.043492798834363855,
+        "p90DensityPathVertical": 0.040467250730079264,
+        "projectedAxisAutocorrelationPeak": 0.09805934277262919,
+        "projectedDiagonalAutocorrelationPeak": 0.2147679853553402,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 12,
+        "verticalSilhouetteCompactness": 0.13916476548133297,
+        "verticalSilhouetteMirrorSimilarity": 0.6964743589743589,
+        "baseHorizontalSpan": 0.7055705925781708,
+        "middleBodyHorizontalSpan": 0.7453559924999299,
+        "crownHorizontalSpan": 0.6637305134197496,
+        "middleBodyToBaseSpanRatio": 1.032258064516129,
+        "crownToMiddleBodySpanRatio": 0.875,
+        "broadBaseThicknessFraction": 0.16666666666666666,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 5.5,
+        "middleSliceDominantComponentFraction": 0.2662363534943023,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.9274093675178697,
+        "primitiveCount": 43,
+        "formationGroupCount": 17,
+        "ownerSpacingCoefficientVariation": 0.43505871947682445,
+        "ownerAngularEntropy": 0.9407273195476242,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 26,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 4,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 5,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "cc-castellanus",
+      "label": "Cirrocumulus castellanus",
+      "classification": {
+        "genus": "cirrocumulus",
+        "species": "castellanus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "growing"
+      },
+      "formation": {
+        "mechanism": "cellular-convective-colony",
+        "materialModel": "granular-ice",
+        "topologyPolicy": "cellular-colony",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 14,
+      "seed": 2538564009,
+      "zOffset": 701,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.4384375
+        ]
+      },
+      "majorantZOffset": 84,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.4401041666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 951,
+        "occupancyFraction": 0.008599175347222222,
+        "connectedComponentCount": 6,
+        "largestComponentFraction": 0.36067297581493163,
+        "dominantComponentFractions": [
+          0.36067297581493163,
+          0.24079915878023134,
+          0.19663512092534174,
+          0.08517350157728706,
+          0.08201892744479496,
+          0.03470031545741325
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.06382978723404255,
+            0.5531914893617021,
+            0.19148936170212766
+          ],
+          "maximum": [
+            0.9361702127659575,
+            0.7872340425531915,
+            0.8723404255319149
+          ]
+        },
+        "meanDensity": 0.3760541019772788,
+        "meanDetailType": 0.6906538009525577,
+        "meanIceFraction": 0.9215686274509803,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.861198738170347,
+        "denseCoreFraction": 0,
+        "denseCoreMeanDensity": 0,
+        "diluteFringeFraction": 0.3459516298633018,
+        "meanOccupiedNeighborCount": 3.9032597266035753,
+        "trilinearCoreFraction": 0.9852786540483701,
+        "projectedFootprintCompactness": 0.03781400825276862,
+        "projectedMirrorSimilarity": 0.2549706662380455,
+        "meanDensityPathCrosswind": 0.045024229004203976,
+        "meanDensityPathVertical": 0.02438812404394382,
+        "meanDensityPathDownwind": 0.0369373529209246,
+        "p90DensityPathVertical": 0.0850229453483521,
+        "projectedAxisAutocorrelationPeak": 0.4399542104937777,
+        "projectedDiagonalAutocorrelationPeak": 0.15495589218690128,
+        "projectedGridAutocorrelationScore": 0.2849983183068764,
+        "projectedAxisAutocorrelationPeakLag": 13,
+        "verticalSilhouetteCompactness": 0.07324220084195307,
+        "verticalSilhouetteMirrorSimilarity": 0.5861170338782279,
+        "baseHorizontalSpan": 0.7756046028744286,
+        "middleBodyHorizontalSpan": 0.7546154281781181,
+        "crownHorizontalSpan": 0.742730977915662,
+        "middleBodyToBaseSpanRatio": 0.9696969696969697,
+        "crownToMiddleBodySpanRatio": 0.96875,
+        "broadBaseThicknessFraction": 0.25,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 9.8,
+        "middleSliceDominantComponentFraction": 0.15677167980452786,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.3595811173858216,
+        "verticalProfileCoefficientVariation": 0.749542908239152,
+        "primitiveCount": 57,
+        "formationGroupCount": 10,
+        "ownerSpacingCoefficientVariation": 0.10791791535366174,
+        "ownerAngularEntropy": 0.8406426982957876,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 3,
+        "secondaryLobeCount": 30,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 3,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "cc-floccus",
+      "label": "Cirrocumulus floccus",
+      "classification": {
+        "genus": "cirrocumulus",
+        "species": "floccus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "decaying"
+      },
+      "formation": {
+        "mechanism": "cellular-convective-colony",
+        "materialModel": "granular-ice",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 15,
+      "seed": 2869586281,
+      "zOffset": 751,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.4696875
+        ]
+      },
+      "majorantZOffset": 90,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.4713541666666667
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 574,
+        "occupancyFraction": 0.005190248842592593,
+        "connectedComponentCount": 17,
+        "largestComponentFraction": 0.16898954703832753,
+        "dominantComponentFractions": [
+          0.16898954703832753,
+          0.14285714285714285,
+          0.13240418118466898,
+          0.10801393728222997,
+          0.10278745644599303,
+          0.09407665505226481,
+          0.06097560975609756,
+          0.04878048780487805
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.0851063829787234,
+            0.46808510638297873,
+            0.2127659574468085
+          ],
+          "maximum": [
+            0.8297872340425532,
+            0.6808510638297872,
+            0.851063829787234
+          ]
+        },
+        "meanDensity": 0.351110200177632,
+        "meanDetailType": 0.760142105622737,
+        "meanIceFraction": 0.9411764705882353,
+        "meanPrecipitationStructure": 0.041962150713944116,
+        "surfaceVoxelFraction": 0.7909407665505227,
+        "denseCoreFraction": 0,
+        "denseCoreMeanDensity": 0,
+        "diluteFringeFraction": 0.3606271777003484,
+        "meanOccupiedNeighborCount": 3.8919860627177703,
+        "trilinearCoreFraction": 0.9825783972125436,
+        "projectedFootprintCompactness": 0.05414082577615063,
+        "projectedMirrorSimilarity": 0.12678527564305014,
+        "meanDensityPathCrosswind": 0.02858684466694478,
+        "meanDensityPathVertical": 0.022568561579166944,
+        "meanDensityPathDownwind": 0.030628762143155124,
+        "p90DensityPathVertical": 0.045139758030871925,
+        "projectedAxisAutocorrelationPeak": 0.13995860333293192,
+        "projectedDiagonalAutocorrelationPeak": 0.09311893607002608,
+        "projectedGridAutocorrelationScore": 0.04683966726290584,
+        "projectedAxisAutocorrelationPeakLag": 16,
+        "verticalSilhouetteCompactness": 0.07047315678618347,
+        "verticalSilhouetteMirrorSimilarity": 0.34945217511904214,
+        "baseHorizontalSpan": 0.5562929134507787,
+        "middleBodyHorizontalSpan": 0.6959705453537528,
+        "crownHorizontalSpan": 0.6959705453537528,
+        "middleBodyToBaseSpanRatio": 1.1612903225806452,
+        "crownToMiddleBodySpanRatio": 1,
+        "broadBaseThicknessFraction": 0.2727272727272727,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0.2,
+        "middleSliceMeanComponentCount": 8.4,
+        "middleSliceDominantComponentFraction": 0.2896250318309142,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.022513231631382316,
+        "verticalProfileCoefficientVariation": 1.256088001251495,
+        "primitiveCount": 72,
+        "formationGroupCount": 11,
+        "ownerSpacingCoefficientVariation": 0.07266703886372036,
+        "ownerAngularEntropy": 0.7437567515358586,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 61,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 3,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "cc-lenticularis",
+      "label": "Cirrocumulus lenticularis",
+      "classification": {
+        "genus": "cirrocumulus",
+        "species": "lenticularis",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "orographic-wave-condensation",
+        "materialModel": "granular-ice",
+        "topologyPolicy": "wave-packet",
+        "boundaryModel": "asymmetric-wave-condensation"
+      },
+      "index": 16,
+      "seed": 2807834723,
+      "zOffset": 801,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.5009375
+        ]
+      },
+      "majorantZOffset": 96,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.5026041666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 783,
+        "occupancyFraction": 0.007080078125,
+        "connectedComponentCount": 3,
+        "largestComponentFraction": 0.3537675606641124,
+        "dominantComponentFractions": [
+          0.3537675606641124,
+          0.351213282247765,
+          0.2950191570881226
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.23404255319148937,
+            0.574468085106383,
+            0.1702127659574468
+          ],
+          "maximum": [
+            0.7446808510638298,
+            0.6382978723404256,
+            0.851063829787234
+          ]
+        },
+        "meanDensity": 0.36322840758270103,
+        "meanDetailType": 0.7019607843137254,
+        "meanIceFraction": 0.9803921568627451,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.9923371647509579,
+        "denseCoreFraction": 0,
+        "denseCoreMeanDensity": 0,
+        "diluteFringeFraction": 0.27330779054916987,
+        "meanOccupiedNeighborCount": 4.286079182630907,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.16227165794926554,
+        "projectedMirrorSimilarity": 0.6013874978625693,
+        "meanDensityPathCrosswind": 0.11636982125092261,
+        "meanDensityPathVertical": 0.012451091985695412,
+        "meanDensityPathDownwind": 0.0817733879060537,
+        "p90DensityPathVertical": 0.019524405506883606,
+        "projectedAxisAutocorrelationPeak": 0.5211992451259557,
+        "projectedDiagonalAutocorrelationPeak": 0.22097987058478938,
+        "projectedGridAutocorrelationScore": 0.3002193745411663,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.2764302691624788,
+        "verticalSilhouetteMirrorSimilarity": 0.6896730669434354,
+        "baseHorizontalSpan": 0.06588078458684124,
+        "middleBodyHorizontalSpan": 0.5892556509887896,
+        "crownHorizontalSpan": 0.25853486762480954,
+        "middleBodyToBaseSpanRatio": 5,
+        "crownToMiddleBodySpanRatio": 0.21875,
+        "broadBaseThicknessFraction": 0.25,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 2.5,
+        "middleSliceDominantComponentFraction": 0.5354705661792276,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.9126939367789739,
+        "primitiveCount": 3,
+        "formationGroupCount": 3,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 3,
+        "waveStackLayerCount": 3,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ac-stratiformis",
+      "label": "Altocumulus stratiformis",
+      "classification": {
+        "genus": "altocumulus",
+        "species": "stratiformis",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "cellular-convective-colony",
+        "materialModel": "mixed-phase-cellular",
+        "topologyPolicy": "cellular-colony",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 17,
+      "seed": 3457402836,
+      "zOffset": 851,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.5321875
+        ]
+      },
+      "majorantZOffset": 102,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.5338541666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 1154,
+        "occupancyFraction": 0.010434751157407407,
+        "connectedComponentCount": 4,
+        "largestComponentFraction": 0.38388214904679374,
+        "dominantComponentFractions": [
+          0.38388214904679374,
+          0.2876949740034662,
+          0.17677642980935876,
+          0.15164644714038128
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.1702127659574468,
+            0.425531914893617,
+            0.1702127659574468
+          ],
+          "maximum": [
+            0.9787234042553191,
+            0.5531914893617021,
+            0.9787234042553191
+          ]
+        },
+        "meanDensity": 0.48225099398511573,
+        "meanDetailType": 0.28463655826281986,
+        "meanIceFraction": 0.23921568627450981,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.621317157712305,
+        "denseCoreFraction": 0.2876949740034662,
+        "denseCoreMeanDensity": 0.7742499409402315,
+        "diluteFringeFraction": 0.2738301559792028,
+        "meanOccupiedNeighborCount": 4.696707105719238,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.10838494654884787,
+        "projectedMirrorSimilarity": 0.09402539883400371,
+        "meanDensityPathCrosswind": 0.07309136420525655,
+        "meanDensityPathVertical": 0.0343211623224683,
+        "meanDensityPathDownwind": 0.06727727841620204,
+        "p90DensityPathVertical": 0.06783479349186483,
+        "projectedAxisAutocorrelationPeak": 0.0868886561601758,
+        "projectedDiagonalAutocorrelationPeak": 0.11726406304998421,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 15,
+        "verticalSilhouetteCompactness": 0.16436394382633873,
+        "verticalSilhouetteMirrorSimilarity": 0.6605251446372942,
+        "baseHorizontalSpan": 0.7811805524688614,
+        "middleBodyHorizontalSpan": 0.8125,
+        "crownHorizontalSpan": 0.6875,
+        "middleBodyToBaseSpanRatio": 1.0263157894736843,
+        "crownToMiddleBodySpanRatio": 0.8461538461538461,
+        "broadBaseThicknessFraction": 0.14285714285714285,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 4.333333333333333,
+        "middleSliceDominantComponentFraction": 0.34121461286018245,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.8579216391385502,
+        "primitiveCount": 32,
+        "formationGroupCount": 14,
+        "ownerSpacingCoefficientVariation": 0.37179128045299936,
+        "ownerAngularEntropy": 0.9654305096819759,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 18,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 4,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 4,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ac-castellanus",
+      "label": "Altocumulus castellanus",
+      "classification": {
+        "genus": "altocumulus",
+        "species": "castellanus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "growing"
+      },
+      "formation": {
+        "mechanism": "cellular-convective-colony",
+        "materialModel": "mixed-phase-cellular",
+        "topologyPolicy": "cellular-colony",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 18,
+      "seed": 2738482455,
+      "zOffset": 901,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.5634375
+        ]
+      },
+      "majorantZOffset": 108,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.5651041666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 1619,
+        "occupancyFraction": 0.01463939525462963,
+        "connectedComponentCount": 8,
+        "largestComponentFraction": 0.2649783817171093,
+        "dominantComponentFractions": [
+          0.2649783817171093,
+          0.22297714638665844,
+          0.169857936998147,
+          0.16306361951822113,
+          0.12476837554045707,
+          0.053119209388511425,
+          0.0006176652254478073,
+          0.0006176652254478073
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.02127659574468085,
+            0.44680851063829785,
+            0.1702127659574468
+          ],
+          "maximum": [
+            0.9787234042553191,
+            0.7446808510638298,
+            0.851063829787234
+          ]
+        },
+        "meanDensity": 0.4645690271167145,
+        "meanDetailType": 0.22086981797042474,
+        "meanIceFraction": 0.1803921568627451,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.7486102532427424,
+        "denseCoreFraction": 0.29030265596046945,
+        "denseCoreMeanDensity": 0.8289027951606174,
+        "diluteFringeFraction": 0.32798023471278565,
+        "meanOccupiedNeighborCount": 4.336009882643607,
+        "trilinearCoreFraction": 0.9975293390982087,
+        "projectedFootprintCompactness": 0.06025751799735338,
+        "projectedMirrorSimilarity": 0.3868677905944987,
+        "meanDensityPathCrosswind": 0.08744765200580873,
+        "meanDensityPathVertical": 0.04445255643628605,
+        "meanDensityPathDownwind": 0.044576379713267424,
+        "p90DensityPathVertical": 0.15569461827284103,
+        "projectedAxisAutocorrelationPeak": 0.28777843320591234,
+        "projectedDiagonalAutocorrelationPeak": 0.031345955467284824,
+        "projectedGridAutocorrelationScore": 0.25643247773862754,
+        "projectedAxisAutocorrelationPeakLag": 7,
+        "verticalSilhouetteCompactness": 0.07335014065028198,
+        "verticalSilhouetteMirrorSimilarity": 0.5687625226600515,
+        "baseHorizontalSpan": 0.8116983224490899,
+        "middleBodyHorizontalSpan": 0.7606306776470285,
+        "crownHorizontalSpan": 0.7517341063611965,
+        "middleBodyToBaseSpanRatio": 0.9347826086956522,
+        "crownToMiddleBodySpanRatio": 0.9767441860465116,
+        "broadBaseThicknessFraction": 0.3333333333333333,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 8.857142857142858,
+        "middleSliceDominantComponentFraction": 0.17803366444109917,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.0962642404650799,
+        "verticalProfileCoefficientVariation": 0.616152038147432,
+        "primitiveCount": 58,
+        "formationGroupCount": 10,
+        "ownerSpacingCoefficientVariation": 0.2531502305173942,
+        "ownerAngularEntropy": 0.6154797815570052,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 2,
+        "secondaryLobeCount": 30,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 4,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ac-floccus",
+      "label": "Altocumulus floccus",
+      "classification": {
+        "genus": "altocumulus",
+        "species": "floccus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "decaying"
+      },
+      "formation": {
+        "mechanism": "cellular-convective-colony",
+        "materialModel": "mixed-phase-cellular",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 19,
+      "seed": 3299322935,
+      "zOffset": 951,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.5946875
+        ]
+      },
+      "majorantZOffset": 114,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.5963541666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 993,
+        "occupancyFraction": 0.008978949652777778,
+        "connectedComponentCount": 18,
+        "largestComponentFraction": 0.16515609264853978,
+        "dominantComponentFractions": [
+          0.16515609264853978,
+          0.1339375629405841,
+          0.13293051359516617,
+          0.1107754279959718,
+          0.10171198388721048,
+          0.09164149043303121,
+          0.08459214501510574,
+          0.04632426988922457
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.14893617021276595,
+            0.3617021276595745,
+            0.1276595744680851
+          ],
+          "maximum": [
+            0.9574468085106383,
+            0.6170212765957447,
+            0.851063829787234
+          ]
+        },
+        "meanDensity": 0.4511936496653042,
+        "meanDetailType": 0.36925537586635865,
+        "meanIceFraction": 0.3079833343206366,
+        "meanPrecipitationStructure": 0.039989732045889854,
+        "surfaceVoxelFraction": 0.6998992950654582,
+        "denseCoreFraction": 0.229607250755287,
+        "denseCoreMeanDensity": 0.7562263501891985,
+        "diluteFringeFraction": 0.3121852970795569,
+        "meanOccupiedNeighborCount": 4.257804632426989,
+        "trilinearCoreFraction": 0.9869083585095669,
+        "projectedFootprintCompactness": 0.05639175158628921,
+        "projectedMirrorSimilarity": 0.2101077623465683,
+        "meanDensityPathCrosswind": 0.046500808938001806,
+        "meanDensityPathVertical": 0.03453864431989261,
+        "meanDensityPathDownwind": 0.04672875407985472,
+        "p90DensityPathVertical": 0.06958698372966207,
+        "projectedAxisAutocorrelationPeak": 0.12198097865813468,
+        "projectedDiagonalAutocorrelationPeak": 0.13520664033067314,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 16,
+        "verticalSilhouetteCompactness": 0.09082835903235796,
+        "verticalSilhouetteMirrorSimilarity": 0.4150401836969001,
+        "baseHorizontalSpan": 0.549621081594705,
+        "middleBodyHorizontalSpan": 0.7697063834129653,
+        "crownHorizontalSpan": 0.7083333333333334,
+        "middleBodyToBaseSpanRatio": 1.206896551724138,
+        "crownToMiddleBodySpanRatio": 0.8717948717948718,
+        "broadBaseThicknessFraction": 0.07692307692307693,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 9,
+        "middleSliceDominantComponentFraction": 0.2604707302804121,
+        "lowerBoundaryRoughness": 0.015537435440436951,
+        "lowerBoundaryRange": 0.041666666666666664,
+        "lowerBoundaryDistinctLevels": 3,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 1.2136731808121954,
+        "primitiveCount": 71,
+        "formationGroupCount": 11,
+        "ownerSpacingCoefficientVariation": 0.07374579720775262,
+        "ownerAngularEntropy": 0.9713256910609174,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 60,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 4,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ac-lenticularis",
+      "label": "Altocumulus lenticularis",
+      "classification": {
+        "genus": "altocumulus",
+        "species": "lenticularis",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "orographic-wave-condensation",
+        "materialModel": "mixed-phase-cellular",
+        "topologyPolicy": "wave-packet",
+        "boundaryModel": "asymmetric-wave-condensation"
+      },
+      "index": 20,
+      "seed": 2874220666,
+      "zOffset": 1001,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.6259375
+        ]
+      },
+      "majorantZOffset": 120,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.6276041666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 5573,
+        "occupancyFraction": 0.05039243344907408,
+        "connectedComponentCount": 1,
+        "largestComponentFraction": 1,
+        "dominantComponentFractions": [
+          1
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.10638297872340426,
+            0.46808510638297873,
+            0.1276595744680851
+          ],
+          "maximum": [
+            0.851063829787234,
+            0.6808510638297872,
+            0.9361702127659575
+          ]
+        },
+        "meanDensity": 0.6660418052022531,
+        "meanDetailType": 0.1607843137254902,
+        "meanIceFraction": 0.2784313725490196,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.6075722232190921,
+        "denseCoreFraction": 0.608469406064956,
+        "denseCoreMeanDensity": 0.8316049982363928,
+        "diluteFringeFraction": 0.11376278485555356,
+        "meanOccupiedNeighborCount": 5.07697828817513,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.4519284886491516,
+        "projectedMirrorSimilarity": 0.874687962392654,
+        "meanDensityPathCrosswind": 0.31464363655100075,
+        "meanDensityPathVertical": 0.07089367394461493,
+        "meanDensityPathDownwind": 0.25071604055333724,
+        "p90DensityPathVertical": 0.12924488944513973,
+        "projectedAxisAutocorrelationPeak": 0.23334072118089658,
+        "projectedDiagonalAutocorrelationPeak": 0.14986627769338434,
+        "projectedGridAutocorrelationScore": 0.08347444348751223,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.28428660898614905,
+        "verticalSilhouetteMirrorSimilarity": 0.868836465273261,
+        "baseHorizontalSpan": 0.7186745129441808,
+        "middleBodyHorizontalSpan": 0.7186745129441808,
+        "crownHorizontalSpan": 0.5229125165837972,
+        "middleBodyToBaseSpanRatio": 1,
+        "crownToMiddleBodySpanRatio": 0.6176470588235294,
+        "broadBaseThicknessFraction": 0.2727272727272727,
+        "middleSliceSingleComponentFraction": 0.4,
+        "middleSliceSingleMajorComponentFraction": 0.4,
+        "middleSliceMeanComponentCount": 1.6,
+        "middleSliceDominantComponentFraction": 0.8470496588153086,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.036502057004485895,
+        "verticalProfileCoefficientVariation": 0.5419586718581636,
+        "primitiveCount": 7,
+        "formationGroupCount": 3,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 3,
+        "waveStackLayerCount": 7,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ac-volutus",
+      "label": "Altocumulus volutus",
+      "classification": {
+        "genus": "altocumulus",
+        "species": "volutus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "horizontal-roll-circulation",
+        "materialModel": "mixed-phase-cellular",
+        "topologyPolicy": "roll-tube",
+        "boundaryModel": "soliton-envelope"
+      },
+      "index": 21,
+      "seed": 3103997652,
+      "zOffset": 1051,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.6571875
+        ]
+      },
+      "majorantZOffset": 126,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.6588541666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 793,
+        "occupancyFraction": 0.007170500578703704,
+        "connectedComponentCount": 1,
+        "largestComponentFraction": 1,
+        "dominantComponentFractions": [
+          1
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.10638297872340426,
+            0.44680851063829785,
+            0.40425531914893614
+          ],
+          "maximum": [
+            0.8936170212765957,
+            0.574468085106383,
+            0.574468085106383
+          ]
+        },
+        "meanDensity": 0.5859951042207552,
+        "meanDetailType": 0.23921568627450981,
+        "meanIceFraction": 0.1803921568627451,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.5699873896595208,
+        "denseCoreFraction": 0.4817150063051702,
+        "denseCoreMeanDensity": 0.8133353865106252,
+        "diluteFringeFraction": 0.18915510718789408,
+        "meanOccupiedNeighborCount": 4.928121059268601,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.28088892649283737,
+        "projectedMirrorSimilarity": 0.5544964539007092,
+        "meanDensityPathCrosswind": 0.21493714969799202,
+        "meanDensityPathVertical": 0.04799567420440599,
+        "meanDensityPathDownwind": 0.05885183860778349,
+        "p90DensityPathVertical": 0.08251981643721318,
+        "projectedAxisAutocorrelationPeak": 0.6701121420229196,
+        "projectedDiagonalAutocorrelationPeak": 0.06380184700189737,
+        "projectedGridAutocorrelationScore": 0.6063102950210222,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.26063583496448656,
+        "verticalSilhouetteMirrorSimilarity": 0.6511953634387829,
+        "baseHorizontalSpan": 0.23385358667337133,
+        "middleBodyHorizontalSpan": 0.3801726581436387,
+        "crownHorizontalSpan": 0.27003086243366087,
+        "middleBodyToBaseSpanRatio": 1.5,
+        "crownToMiddleBodySpanRatio": 0.6486486486486487,
+        "broadBaseThicknessFraction": 0.14285714285714285,
+        "middleSliceSingleComponentFraction": 1,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 1,
+        "middleSliceDominantComponentFraction": 1,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.691351496139685,
+        "primitiveCount": 0,
+        "formationGroupCount": 1,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "as-opacus",
+      "label": "Altostratus opacus",
+      "classification": {
+        "genus": "altostratus",
+        "species": null,
+        "supplementaryFeature": null,
+        "speciesAliases": [
+          "opacus"
+        ],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "frontal-ascent-sheet",
+        "materialModel": "mixed-phase-sheet",
+        "topologyPolicy": "continuous-sheet",
+        "boundaryModel": "curved-frontal-swath"
+      },
+      "index": 22,
+      "seed": 1677047247,
+      "zOffset": 1101,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.6884375
+        ]
+      },
+      "majorantZOffset": 132,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.6901041666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 14328,
+        "occupancyFraction": 0.12955729166666666,
+        "connectedComponentCount": 1,
+        "largestComponentFraction": 1,
+        "dominantComponentFractions": [
+          1
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0,
+            0.44680851063829785,
+            0.0851063829787234
+          ],
+          "maximum": [
+            0.9574468085106383,
+            0.6808510638297872,
+            0.9574468085106383
+          ]
+        },
+        "meanDensity": 0.7249542921579575,
+        "meanDetailType": 0.4196078431372549,
+        "meanIceFraction": 0.4196078431372549,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.2721943048576214,
+        "denseCoreFraction": 0.7600502512562815,
+        "denseCoreMeanDensity": 0.8352948378616828,
+        "diluteFringeFraction": 0.0893355667225014,
+        "meanOccupiedNeighborCount": 5.647403685092128,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.4687163518539459,
+        "projectedMirrorSimilarity": 0.7328464382595659,
+        "meanDensityPathCrosswind": 0.45851262902971723,
+        "meanDensityPathVertical": 0.16072951795805376,
+        "meanDensityPathDownwind": 0.4316466546725075,
+        "p90DensityPathVertical": 0.17588652482269498,
+        "projectedAxisAutocorrelationPeak": 0.08097054576179269,
+        "projectedDiagonalAutocorrelationPeak": 0.10483479703772759,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 10,
+        "verticalSilhouetteCompactness": 0.46207855174891527,
+        "verticalSilhouetteMirrorSimilarity": 0.889942246921652,
+        "baseHorizontalSpan": 0.9157192073264963,
+        "middleBodyHorizontalSpan": 0.9157192073264963,
+        "crownHorizontalSpan": 0.9157192073264963,
+        "middleBodyToBaseSpanRatio": 1,
+        "crownToMiddleBodySpanRatio": 1,
+        "broadBaseThicknessFraction": 0.25,
+        "middleSliceSingleComponentFraction": 1,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 1,
+        "middleSliceDominantComponentFraction": 1,
+        "lowerBoundaryRoughness": 0,
+        "lowerBoundaryRange": 0,
+        "lowerBoundaryDistinctLevels": 0,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0.012630242056357745,
+        "verticalProfileCoefficientVariation": 0.44805271941831143,
+        "primitiveCount": 0,
+        "formationGroupCount": 1,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 3,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "ns-precipitating",
+      "label": "Nimbostratus praecipitatio",
+      "classification": {
+        "genus": "nimbostratus",
+        "species": null,
+        "supplementaryFeature": "praecipitatio",
+        "speciesAliases": [],
+        "lifecycle": "precipitating"
+      },
+      "formation": {
+        "mechanism": "frontal-ascent-sheet",
+        "materialModel": "mixed-phase-sheet",
+        "topologyPolicy": "continuous-sheet",
+        "boundaryModel": "curved-frontal-swath"
+      },
+      "index": 23,
+      "seed": 3822426171,
+      "zOffset": 1151,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.7196875
+        ]
+      },
+      "majorantZOffset": 138,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.7213541666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 23728,
+        "occupancyFraction": 0.21455439814814814,
+        "connectedComponentCount": 1,
+        "largestComponentFraction": 1,
+        "dominantComponentFractions": [
+          1
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.02127659574468085,
+            0.0851063829787234,
+            0.10638297872340426
+          ],
+          "maximum": [
+            0.9787234042553191,
+            0.723404255319149,
+            0.9574468085106383
+          ]
+        },
+        "meanDensity": 0.82922946994037,
+        "meanDetailType": 0.5426639165443655,
+        "meanIceFraction": 0.38096432774053657,
+        "meanPrecipitationStructure": 0.092331389737284,
+        "surfaceVoxelFraction": 0.26003034389750507,
+        "denseCoreFraction": 0.7669420094403236,
+        "denseCoreMeanDensity": 0.9643675560124039,
+        "diluteFringeFraction": 0.07784052596089008,
+        "meanOccupiedNeighborCount": 5.634103169251517,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.4112883873412673,
+        "projectedMirrorSimilarity": 0.8021000869772256,
+        "meanDensityPathCrosswind": 0.39718916514080255,
+        "meanDensityPathVertical": 0.295647867272886,
+        "meanDensityPathDownwind": 0.3890681970803033,
+        "p90DensityPathVertical": 0.409261576971214,
+        "projectedAxisAutocorrelationPeak": 0.2941697018475473,
+        "projectedDiagonalAutocorrelationPeak": 0.07322012601227831,
+        "projectedGridAutocorrelationScore": 0.220949575835269,
+        "projectedAxisAutocorrelationPeakLag": 10,
+        "verticalSilhouetteCompactness": 0.30660804492177934,
+        "verticalSilhouetteMirrorSimilarity": 0.6453422989431725,
+        "baseHorizontalSpan": 0.7186745129441808,
+        "middleBodyHorizontalSpan": 0.904752114608686,
+        "crownHorizontalSpan": 0.904752114608686,
+        "middleBodyToBaseSpanRatio": 1.2058823529411764,
+        "crownToMiddleBodySpanRatio": 1,
+        "broadBaseThicknessFraction": 0.22580645161290322,
+        "middleSliceSingleComponentFraction": 0.4,
+        "middleSliceSingleMajorComponentFraction": 0.4,
+        "middleSliceMeanComponentCount": 3.4,
+        "middleSliceDominantComponentFraction": 0.7366104677492007,
+        "lowerBoundaryRoughness": 0.12242068800606631,
+        "lowerBoundaryRange": 0.3125,
+        "lowerBoundaryDistinctLevels": 11,
+        "lowerThirdMassFraction": 0.06441543366652921,
+        "upperThirdMassFraction": 0.1416622935247537,
+        "verticalProfileCoefficientVariation": 0.8864294668975176,
+        "primitiveCount": 0,
+        "formationGroupCount": 1,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 3,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "sc-stratiformis",
+      "label": "Stratocumulus stratiformis",
+      "classification": {
+        "genus": "stratocumulus",
+        "species": "stratiformis",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "inversion-bounded-cellular-deck",
+        "materialModel": "liquid-cellular",
+        "topologyPolicy": "cellular-colony",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 24,
+      "seed": 3333191490,
+      "zOffset": 1201,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.7509375
+        ]
+      },
+      "majorantZOffset": 144,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.7526041666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 3330,
+        "occupancyFraction": 0.030110677083333332,
+        "connectedComponentCount": 2,
+        "largestComponentFraction": 0.7327327327327328,
+        "dominantComponentFractions": [
+          0.7327327327327328,
+          0.2672672672672673
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0,
+            0.2553191489361702,
+            0.3617021276595745
+          ],
+          "maximum": [
+            0.9787234042553191,
+            0.44680851063829785,
+            0.9148936170212766
+          ]
+        },
+        "meanDensity": 0.6995760466348702,
+        "meanDetailType": 0.2839239239239239,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.418018018018018,
+        "denseCoreFraction": 0.6207207207207207,
+        "denseCoreMeanDensity": 0.9029340618685792,
+        "diluteFringeFraction": 0.14264264264264265,
+        "meanOccupiedNeighborCount": 5.198798798798799,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.18200973024914888,
+        "projectedMirrorSimilarity": 0.4667109505819183,
+        "meanDensityPathCrosswind": 0.24659555788018592,
+        "meanDensityPathVertical": 0.08386752476128158,
+        "meanDensityPathDownwind": 0.1625105151931718,
+        "p90DensityPathVertical": 0.1570296203587818,
+        "projectedAxisAutocorrelationPeak": 0.13691732342137555,
+        "projectedDiagonalAutocorrelationPeak": 0.05492089303832512,
+        "projectedGridAutocorrelationScore": 0.08199643038305043,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.2267895288390265,
+        "verticalSilhouetteMirrorSimilarity": 0.6987115114249076,
+        "baseHorizontalSpan": 0.669913966283897,
+        "middleBodyHorizontalSpan": 0.7421463804398698,
+        "crownHorizontalSpan": 0.6332785063987777,
+        "middleBodyToBaseSpanRatio": 1,
+        "crownToMiddleBodySpanRatio": 0.7777777777777778,
+        "broadBaseThicknessFraction": 0.2,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 2.8,
+        "middleSliceDominantComponentFraction": 0.5686954911618126,
+        "lowerBoundaryRoughness": 0.024288126704028416,
+        "lowerBoundaryRange": 0.10416666666666667,
+        "lowerBoundaryDistinctLevels": 6,
+        "lowerThirdMassFraction": 0.3259652046562129,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.6173680685456638,
+        "primitiveCount": 26,
+        "formationGroupCount": 12,
+        "ownerSpacingCoefficientVariation": 0.37191905417784776,
+        "ownerAngularEntropy": 0.8752715278979706,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 14,
+        "hierarchyLevelCount": 3,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 4,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 4,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "sc-castellanus",
+      "label": "Stratocumulus castellanus",
+      "classification": {
+        "genus": "stratocumulus",
+        "species": "castellanus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "growing"
+      },
+      "formation": {
+        "mechanism": "inversion-bounded-cellular-deck",
+        "materialModel": "liquid-cellular",
+        "topologyPolicy": "cellular-colony",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 25,
+      "seed": 2030768928,
+      "zOffset": 1251,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.7821875
+        ]
+      },
+      "majorantZOffset": 150,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.7838541666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 2518,
+        "occupancyFraction": 0.02276837384259259,
+        "connectedComponentCount": 2,
+        "largestComponentFraction": 0.5822081016679904,
+        "dominantComponentFractions": [
+          0.5822081016679904,
+          0.4177918983320095
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.0425531914893617,
+            0.2978723404255319,
+            0.1276595744680851
+          ],
+          "maximum": [
+            0.9787234042553191,
+            0.6170212765957447,
+            0.851063829787234
+          ]
+        },
+        "meanDensity": 0.5638228285754334,
+        "meanDetailType": 0.22080860938497718,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.6834789515488483,
+        "denseCoreFraction": 0.38482922954725973,
+        "denseCoreMeanDensity": 0.925332362046986,
+        "diluteFringeFraction": 0.25536139793486895,
+        "meanOccupiedNeighborCount": 4.635424940428912,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.07297454694386776,
+        "projectedMirrorSimilarity": 0.33271552470447496,
+        "meanDensityPathCrosswind": 0.12586045056320402,
+        "meanDensityPathVertical": 0.06359264870561884,
+        "meanDensityPathDownwind": 0.07024769333760224,
+        "p90DensityPathVertical": 0.2129328327075511,
+        "projectedAxisAutocorrelationPeak": 0.32296571108735916,
+        "projectedDiagonalAutocorrelationPeak": 0.05067304154770794,
+        "projectedGridAutocorrelationScore": 0.27229266953965126,
+        "projectedAxisAutocorrelationPeakLag": 8,
+        "verticalSilhouetteCompactness": 0.1350884841043611,
+        "verticalSilhouetteMirrorSimilarity": 0.577382743791925,
+        "baseHorizontalSpan": 0.8267972847076845,
+        "middleBodyHorizontalSpan": 0.7728015412913086,
+        "crownHorizontalSpan": 0.733617369235792,
+        "middleBodyToBaseSpanRatio": 0.9142857142857143,
+        "crownToMiddleBodySpanRatio": 0.9302325581395349,
+        "broadBaseThicknessFraction": 0.25,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 8.857142857142858,
+        "middleSliceDominantComponentFraction": 0.30231935706160007,
+        "lowerBoundaryRoughness": 0.010400055585666998,
+        "lowerBoundaryRange": 0.0625,
+        "lowerBoundaryDistinctLevels": 4,
+        "lowerThirdMassFraction": 0.021167046474690976,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.5960456873294195,
+        "primitiveCount": 58,
+        "formationGroupCount": 10,
+        "ownerSpacingCoefficientVariation": 0.32040493588810426,
+        "ownerAngularEntropy": 0.5869880158145605,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 2,
+        "secondaryLobeCount": 30,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 4,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "sc-floccus",
+      "label": "Stratocumulus floccus",
+      "classification": {
+        "genus": "stratocumulus",
+        "species": "floccus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "decaying"
+      },
+      "formation": {
+        "mechanism": "inversion-bounded-cellular-deck",
+        "materialModel": "liquid-cellular",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 26,
+      "seed": 1516981971,
+      "zOffset": 1301,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.8134375
+        ]
+      },
+      "majorantZOffset": 156,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.8151041666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 1904,
+        "occupancyFraction": 0.017216435185185185,
+        "connectedComponentCount": 17,
+        "largestComponentFraction": 0.2972689075630252,
+        "dominantComponentFractions": [
+          0.2972689075630252,
+          0.16649159663865545,
+          0.0934873949579832,
+          0.09296218487394958,
+          0.08140756302521009,
+          0.06460084033613446,
+          0.06144957983193277,
+          0.05042016806722689
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0,
+            0.2127659574468085,
+            0.1276595744680851
+          ],
+          "maximum": [
+            0.9574468085106383,
+            0.5106382978723404,
+            0.9148936170212766
+          ]
+        },
+        "meanDensity": 0.562662712143681,
+        "meanDetailType": 0.3692618223760092,
+        "meanIceFraction": 0.049159663865546224,
+        "meanPrecipitationStructure": 0.04000247157686604,
+        "surfaceVoxelFraction": 0.6055672268907563,
+        "denseCoreFraction": 0.4317226890756303,
+        "denseCoreMeanDensity": 0.8610467057869376,
+        "diluteFringeFraction": 0.23844537815126052,
+        "meanOccupiedNeighborCount": 4.543067226890757,
+        "trilinearCoreFraction": 0.9973739495798319,
+        "projectedFootprintCompactness": 0.054040134898862925,
+        "projectedMirrorSimilarity": 0.16068245480010185,
+        "meanDensityPathCrosswind": 0.08111681713648586,
+        "meanDensityPathVertical": 0.05375902267771819,
+        "meanDensityPathDownwind": 0.06331618226486821,
+        "p90DensityPathVertical": 0.10312891113892365,
+        "projectedAxisAutocorrelationPeak": 0.11479313560031197,
+        "projectedDiagonalAutocorrelationPeak": 0.17560580770076467,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 14,
+        "verticalSilhouetteCompactness": 0.07355445859081201,
+        "verticalSilhouetteMirrorSimilarity": 0.4905943293347873,
+        "baseHorizontalSpan": 0.76631558990623,
+        "middleBodyHorizontalSpan": 0.8594854726973445,
+        "crownHorizontalSpan": 0.8594854726973445,
+        "middleBodyToBaseSpanRatio": 1.121212121212121,
+        "crownToMiddleBodySpanRatio": 1,
+        "broadBaseThicknessFraction": 0.13333333333333333,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 10.142857142857142,
+        "middleSliceDominantComponentFraction": 0.2506403874416297,
+        "lowerBoundaryRoughness": 0.04156207658447559,
+        "lowerBoundaryRange": 0.1875,
+        "lowerBoundaryDistinctLevels": 10,
+        "lowerThirdMassFraction": 0.02492093241185428,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 1.1318108121216086,
+        "primitiveCount": 78,
+        "formationGroupCount": 11,
+        "ownerSpacingCoefficientVariation": 0.21884408762735505,
+        "ownerAngularEntropy": 0.8878442516014183,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 67,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 4,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "sc-lenticularis",
+      "label": "Stratocumulus lenticularis",
+      "classification": {
+        "genus": "stratocumulus",
+        "species": "lenticularis",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "orographic-wave-condensation",
+        "materialModel": "liquid-cellular",
+        "topologyPolicy": "wave-packet",
+        "boundaryModel": "asymmetric-wave-condensation"
+      },
+      "index": 27,
+      "seed": 3964384772,
+      "zOffset": 1351,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.8446875
+        ]
+      },
+      "majorantZOffset": 162,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.8463541666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 4506,
+        "occupancyFraction": 0.04074435763888889,
+        "connectedComponentCount": 3,
+        "largestComponentFraction": 0.533288948069241,
+        "dominantComponentFractions": [
+          0.533288948069241,
+          0.2596537949400799,
+          0.2070572569906791
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.10638297872340426,
+            0.3617021276595745,
+            0.10638297872340426
+          ],
+          "maximum": [
+            0.8723404255319149,
+            0.5957446808510638,
+            0.9148936170212766
+          ]
+        },
+        "meanDensity": 0.7534381173685631,
+        "meanDetailType": 0.1607843137254902,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.6520195295162006,
+        "denseCoreFraction": 0.6875277407900577,
+        "denseCoreMeanDensity": 0.919492651805719,
+        "diluteFringeFraction": 0.10252996005326231,
+        "meanOccupiedNeighborCount": 4.944518419884599,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.25024256185144755,
+        "projectedMirrorSimilarity": 0.7908865066939323,
+        "meanDensityPathCrosswind": 0.328335798536049,
+        "meanDensityPathVertical": 0.0807082409809283,
+        "meanDensityPathDownwind": 0.2257308614935336,
+        "p90DensityPathVertical": 0.17271589486858574,
+        "projectedAxisAutocorrelationPeak": 0.43787799247083853,
+        "projectedDiagonalAutocorrelationPeak": 0.03543307993797542,
+        "projectedGridAutocorrelationScore": 0.40244491253286313,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.2615269638784427,
+        "verticalSilhouetteMirrorSimilarity": 0.8478693747510953,
+        "baseHorizontalSpan": 0.7811805524688614,
+        "middleBodyHorizontalSpan": 0.6972166887783963,
+        "crownHorizontalSpan": 0.6102424381615338,
+        "middleBodyToBaseSpanRatio": 0.8648648648648649,
+        "crownToMiddleBodySpanRatio": 0.8125,
+        "broadBaseThicknessFraction": 0.16666666666666666,
+        "middleSliceSingleComponentFraction": 0.2,
+        "middleSliceSingleMajorComponentFraction": 0.2,
+        "middleSliceMeanComponentCount": 1.8,
+        "middleSliceDominantComponentFraction": 0.6725311873148863,
+        "lowerBoundaryRoughness": 0.010162016971083364,
+        "lowerBoundaryRange": 0.020833333333333332,
+        "lowerBoundaryDistinctLevels": 2,
+        "lowerThirdMassFraction": 0,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.660883357469313,
+        "primitiveCount": 6,
+        "formationGroupCount": 2,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 2,
+        "waveStackLayerCount": 6,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "sc-volutus",
+      "label": "Stratocumulus volutus",
+      "classification": {
+        "genus": "stratocumulus",
+        "species": "volutus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "horizontal-roll-circulation",
+        "materialModel": "liquid-cellular",
+        "topologyPolicy": "roll-tube",
+        "boundaryModel": "soliton-envelope"
+      },
+      "index": 28,
+      "seed": 1405184912,
+      "zOffset": 1401,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.8759375
+        ]
+      },
+      "majorantZOffset": 168,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.8776041666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 1519,
+        "occupancyFraction": 0.013735170717592593,
+        "connectedComponentCount": 1,
+        "largestComponentFraction": 1,
+        "dominantComponentFractions": [
+          1
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.10638297872340426,
+            0.2978723404255319,
+            0.3829787234042553
+          ],
+          "maximum": [
+            0.8936170212765957,
+            0.46808510638297873,
+            0.5957446808510638
+          ]
+        },
+        "meanDensity": 0.7643367024229046,
+        "meanDetailType": 0.1803921568627451,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.4423963133640553,
+        "denseCoreFraction": 0.6708360763660303,
+        "denseCoreMeanDensity": 0.9575977986876792,
+        "diluteFringeFraction": 0.11718235681369323,
+        "meanOccupiedNeighborCount": 5.207373271889401,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.35688492544780054,
+        "projectedMirrorSimilarity": 0.666517964380083,
+        "meanDensityPathCrosswind": 0.3087838965373384,
+        "meanDensityPathVertical": 0.08698137930629256,
+        "meanDensityPathDownwind": 0.10647720570253044,
+        "p90DensityPathVertical": 0.13725490196078433,
+        "projectedAxisAutocorrelationPeak": 0.5533531859462961,
+        "projectedDiagonalAutocorrelationPeak": 0.07291948466089909,
+        "projectedGridAutocorrelationScore": 0.48043370128539703,
+        "projectedAxisAutocorrelationPeakLag": 4,
+        "verticalSilhouetteCompactness": 0.32994544845307017,
+        "verticalSilhouetteMirrorSimilarity": 0.675112084245647,
+        "baseHorizontalSpan": 0.26434536542603165,
+        "middleBodyHorizontalSpan": 0.42593850625543483,
+        "crownHorizontalSpan": 0.37845629426218647,
+        "middleBodyToBaseSpanRatio": 1.5714285714285714,
+        "crownToMiddleBodySpanRatio": 0.7894736842105263,
+        "broadBaseThicknessFraction": 0.2222222222222222,
+        "middleSliceSingleComponentFraction": 1,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 1,
+        "middleSliceDominantComponentFraction": 1,
+        "lowerBoundaryRoughness": 0.018728937756535738,
+        "lowerBoundaryRange": 0.08333333333333333,
+        "lowerBoundaryDistinctLevels": 5,
+        "lowerThirdMassFraction": 0.07728111003776236,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.6293783443515467,
+        "primitiveCount": 0,
+        "formationGroupCount": 1,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "st-nebulosus",
+      "label": "Stratus nebulosus",
+      "classification": {
+        "genus": "stratus",
+        "species": "nebulosus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "mature"
+      },
+      "formation": {
+        "mechanism": "inversion-bounded-deck",
+        "materialModel": "liquid-sheet",
+        "topologyPolicy": "continuous-sheet",
+        "boundaryModel": "curved-frontal-swath"
+      },
+      "index": 29,
+      "seed": 1526519649,
+      "zOffset": 1451,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.9071875
+        ]
+      },
+      "majorantZOffset": 174,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.9088541666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 9117,
+        "occupancyFraction": 0.08243815104166667,
+        "connectedComponentCount": 1,
+        "largestComponentFraction": 1,
+        "dominantComponentFractions": [
+          1
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0,
+            0.2127659574468085,
+            0.06382978723404255
+          ],
+          "maximum": [
+            1,
+            0.3404255319148936,
+            0.9574468085106383
+          ]
+        },
+        "meanDensity": 0.5842547965769614,
+        "meanDetailType": 0.2,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.38291104529998904,
+        "denseCoreFraction": 0,
+        "denseCoreMeanDensity": 0,
+        "diluteFringeFraction": 0.15849511900844576,
+        "meanOccupiedNeighborCount": 5.522211253701876,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.4949644675577669,
+        "projectedMirrorSimilarity": 0.7925953247909233,
+        "meanDensityPathCrosswind": 0.38288175534733687,
+        "meanDensityPathVertical": 0.07805303001571061,
+        "meanDensityPathDownwind": 0.3563930804490939,
+        "p90DensityPathVertical": 0.08577388402169378,
+        "projectedAxisAutocorrelationPeak": 0.07421875477500976,
+        "projectedDiagonalAutocorrelationPeak": 0.03555886155947943,
+        "projectedGridAutocorrelationScore": 0.03865989321553033,
+        "projectedAxisAutocorrelationPeakLag": 11,
+        "verticalSilhouetteCompactness": 0.31856711219437317,
+        "verticalSilhouetteMirrorSimilarity": 0.8928571428571429,
+        "baseHorizontalSpan": 0.9464847243000456,
+        "middleBodyHorizontalSpan": 0.9464847243000456,
+        "crownHorizontalSpan": 0.9464847243000456,
+        "middleBodyToBaseSpanRatio": 1,
+        "crownToMiddleBodySpanRatio": 1,
+        "broadBaseThicknessFraction": 0.2857142857142857,
+        "middleSliceSingleComponentFraction": 1,
+        "middleSliceSingleMajorComponentFraction": 1,
+        "middleSliceMeanComponentCount": 1,
+        "middleSliceDominantComponentFraction": 1,
+        "lowerBoundaryRoughness": 0.010236663129684999,
+        "lowerBoundaryRange": 0.041666666666666664,
+        "lowerBoundaryDistinctLevels": 3,
+        "lowerThirdMassFraction": 0.9419449074428549,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.4722674071317714,
+        "primitiveCount": 0,
+        "formationGroupCount": 1,
+        "ownerSpacingCoefficientVariation": 0,
+        "ownerAngularEntropy": 0,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 0,
+        "hierarchyLevelCount": 1,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 3,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "st-fractus",
+      "label": "Stratus fractus",
+      "classification": {
+        "genus": "stratus",
+        "species": "fractus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "decaying"
+      },
+      "formation": {
+        "mechanism": "boundary-layer-fragmentation",
+        "materialModel": "liquid-sheet",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 30,
+      "seed": 2452074725,
+      "zOffset": 1501,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.9384375
+        ]
+      },
+      "majorantZOffset": 180,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.9401041666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 1079,
+        "occupancyFraction": 0.00975658275462963,
+        "connectedComponentCount": 12,
+        "largestComponentFraction": 0.22706209453197404,
+        "dominantComponentFractions": [
+          0.22706209453197404,
+          0.11399443929564411,
+          0.10472659870250231,
+          0.10194624652455977,
+          0.10194624652455977,
+          0.06950880444856349,
+          0.06765523632993513,
+          0.060240963855421686
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0,
+            0.1702127659574468,
+            0.0425531914893617
+          ],
+          "maximum": [
+            0.851063829787234,
+            0.3829787234042553,
+            0.9574468085106383
+          ]
+        },
+        "meanDensity": 0.32439986189100295,
+        "meanDetailType": 0.3607843137254902,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.794253938832252,
+        "denseCoreFraction": 0,
+        "denseCoreMeanDensity": 0,
+        "diluteFringeFraction": 0.4531974050046339,
+        "meanOccupiedNeighborCount": 4.120481927710843,
+        "trilinearCoreFraction": 0.9972196478220574,
+        "projectedFootprintCompactness": 0.040863588106006675,
+        "projectedMirrorSimilarity": 0.26532109223415834,
+        "meanDensityPathCrosswind": 0.037424083286687906,
+        "meanDensityPathVertical": 0.01654976127566865,
+        "meanDensityPathDownwind": 0.038991584157334544,
+        "p90DensityPathVertical": 0.04005006257822278,
+        "projectedAxisAutocorrelationPeak": 0.09749742023717446,
+        "projectedDiagonalAutocorrelationPeak": 0.15286431656507704,
+        "projectedGridAutocorrelationScore": 0,
+        "projectedAxisAutocorrelationPeakLag": 9,
+        "verticalSilhouetteCompactness": 0.10957709949518818,
+        "verticalSilhouetteMirrorSimilarity": 0.28839722443408033,
+        "baseHorizontalSpan": 0.6454972243679028,
+        "middleBodyHorizontalSpan": 0.8421409554753224,
+        "crownHorizontalSpan": 0.7098635432250342,
+        "middleBodyToBaseSpanRatio": 1.075,
+        "crownToMiddleBodySpanRatio": 0.7105263157894737,
+        "broadBaseThicknessFraction": 0.18181818181818182,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 7.2,
+        "middleSliceDominantComponentFraction": 0.3532495336985825,
+        "lowerBoundaryRoughness": 0.03871112963273359,
+        "lowerBoundaryRange": 0.16666666666666666,
+        "lowerBoundaryDistinctLevels": 9,
+        "lowerThirdMassFraction": 0.8142554645574016,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.7273924278183304,
+        "primitiveCount": 72,
+        "formationGroupCount": 12,
+        "ownerSpacingCoefficientVariation": 0.14093862618603661,
+        "ownerAngularEntropy": 0.9172097224626076,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 49,
+        "hierarchyLevelCount": 2,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    },
+    {
+      "id": "cu-fractus",
+      "label": "Cumulus fractus",
+      "classification": {
+        "genus": "cumulus",
+        "species": "fractus",
+        "supplementaryFeature": null,
+        "speciesAliases": [],
+        "lifecycle": "decaying"
+      },
+      "formation": {
+        "mechanism": "boundary-layer-fragmentation",
+        "materialModel": "liquid-convective",
+        "topologyPolicy": "fragmented-population",
+        "boundaryModel": "domain-warped-formation-primitives"
+      },
+      "index": 31,
+      "seed": 590252822,
+      "zOffset": 1551,
+      "sampleTransform": {
+        "scale": [
+          0.9791666666666666,
+          0.9791666666666666,
+          0.029375
+        ],
+        "offset": [
+          0.010416666666666666,
+          0.010416666666666666,
+          0.9696875
+        ]
+      },
+      "majorantZOffset": 186,
+      "majorantSampleTransform": {
+        "scale": [
+          0.8333333333333334,
+          0.8333333333333334,
+          0.026041666666666668
+        ],
+        "offset": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.9713541666666666
+        ]
+      },
+      "statistics": {
+        "occupiedVoxels": 2468,
+        "occupancyFraction": 0.022316261574074073,
+        "connectedComponentCount": 9,
+        "largestComponentFraction": 0.2986223662884927,
+        "dominantComponentFractions": [
+          0.2986223662884927,
+          0.15113452188006482,
+          0.14343598055105347,
+          0.11588330632090761,
+          0.07901134521880065,
+          0.06361426256077796,
+          0.05429497568881685,
+          0.049027552674230146
+        ],
+        "occupiedBounds": {
+          "minimum": [
+            0.0425531914893617,
+            0.19148936170212766,
+            0.10638297872340426
+          ],
+          "maximum": [
+            0.9148936170212766,
+            0.5957446808510638,
+            1
+          ]
+        },
+        "meanDensity": 0.484321670321289,
+        "meanDetailType": 0.1803921568627451,
+        "meanIceFraction": 0,
+        "meanPrecipitationStructure": 0,
+        "surfaceVoxelFraction": 0.580226904376013,
+        "denseCoreFraction": 0.2759319286871961,
+        "denseCoreMeanDensity": 0.7563963030145979,
+        "diluteFringeFraction": 0.2544570502431118,
+        "meanOccupiedNeighborCount": 4.741491085899514,
+        "trilinearCoreFraction": 1,
+        "projectedFootprintCompactness": 0.06330722045671998,
+        "projectedMirrorSimilarity": 0.2433871757219775,
+        "meanDensityPathCrosswind": 0.07614383248521729,
+        "meanDensityPathVertical": 0.04525274030260248,
+        "meanDensityPathDownwind": 0.07025425428194079,
+        "p90DensityPathVertical": 0.09294952023362536,
+        "projectedAxisAutocorrelationPeak": 0.20803600874186207,
+        "projectedDiagonalAutocorrelationPeak": 0.14283451481183956,
+        "projectedGridAutocorrelationScore": 0.0652014939300225,
+        "projectedAxisAutocorrelationPeakLag": 10,
+        "verticalSilhouetteCompactness": 0.16117581357702737,
+        "verticalSilhouetteMirrorSimilarity": 0.26133930191760935,
+        "baseHorizontalSpan": 0.5008673033404711,
+        "middleBodyHorizontalSpan": 0.7795119555779045,
+        "crownHorizontalSpan": 0.738922827123675,
+        "middleBodyToBaseSpanRatio": 1.1764705882352942,
+        "crownToMiddleBodySpanRatio": 0.925,
+        "broadBaseThicknessFraction": 0.1,
+        "middleSliceSingleComponentFraction": 0,
+        "middleSliceSingleMajorComponentFraction": 0,
+        "middleSliceMeanComponentCount": 5.333333333333333,
+        "middleSliceDominantComponentFraction": 0.4230847756960152,
+        "lowerBoundaryRoughness": 0.05570938552266013,
+        "lowerBoundaryRange": 0.20833333333333334,
+        "lowerBoundaryDistinctLevels": 11,
+        "lowerThirdMassFraction": 0.10959209719064444,
+        "upperThirdMassFraction": 0,
+        "verticalProfileCoefficientVariation": 0.7422208464967643,
+        "primitiveCount": 60,
+        "formationGroupCount": 10,
+        "ownerSpacingCoefficientVariation": 0.09014640649432021,
+        "ownerAngularEntropy": 0.7903168648182228,
+        "entrainmentCavityCount": 0,
+        "streamlineCount": 0,
+        "commonBaseCount": 0,
+        "secondaryLobeCount": 39,
+        "hierarchyLevelCount": 2,
+        "waveCrestCount": 0,
+        "waveStackLayerCount": 0,
+        "formationBoundaryLobeCount": 0,
+        "convectiveBaseLobeCount": 0,
+        "convectiveCrownLobeCount": 0,
+        "convectiveMergedBodyLobeCount": 0,
+        "convectiveEvaporatingFlankCount": 0,
+        "cirrusCommaHeadLobeCount": 0,
+        "cirrusTaperedFallstreakCount": 0,
+        "cirrusMeanFallstreakTerminalRadiusRatio": 0,
+        "cirrusMeanFallstreakTerminalDensityRatio": 0,
+        "cirrusFallstreakDirectionSpread": 0,
+        "cellularClusterCount": 0,
+        "thermalBranchSpread": 0
+      }
+    }
+  ],
+  "checksums": {
+    "algorithm": "SHA-256",
+    "atlas": "d9b3edb60f217580fa7c6c006cab32fdfeed3165c0025dcdeae01738de701141",
+    "majorants": "7d828a7ace8ed3304e5055fc326fa702adbdd1b18b781e91f0cf3631c2c6578e"
+  },
+  "provenance": {
+    "license": "original-project-asset",
+    "method": "deterministic formation-manifold volumes: hierarchical thermal trees, reconstructible sedimenting ice trajectories, finite multi-lobed cellular colonies, harmonic inversion/frontal boundaries with dry-air intrusions, wave lenses, roll circulation, and fragmented boundary-layer shreds",
+    "references": [
+      "https://www.guerrilla-games.com/read/nubis-cubed",
+      "https://research.nvidia.com/labs/prl/publication/nanovdb/",
+      "https://www.sidefx.com/docs/houdini/nodes/sop/vdbfromparticles.html",
+      "https://www.met.reading.ac.uk/~swrhgnrj/publications/fractal_ci.pdf",
+      "https://research.google/pubs/simulation-of-cloud-dynamics-on-graphics-hardware/",
+      "https://cloudatlas.wmo.int/en/clouds-genera.html",
+      "https://cloudatlas.wmo.int/en/species-cumulus-congestus-cu-con.html",
+      "https://cloudatlas.wmo.int/species-cumulonimbus-capillatus-cb-cap.html",
+      "https://cloudatlas.wmo.int/en/clouds-species-uncinus.html",
+      "https://cloudatlas.wmo.int/en/species-altocumulus-stratiformis-ac-str.html"
+    ]
+  }
+}

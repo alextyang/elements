@@ -1,0 +1,6856 @@
+{
+  "schema": "elements-cloud-morphology-modifiers",
+  "version": 1,
+  "generatorVersion": "1.2.0",
+  "coordinateSystems": {
+    "parentLocal": {
+      "u": "crosswind normalized by parent support",
+      "v": "altitude normalized by parent depth",
+      "w": "downwind normalized by parent support"
+    },
+    "upperAtmosphere": {
+      "u": "east tangent metres",
+      "v": "radial altitude metres",
+      "w": "north tangent metres",
+      "curvature": "Earth spherical shell"
+    }
+  },
+  "compositionOrder": [
+    "placement",
+    "warp",
+    "subtract",
+    "smooth-union",
+    "reuse",
+    "optical"
+  ],
+  "operatorCodes": {
+    "warp-curl": 1,
+    "add-spine-ribs": 2,
+    "warp-wave": 3,
+    "place-world-bands": 4,
+    "subtract-lacunae": 5,
+    "clone-layer": 6,
+    "remap-extinction": 7,
+    "separate-elements": 8,
+    "add-udder-lobes": 9,
+    "add-kh-billow": 10,
+    "displace-underside": 11,
+    "subtract-cavum": 12,
+    "add-gust-front": 13,
+    "add-vortex-funnel": 14,
+    "add-wall-lowering": 15,
+    "add-tail-connector": 16,
+    "reuse-base-macro": 17,
+    "add-cap-shell": 18,
+    "add-veil-sheet": 19,
+    "add-fragments": 20,
+    "add-inflow-band": 21,
+    "add-upper-wave-sheet": 22
+  },
+  "blendCodes": {
+    "smooth-union": 1,
+    "subtract": 2,
+    "warp": 3,
+    "placement": 4,
+    "optical": 5,
+    "reuse": 6
+  },
+  "anchorCodes": {
+    "parent-volume": 1,
+    "parent-filament-axis": 2,
+    "parent-layer-midplane": 3,
+    "parent-upper-surface": 4,
+    "parent-underside": 5,
+    "anvil-underside": 6,
+    "parent-leading-lower-edge": 7,
+    "rain-free-base": 8,
+    "precipitation-core-edge": 9,
+    "parent-top": 10,
+    "parent-lower-environment": 11,
+    "storm-inflow-sector": 12,
+    "tangent-shell": 13
+  },
+  "materialProfileCodes": {
+    "none": 0,
+    "psc-nitric-acid-water": 1,
+    "psc-ice-nacreous-10um": 2,
+    "pmc-water-ice-60-100nm": 3
+  },
+  "macroVolumeCodes": {
+    "none": 0,
+    "cb-capillatus-incus": 6
+  },
+  "logicalTopologyConnectivityCodes": {
+    "single-connected": 0,
+    "fragmented-population": 1,
+    "cellular-colony": 2,
+    "continuous-sheet": 3,
+    "finite-wave-packet": 4,
+    "roll-tube": 5
+  },
+  "logicalTopologyOwnerWordLayout": {
+    "exemplarOrdinal": [
+      0,
+      2
+    ],
+    "connectivity": [
+      2,
+      3
+    ],
+    "lineageDepth": [
+      5,
+      4
+    ],
+    "macroElementCount": [
+      9,
+      6
+    ],
+    "branchOrCrestCount": [
+      15,
+      4
+    ],
+    "shearCoupling": [
+      19,
+      4
+    ],
+    "sedimentationCoupling": [
+      23,
+      4
+    ],
+    "cellularClosure": [
+      27,
+      5
+    ]
+  },
+  "operatorParameterLayouts": {
+    "warp-curl": [
+      "bendRadians",
+      "torsionRadians",
+      "axialFrequency",
+      "divergenceLimit",
+      "octaveCount",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-spine-ribs": [
+      "spineRadiusFraction",
+      "ribLengthFraction",
+      "ribTaper",
+      "missingPairFraction",
+      "asymmetry",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "warp-wave": [
+      "amplitudeToWavelength",
+      "secondaryAmplitudeFraction",
+      "phaseDrift",
+      "wavelengthDriftFraction",
+      "crestSkew",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "place-world-bands": [
+      "angularParallelToleranceRadians",
+      "bandWidthVariation",
+      "intervalVariation",
+      "finiteEndErosionFraction",
+      "twoHorizonConvergence",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "subtract-lacunae": [
+      "throughLayerDepthFraction",
+      "eccentricity",
+      "rimFringeOctaves",
+      "rimFringeAmplitudeFraction",
+      "mergeProbability",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "clone-layer": [
+      "verticalSeparationParentDepth",
+      "horizontalOffsetParentRadius",
+      "orientationDeltaRadians",
+      "windShearMps",
+      "mergeFraction",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "remap-extinction": [
+      "medianVisibleOpticalDepth",
+      "opaqueAreaMinimum",
+      "opaqueAreaMaximum",
+      "directDiscTransmissionMinimum",
+      "directDiscTransmissionMaximum",
+      "preservePerlucidusGaps",
+      "zero",
+      "zero"
+    ],
+    "separate-elements": [
+      "clearGapFraction",
+      "ownerRadiusVariation",
+      "edgeErosionFraction",
+      "permitTranslucidusCombination",
+      "zero",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-udder-lobes": [
+      "attachmentNeckFraction",
+      "penetrationToDiameter",
+      "lobeAspect",
+      "lateBreakawayFraction",
+      "sublimationErosionFraction",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-kh-billow": [
+      "wavelengthToShearDepth",
+      "overturnFraction",
+      "pairingProbability",
+      "phaseJitterRadians",
+      "terminalDissipationFraction",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "displace-underside": [
+      "octaveCount",
+      "directionalCoherence",
+      "amplitudeToWavelength",
+      "cuspFraction",
+      "opticalDepthCorrelation",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "subtract-cavum": [
+      "eccentricity",
+      "throughLayerDepthFraction",
+      "rimGlaciationWidthFraction",
+      "growthFrontAsymmetry",
+      "aircraftLinearProbability",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-gust-front": [
+      "shelfToRoll",
+      "leadingOverhangFraction",
+      "undersideRaggedness",
+      "alongFrontCurvature",
+      "detachedRollGapFraction",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-vortex-funnel": [
+      "topRadiusToLength",
+      "terminalRadiusFraction",
+      "curvatureFraction",
+      "condensationCompleteness",
+      "helicalPerturbation",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-wall-lowering": [
+      "loweringDepthToWidth",
+      "baseTiltRadians",
+      "inflowSideBias",
+      "rotationStrength",
+      "edgeScudFraction",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-tail-connector": [
+      "endHeightMismatchMaximumFraction",
+      "narrowingTowardMurus",
+      "upwardMotionNearJunction",
+      "curvatureFraction",
+      "verticalAspectMaximum",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "reuse-base-macro": [
+      "macroVolumeCode",
+      "preserveParentOwner",
+      "independentStampForbidden",
+      "downwindAxisFromUpperWind",
+      "zero",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-cap-shell": [
+      "shellThicknessToRadius",
+      "summitClearanceToRadius",
+      "domeEccentricity",
+      "penetrationFraction",
+      "stackedSpacingThicknesses",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-veil-sheet": [
+      "thicknessToWidth",
+      "edgeFrayFraction",
+      "towerIntersectionCount",
+      "penetrationBlendFraction",
+      "tiltRadians",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-fragments": [
+      "raggednessOctaves",
+      "concavityFraction",
+      "saturationMergeFraction",
+      "verticalJitterFraction",
+      "independentWindFraction",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-inflow-band": [
+      "alignToLowLevelWindRadians",
+      "baseAboveMurusMeters",
+      "terminalUpdraftGapFraction",
+      "broadBeaverTailProbability",
+      "inflowSpeedMps",
+      "zero",
+      "zero",
+      "zero"
+    ],
+    "add-upper-wave-sheet": [
+      "verticalThicknessMeters",
+      "primaryWaveAmplitudeMeters",
+      "primaryWavelengthMeters",
+      "secondaryWaveFraction",
+      "horizontalAnisotropy",
+      "khIntermittency",
+      "turbulenceIntermittency",
+      "materialProfileCode"
+    ]
+  },
+  "flagBits": {
+    "finite": 1,
+    "parentAttached": 2,
+    "upperAtmosphere": 4,
+    "cameraIndependent": 8,
+    "subtractive": 16,
+    "optical": 32,
+    "hydrometeorAnchor": 64,
+    "independentAdvection": 128,
+    "materialRequired": 256,
+    "reuseBase": 512,
+    "supercooled": 1024
+  },
+  "rendererContract": {
+    "textureBinding": {
+      "group": 0,
+      "binding": 30,
+      "resource": "texture_2d<f32>",
+      "format": "rgba32float",
+      "sampleType": "unfilterable-float"
+    },
+    "textureWidth": 256,
+    "maximumParentOwners": 36,
+    "maximumModifierRecords": 288,
+    "recordStrideTexels": 8,
+    "headerTexels": 37,
+    "texelLayout": {
+      "0": "header: recordCount, ownerCapacity, recordStrideTexels, manifestVersion",
+      "1..36": "ownerRanges[parentOwner]: recordOffset, recordCount, droppedCount, bitcast-f32 logicalTopologyWord",
+      "record0": "meta: operatorCode, blendCode, anchorCode, flags",
+      "record1": "identity: parentOwnerIndex, bitcast-f32 deterministicSeed bits, intensity, lifecycle",
+      "record2": "centerSupport: centerEastKm, centerAltitudeKm, centerNorthKm, supportRadiusKm",
+      "record3": "axisU: xyz direction, halfExtentKm",
+      "record4": "axisV: xyz direction, halfExtentKm",
+      "record5": "axisW: xyz direction, halfExtentKm",
+      "record6": "shape0: operator-specific physical parameters",
+      "record7": "shape1: operator-specific spectrum/material parameters"
+    },
+    "logicalTopologyOwnerWord": {
+      "transport": "raw-u32-bits-in-owner-range-alpha",
+      "layout": {
+        "exemplarOrdinal": [
+          0,
+          2
+        ],
+        "connectivity": [
+          2,
+          3
+        ],
+        "lineageDepth": [
+          5,
+          4
+        ],
+        "macroElementCount": [
+          9,
+          6
+        ],
+        "branchOrCrestCount": [
+          15,
+          4
+        ],
+        "shearCoupling": [
+          19,
+          4
+        ],
+        "sedimentationCoupling": [
+          23,
+          4
+        ],
+        "cellularClosure": [
+          27,
+          5
+        ]
+      },
+      "purpose": "Carries the same species-qualified exemplar used by macro-atlas and family-foundation selection into morphology evaluation."
+    },
+    "cirrusFibratusSubvoxelReconstruction": {
+      "speciesCode": 1,
+      "formationMechanismCode": 3,
+      "connectivityCode": 1,
+      "maximumFibreCount": 8,
+      "primaryFibreCount": [
+        3,
+        5
+      ],
+      "sourceCrossRadiusKm": [
+        0.016,
+        0.075
+      ],
+      "sourceVerticalRadiusKm": [
+        0.014,
+        0.055
+      ],
+      "terminalWidthRatio": [
+        0.3,
+        0.58
+      ],
+      "terminalDensityRatio": [
+        0.34,
+        0.58
+      ],
+      "maximumSourceToTerminalDropDepth": 0.48,
+      "originalSupportMaximumSdfVoxels": 0,
+      "couplingFootprintVoxelFraction": 0.35,
+      "implementation": "owner-seeded-c2-elliptical-fibres-with-area-preserving-world-filter",
+      "prohibitions": [
+        "camera-space-density",
+        "screen-space-geometry",
+        "generic-scalar-noise",
+        "fibratus-hooks",
+        "fibratus-terminal-tufts",
+        "exterior-support-expansion"
+      ]
+    },
+    "requiredPasses": [
+      "cloud-lighting-cache",
+      "cloud-view-transport"
+    ],
+    "cpuResponsibilities": [
+      "Compile modifiers in compositionOrder and assign each parent a contiguous record range.",
+      "Inflate parent world bounds by finite additive/warp support before the interval prepass.",
+      "Resolve named anchors from the same persistent CloudSystem owner used by light and view transport.",
+      "Emit diagnostics instead of silently dropping dependencies or invalid genus/phase/lifecycle combinations."
+    ],
+    "shaderResponsibilities": [
+      "Evaluate modifier coordinates in parent world/local space before base density detail synthesis.",
+      "Apply true signed subtraction for lacunosus and cavum before lighting and transport.",
+      "Use the same modified density, phase and optical depth in cloud lighting and view transport.",
+      "Derive radiatus convergence only through the physical camera projection.",
+      "Evaluate upper-atmosphere records on curved tangent shells with atmosphere transmittance to both source and observer.",
+      "Treat the 48^3 Ci-fibratus volume as finite macro support and reconstruct its thin C2 fibre hierarchy in world kilometres inside the original signed boundary.",
+      "Use one area-preserving analytic fibre kernel in view, exact-light, and footprint-filtered directional coupling density."
+    ]
+  },
+  "modifiers": [
+    {
+      "id": "intortus",
+      "category": "variety",
+      "description": "Irregularly curved and capriciously entangled Cirrus filaments.",
+      "representation": "coordinate-warp",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-filament-axis",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -1,
+            1
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          500,
+          15000
+        ],
+        "verticalExtentMeters": [
+          50,
+          1000
+        ],
+        "downwindExtentMeters": [
+          300,
+          8000
+        ],
+        "wavelengthMeters": [
+          400,
+          5000
+        ],
+        "note": "Curvature acts along existing ice-fiber trajectories; it must not thicken them into tubes."
+      },
+      "placement": {
+        "method": "curve-chain",
+        "count": [
+          5,
+          13
+        ],
+        "scaleRelative": [
+          0.05,
+          0.18
+        ],
+        "minimumSeparation": 0.04,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cirrus"
+        ],
+        "phases": [
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "warp-curl",
+          "opCode": 1,
+          "blend": "warp",
+          "blendCode": 3,
+          "anchor": "parent-filament-axis",
+          "anchorCode": 2,
+          "parameters": {
+            "octaveCount": 3,
+            "bendRadians": [
+              0.18,
+              0.95
+            ],
+            "torsionRadians": [
+              -0.7,
+              0.7
+            ],
+            "axialFrequency": [
+              0.7,
+              3.2
+            ],
+            "divergenceLimit": 0.35
+          },
+          "flags": [
+            "preserve-cross-section",
+            "advect-with-parent"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVarieties"
+      ],
+      "referenceVariation": {
+        "seed": 1741322345,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              -0.795393,
+              0,
+              0.070095
+            ],
+            "scale": [
+              0.189063,
+              0.136741,
+              0.106797
+            ],
+            "angleRadians": 0.431556,
+            "intensity": 0.985401
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.588785,
+              0,
+              0.141684
+            ],
+            "scale": [
+              0.081292,
+              0.051039,
+              0.08083
+            ],
+            "angleRadians": 0.299123,
+            "intensity": 0.878547
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.427124,
+              0,
+              0.177744
+            ],
+            "scale": [
+              0.062259,
+              0.058543,
+              0.052036
+            ],
+            "angleRadians": 0.078754,
+            "intensity": 0.655857
+          },
+          {
+            "index": 3,
+            "center": [
+              -0.267795,
+              0,
+              0.169232
+            ],
+            "scale": [
+              0.056159,
+              0.049924,
+              0.090225
+            ],
+            "angleRadians": -0.168712,
+            "intensity": 0.698348
+          },
+          {
+            "index": 4,
+            "center": [
+              -0.130621,
+              0,
+              0.118284
+            ],
+            "scale": [
+              0.080242,
+              0.051485,
+              0.064217
+            ],
+            "angleRadians": -0.360406,
+            "intensity": 0.866875
+          },
+          {
+            "index": 5,
+            "center": [
+              0.065185,
+              0,
+              0.037675
+            ],
+            "scale": [
+              0.04397,
+              0.037994,
+              0.055703
+            ],
+            "angleRadians": -0.454727,
+            "intensity": 0.954407
+          },
+          {
+            "index": 6,
+            "center": [
+              0.278235,
+              0,
+              -0.052381
+            ],
+            "scale": [
+              0.06275,
+              0.048235,
+              0.065419
+            ],
+            "angleRadians": -0.446165,
+            "intensity": 0.839962
+          },
+          {
+            "index": 7,
+            "center": [
+              0.465926,
+              0,
+              -0.129303
+            ],
+            "scale": [
+              0.056346,
+              0.060387,
+              0.066645
+            ],
+            "angleRadians": -0.334734,
+            "intensity": 0.757334
+          },
+          {
+            "index": 8,
+            "center": [
+              0.668272,
+              0,
+              -0.1738
+            ],
+            "scale": [
+              0.158929,
+              0.08883,
+              0.168997
+            ],
+            "angleRadians": -0.129364,
+            "intensity": 0.72524
+          },
+          {
+            "index": 9,
+            "center": [
+              0.836983,
+              0,
+              -0.174715
+            ],
+            "scale": [
+              0.040395,
+              0.038212,
+              0.055659
+            ],
+            "angleRadians": 0.119688,
+            "intensity": 0.722865
+          }
+        ],
+        "topology": {
+          "count": 10,
+          "nearestSpacingCoefficientVariation": 0.144334,
+          "orderedIntervalCoefficientVariation": 0.134005,
+          "nearestDirectionEntropy": 0.507309
+        }
+      }
+    },
+    {
+      "id": "vertebratus",
+      "category": "variety",
+      "description": "A finite Cirrus spine with uneven paired ribs resembling vertebrae or a fish skeleton.",
+      "representation": "additive-attached-field",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-filament-axis",
+        "normalizedSupport": {
+          "u": [
+            -0.92,
+            0.92
+          ],
+          "v": [
+            -0.28,
+            0.28
+          ],
+          "w": [
+            -0.72,
+            0.72
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          1500,
+          18000
+        ],
+        "verticalExtentMeters": [
+          40,
+          700
+        ],
+        "downwindExtentMeters": [
+          600,
+          6000
+        ],
+        "wavelengthMeters": [
+          250,
+          1800
+        ],
+        "note": "Ribs taper away from an irregular central ice spine and may be missing or unequal."
+      },
+      "placement": {
+        "method": "paired-rib-chain",
+        "count": [
+          7,
+          19
+        ],
+        "scaleRelative": [
+          0.04,
+          0.16
+        ],
+        "minimumSeparation": 0.035,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cirrus"
+        ],
+        "phases": [
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-spine-ribs",
+          "opCode": 2,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "parent-filament-axis",
+          "anchorCode": 2,
+          "parameters": {
+            "spineRadiusFraction": [
+              0.025,
+              0.08
+            ],
+            "ribLengthFraction": [
+              0.18,
+              0.48
+            ],
+            "ribTaper": [
+              0.55,
+              0.9
+            ],
+            "missingPairFraction": [
+              0.08,
+              0.28
+            ],
+            "asymmetry": [
+              0.1,
+              0.42
+            ]
+          },
+          "flags": [
+            "finite-chain",
+            "density-tapered-ribs"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVarieties"
+      ],
+      "referenceVariation": {
+        "seed": 3115876172,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              -0.798785,
+              0,
+              0.070095
+            ],
+            "scale": [
+              0.15179,
+              0.130091,
+              0.098158
+            ],
+            "angleRadians": 0.431556,
+            "intensity": 0.748798
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.672943,
+              0,
+              0.122749
+            ],
+            "scale": [
+              0.069297,
+              0.06929,
+              0.054934
+            ],
+            "angleRadians": 0.35058,
+            "intensity": 0.815509
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.537613,
+              0,
+              0.160484
+            ],
+            "scale": [
+              0.042017,
+              0.024224,
+              0.032219
+            ],
+            "angleRadians": 0.222667,
+            "intensity": 0.892985
+          },
+          {
+            "index": 3,
+            "center": [
+              -0.411804,
+              0,
+              0.178715
+            ],
+            "scale": [
+              0.066737,
+              0.095806,
+              0.095373
+            ],
+            "angleRadians": 0.059569,
+            "intensity": 0.852328
+          },
+          {
+            "index": 4,
+            "center": [
+              -0.322734,
+              0,
+              0.175226
+            ],
+            "scale": [
+              0.113883,
+              0.090768,
+              0.165642
+            ],
+            "angleRadians": -0.113895,
+            "intensity": 0.806611
+          },
+          {
+            "index": 5,
+            "center": [
+              -0.198561,
+              0,
+              0.15044
+            ],
+            "scale": [
+              0.087462,
+              0.069208,
+              0.076957
+            ],
+            "angleRadians": -0.267918,
+            "intensity": 0.683983
+          },
+          {
+            "index": 6,
+            "center": [
+              -0.104511,
+              0,
+              0.107371
+            ],
+            "scale": [
+              0.050522,
+              0.037455,
+              0.035297
+            ],
+            "angleRadians": -0.381611,
+            "intensity": 0.624941
+          },
+          {
+            "index": 7,
+            "center": [
+              0.028728,
+              0,
+              0.051253
+            ],
+            "scale": [
+              0.125278,
+              0.080011,
+              0.093262
+            ],
+            "angleRadians": -0.446932,
+            "intensity": 0.922087
+          },
+          {
+            "index": 8,
+            "center": [
+              0.187993,
+              0,
+              -0.011094
+            ],
+            "scale": [
+              0.047653,
+              0.057396,
+              0.064178
+            ],
+            "angleRadians": -0.462865,
+            "intensity": 0.726846
+          },
+          {
+            "index": 9,
+            "center": [
+              0.333892,
+              0,
+              -0.072093
+            ],
+            "scale": [
+              0.127742,
+              0.132657,
+              0.142716
+            ],
+            "angleRadians": -0.429586,
+            "intensity": 0.853476
+          },
+          {
+            "index": 10,
+            "center": [
+              0.476623,
+              0,
+              -0.124331
+            ],
+            "scale": [
+              0.111674,
+              0.116084,
+              0.142994
+            ],
+            "angleRadians": -0.346917,
+            "intensity": 0.972339
+          },
+          {
+            "index": 11,
+            "center": [
+              0.589464,
+              0,
+              -0.161457
+            ],
+            "scale": [
+              0.130223,
+              0.088018,
+              0.150369
+            ],
+            "angleRadians": -0.217522,
+            "intensity": 0.704315
+          },
+          {
+            "index": 12,
+            "center": [
+              0.724456,
+              0,
+              -0.178961
+            ],
+            "scale": [
+              0.18401,
+              0.126711,
+              0.129677
+            ],
+            "angleRadians": -0.053586,
+            "intensity": 0.729243
+          },
+          {
+            "index": 13,
+            "center": [
+              0.822415,
+              0,
+              -0.174715
+            ],
+            "scale": [
+              0.119636,
+              0.056113,
+              0.10331
+            ],
+            "angleRadians": 0.119688,
+            "intensity": 0.935899
+          }
+        ],
+        "topology": {
+          "count": 14,
+          "nearestSpacingCoefficientVariation": 0.188234,
+          "orderedIntervalCoefficientVariation": 0.162345,
+          "nearestDirectionEntropy": 0.641391
+        }
+      }
+    },
+    {
+      "id": "undulatus",
+      "category": "variety",
+      "description": "Coherent wave organization whose wavelength and phase vary slowly across a finite cloud field.",
+      "representation": "coordinate-warp",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-layer-midplane",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.55,
+            0.55
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          3000,
+          150000
+        ],
+        "verticalExtentMeters": [
+          30,
+          900
+        ],
+        "downwindExtentMeters": [
+          3000,
+          120000
+        ],
+        "wavelengthMeters": [
+          500,
+          24000
+        ],
+        "note": "A gravity-wave displacement, not repeated opacity stripes."
+      },
+      "placement": {
+        "method": "wave-train",
+        "count": [
+          4,
+          11
+        ],
+        "scaleRelative": [
+          0.08,
+          0.28
+        ],
+        "minimumSeparation": 0,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cirrocumulus",
+          "cirrostratus",
+          "altocumulus",
+          "altostratus",
+          "stratocumulus",
+          "stratus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "warp-wave",
+          "opCode": 3,
+          "blend": "warp",
+          "blendCode": 3,
+          "anchor": "parent-layer-midplane",
+          "anchorCode": 3,
+          "parameters": {
+            "amplitudeToWavelength": [
+              0.025,
+              0.16
+            ],
+            "secondaryAmplitudeFraction": [
+              0.08,
+              0.34
+            ],
+            "phaseDrift": [
+              -0.35,
+              0.35
+            ],
+            "wavelengthDriftFraction": [
+              0.04,
+              0.22
+            ],
+            "crestSkew": [
+              -0.25,
+              0.25
+            ]
+          },
+          "flags": [
+            "finite-envelope",
+            "nonstationary-phase"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVarieties"
+      ],
+      "referenceVariation": {
+        "seed": 395329982,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              -0.832141,
+              0,
+              0.028975
+            ],
+            "scale": [
+              0.098563,
+              0.09019,
+              0.098847
+            ],
+            "angleRadians": -0.024916,
+            "intensity": 0.841893
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.568453,
+              0.100149,
+              -0.038001
+            ],
+            "scale": [
+              0.089794,
+              0.067293,
+              0.069663
+            ],
+            "angleRadians": 0.122597,
+            "intensity": 0.828028
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.34947,
+              0.110343,
+              -0.066312
+            ],
+            "scale": [
+              0.147606,
+              0.11955,
+              0.133217
+            ],
+            "angleRadians": 0.01237,
+            "intensity": 0.961287
+          },
+          {
+            "index": 3,
+            "center": [
+              -0.139473,
+              0.021427,
+              0.027435
+            ],
+            "scale": [
+              0.156476,
+              0.157902,
+              0.156971
+            ],
+            "angleRadians": 0.08632,
+            "intensity": 0.635707
+          },
+          {
+            "index": 4,
+            "center": [
+              0.08816,
+              -0.086735,
+              0.073642
+            ],
+            "scale": [
+              0.102181,
+              0.067667,
+              0.133504
+            ],
+            "angleRadians": -0.104965,
+            "intensity": 0.922264
+          },
+          {
+            "index": 5,
+            "center": [
+              0.362494,
+              -0.116991,
+              0.008332
+            ],
+            "scale": [
+              0.20684,
+              0.207634,
+              0.284672
+            ],
+            "angleRadians": -0.068463,
+            "intensity": 0.721117
+          },
+          {
+            "index": 6,
+            "center": [
+              0.636133,
+              -0.042165,
+              -0.050551
+            ],
+            "scale": [
+              0.219616,
+              0.172566,
+              0.235711
+            ],
+            "angleRadians": 0.021611,
+            "intensity": 0.826199
+          },
+          {
+            "index": 7,
+            "center": [
+              0.864438,
+              0.070534,
+              0.043422
+            ],
+            "scale": [
+              0.16487,
+              0.156238,
+              0.207023
+            ],
+            "angleRadians": -0.093125,
+            "intensity": 0.972939
+          }
+        ],
+        "topology": {
+          "count": 8,
+          "nearestSpacingCoefficientVariation": 0.085861,
+          "orderedIntervalCoefficientVariation": 0.104191,
+          "nearestDirectionEntropy": 0.603759
+        }
+      }
+    },
+    {
+      "id": "radiatus",
+      "category": "variety",
+      "description": "Several finite, physically parallel world-space bands whose apparent convergence comes only from perspective.",
+      "representation": "world-placement",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-volume",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.45,
+            0.45
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          10000,
+          300000
+        ],
+        "verticalExtentMeters": [
+          50,
+          3000
+        ],
+        "downwindExtentMeters": [
+          20000,
+          400000
+        ],
+        "wavelengthMeters": [
+          1000,
+          30000
+        ],
+        "note": "Never bend bands toward the camera; projection creates the horizon convergence."
+      },
+      "placement": {
+        "method": "parallel-band-array",
+        "count": [
+          3,
+          9
+        ],
+        "scaleRelative": [
+          0.12,
+          0.34
+        ],
+        "minimumSeparation": 0.07,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cirrus",
+          "altocumulus",
+          "altostratus",
+          "stratocumulus",
+          "cumulus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [
+          "banded-organization"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "place-world-bands",
+          "opCode": 4,
+          "blend": "placement",
+          "blendCode": 4,
+          "anchor": "parent-volume",
+          "anchorCode": 1,
+          "parameters": {
+            "angularParallelToleranceRadians": 0.035,
+            "bandWidthVariation": [
+              0.16,
+              0.48
+            ],
+            "intervalVariation": [
+              0.08,
+              0.32
+            ],
+            "finiteEndErosionFraction": [
+              0.08,
+              0.25
+            ],
+            "twoHorizonConvergence": true
+          },
+          "flags": [
+            "camera-independent",
+            "world-parallel"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVarieties"
+      ],
+      "referenceVariation": {
+        "seed": 1294268334,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              -0.765938,
+              0.010575,
+              -0.007492
+            ],
+            "scale": [
+              0.133638,
+              0.13122,
+              0.101817
+            ],
+            "angleRadians": 1.557255,
+            "intensity": 0.825172
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.483979,
+              0.003317,
+              0.009348
+            ],
+            "scale": [
+              0.205696,
+              0.179382,
+              0.275122
+            ],
+            "angleRadians": 1.581327,
+            "intensity": 0.878912
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.255567,
+              -0.011431,
+              -0.037836
+            ],
+            "scale": [
+              0.174189,
+              0.168446,
+              0.182871
+            ],
+            "angleRadians": 1.582991,
+            "intensity": 0.903238
+          },
+          {
+            "index": 3,
+            "center": [
+              -0.018598,
+              -0.004689,
+              0.027257
+            ],
+            "scale": [
+              0.167946,
+              0.208714,
+              0.249964
+            ],
+            "angleRadians": 1.587702,
+            "intensity": 0.93297
+          },
+          {
+            "index": 4,
+            "center": [
+              0.249552,
+              0.022903,
+              -0.011981
+            ],
+            "scale": [
+              0.250218,
+              0.179248,
+              0.294448
+            ],
+            "angleRadians": 1.5716,
+            "intensity": 0.917543
+          },
+          {
+            "index": 5,
+            "center": [
+              0.541533,
+              0.014973,
+              -0.004749
+            ],
+            "scale": [
+              0.112553,
+              0.163397,
+              0.127145
+            ],
+            "angleRadians": 1.558895,
+            "intensity": 0.952211
+          },
+          {
+            "index": 6,
+            "center": [
+              0.786365,
+              0.033377,
+              -0.015598
+            ],
+            "scale": [
+              0.116384,
+              0.074958,
+              0.149274
+            ],
+            "angleRadians": 1.585111,
+            "intensity": 0.86181
+          }
+        ],
+        "topology": {
+          "count": 7,
+          "nearestSpacingCoefficientVariation": 0.069363,
+          "orderedIntervalCoefficientVariation": 0.090919,
+          "nearestDirectionEntropy": 0.614124
+        }
+      }
+    },
+    {
+      "id": "lacunosus",
+      "category": "variety",
+      "description": "A thin cellular layer with finite, fringed round holes organized like an irregular net or honeycomb.",
+      "representation": "subtractive-topology",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-layer-midplane",
+        "normalizedSupport": {
+          "u": [
+            -0.92,
+            0.92
+          ],
+          "v": [
+            -0.18,
+            0.18
+          ],
+          "w": [
+            -0.92,
+            0.92
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          3000,
+          120000
+        ],
+        "verticalExtentMeters": [
+          50,
+          1200
+        ],
+        "downwindExtentMeters": [
+          3000,
+          120000
+        ],
+        "wavelengthMeters": [
+          400,
+          12000
+        ],
+        "note": "The holes remove condensate through the layer; they are not pale discs painted over it."
+      },
+      "placement": {
+        "method": "best-candidate-plane",
+        "count": [
+          8,
+          28
+        ],
+        "scaleRelative": [
+          0.07,
+          0.22
+        ],
+        "minimumSeparation": 0.08,
+        "candidateCount": 24,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cirrocumulus",
+          "altocumulus",
+          "stratocumulus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [
+          "open-cell-organization"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "subtract-lacunae",
+          "opCode": 5,
+          "blend": "subtract",
+          "blendCode": 2,
+          "anchor": "parent-layer-midplane",
+          "anchorCode": 3,
+          "parameters": {
+            "throughLayerDepthFraction": [
+              0.8,
+              1.35
+            ],
+            "eccentricity": [
+              0,
+              0.45
+            ],
+            "rimFringeOctaves": 3,
+            "rimFringeAmplitudeFraction": [
+              0.04,
+              0.18
+            ],
+            "mergeProbability": [
+              0.05,
+              0.22
+            ]
+          },
+          "flags": [
+            "real-clear-space",
+            "aperiodic-cells"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVarieties"
+      ],
+      "referenceVariation": {
+        "seed": 1144076146,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.113846,
+              -0.023669,
+              -0.091751
+            ],
+            "scale": [
+              0.083628,
+              0.067079,
+              0.073442
+            ],
+            "angleRadians": 3.672927,
+            "intensity": 0.644724
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.745016,
+              -0.01463,
+              -0.730181
+            ],
+            "scale": [
+              0.175898,
+              0.226879,
+              0.166287
+            ],
+            "angleRadians": 3.375532,
+            "intensity": 0.881666
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.50671,
+              0.02167,
+              0.608456
+            ],
+            "scale": [
+              0.14695,
+              0.086115,
+              0.170441
+            ],
+            "angleRadians": 5.557163,
+            "intensity": 0.9361
+          },
+          {
+            "index": 3,
+            "center": [
+              0.691195,
+              -0.031412,
+              -0.723188
+            ],
+            "scale": [
+              0.16563,
+              0.151169,
+              0.166372
+            ],
+            "angleRadians": 0.590994,
+            "intensity": 0.673341
+          },
+          {
+            "index": 4,
+            "center": [
+              0.427641,
+              0.020535,
+              0.451929
+            ],
+            "scale": [
+              0.178202,
+              0.152393,
+              0.159696
+            ],
+            "angleRadians": 3.390501,
+            "intensity": 0.731826
+          },
+          {
+            "index": 5,
+            "center": [
+              -0.574695,
+              0.059845,
+              0.052597
+            ],
+            "scale": [
+              0.081358,
+              0.078372,
+              0.074155
+            ],
+            "angleRadians": 6.004453,
+            "intensity": 0.931236
+          },
+          {
+            "index": 6,
+            "center": [
+              -0.257476,
+              0.055162,
+              -0.59285
+            ],
+            "scale": [
+              0.146462,
+              0.072091,
+              0.122074
+            ],
+            "angleRadians": 3.117514,
+            "intensity": 0.830063
+          },
+          {
+            "index": 7,
+            "center": [
+              0.70443,
+              0.054743,
+              -0.116413
+            ],
+            "scale": [
+              0.142693,
+              0.082804,
+              0.13993
+            ],
+            "angleRadians": 0.523392,
+            "intensity": 0.744745
+          },
+          {
+            "index": 8,
+            "center": [
+              0.244359,
+              0.000662,
+              -0.837869
+            ],
+            "scale": [
+              0.204764,
+              0.161355,
+              0.201138
+            ],
+            "angleRadians": 2.572967,
+            "intensity": 0.66389
+          },
+          {
+            "index": 9,
+            "center": [
+              -0.058,
+              0.048873,
+              0.471241
+            ],
+            "scale": [
+              0.240282,
+              0.107073,
+              0.188184
+            ],
+            "angleRadians": 3.937751,
+            "intensity": 0.628818
+          },
+          {
+            "index": 10,
+            "center": [
+              0.658113,
+              0.005713,
+              0.798977
+            ],
+            "scale": [
+              0.142265,
+              0.145122,
+              0.170866
+            ],
+            "angleRadians": 1.604338,
+            "intensity": 0.801148
+          },
+          {
+            "index": 11,
+            "center": [
+              0.141845,
+              -0.025382,
+              -0.458041
+            ],
+            "scale": [
+              0.088637,
+              0.097616,
+              0.08703
+            ],
+            "angleRadians": 5.525993,
+            "intensity": 0.812368
+          },
+          {
+            "index": 12,
+            "center": [
+              0.162721,
+              0.00401,
+              0.851199
+            ],
+            "scale": [
+              0.089588,
+              0.044212,
+              0.095344
+            ],
+            "angleRadians": 2.75361,
+            "intensity": 0.924509
+          },
+          {
+            "index": 13,
+            "center": [
+              -0.848521,
+              0.059854,
+              0.400414
+            ],
+            "scale": [
+              0.08541,
+              0.104163,
+              0.111551
+            ],
+            "angleRadians": 0.501958,
+            "intensity": 0.783528
+          },
+          {
+            "index": 14,
+            "center": [
+              -0.834279,
+              0.00255,
+              -0.401171
+            ],
+            "scale": [
+              0.1224,
+              0.129336,
+              0.137393
+            ],
+            "angleRadians": 1.639849,
+            "intensity": 0.645059
+          },
+          {
+            "index": 15,
+            "center": [
+              -0.208968,
+              -0.039341,
+              0.862983
+            ],
+            "scale": [
+              0.220453,
+              0.133134,
+              0.26341
+            ],
+            "angleRadians": 1.344747,
+            "intensity": 0.688301
+          },
+          {
+            "index": 16,
+            "center": [
+              0.412948,
+              0.01452,
+              0.080236
+            ],
+            "scale": [
+              0.070014,
+              0.072602,
+              0.108053
+            ],
+            "angleRadians": 5.699305,
+            "intensity": 0.984196
+          },
+          {
+            "index": 17,
+            "center": [
+              -0.439472,
+              0.030414,
+              -0.820708
+            ],
+            "scale": [
+              0.089073,
+              0.085885,
+              0.10973
+            ],
+            "angleRadians": 2.787204,
+            "intensity": 0.652406
+          },
+          {
+            "index": 18,
+            "center": [
+              -0.236324,
+              -0.020122,
+              -0.061393
+            ],
+            "scale": [
+              0.116268,
+              0.089822,
+              0.097785
+            ],
+            "angleRadians": 4.814759,
+            "intensity": 0.74623
+          },
+          {
+            "index": 19,
+            "center": [
+              0.863877,
+              -0.008606,
+              0.401224
+            ],
+            "scale": [
+              0.071094,
+              0.053868,
+              0.100562
+            ],
+            "angleRadians": 3.655715,
+            "intensity": 0.844187
+          }
+        ],
+        "topology": {
+          "count": 20,
+          "nearestSpacingCoefficientVariation": 0.117196,
+          "orderedIntervalCoefficientVariation": 0.784428,
+          "nearestDirectionEntropy": 0.956984
+        }
+      }
+    },
+    {
+      "id": "duplicatus",
+      "category": "variety",
+      "description": "Two or more finite cloud layers at slightly different levels, sometimes merging locally.",
+      "representation": "layer-composition",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-volume",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -1,
+            1
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          5000,
+          250000
+        ],
+        "verticalExtentMeters": [
+          100,
+          3000
+        ],
+        "downwindExtentMeters": [
+          5000,
+          250000
+        ],
+        "wavelengthMeters": null,
+        "note": "Each layer keeps its own wind, offset and optical path; this is not double sampling one slab."
+      },
+      "placement": {
+        "method": "layer-stack",
+        "count": [
+          2,
+          4
+        ],
+        "scaleRelative": [
+          0.72,
+          1
+        ],
+        "minimumSeparation": 0.06,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cirrus",
+          "cirrostratus",
+          "altocumulus",
+          "altostratus",
+          "stratocumulus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "clone-layer",
+          "opCode": 6,
+          "blend": "placement",
+          "blendCode": 4,
+          "anchor": "parent-volume",
+          "anchorCode": 1,
+          "parameters": {
+            "verticalSeparationParentDepth": [
+              0.18,
+              1.3
+            ],
+            "horizontalOffsetParentRadius": [
+              0.05,
+              0.42
+            ],
+            "orientationDeltaRadians": [
+              -0.28,
+              0.28
+            ],
+            "windShearMps": [
+              0.5,
+              14
+            ],
+            "mergeFraction": [
+              0.02,
+              0.3
+            ]
+          },
+          "flags": [
+            "independent-advection",
+            "separate-optical-paths"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVarieties"
+      ],
+      "referenceVariation": {
+        "seed": 844168975,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.076903,
+              -0.322037,
+              0.087287
+            ],
+            "scale": [
+              1.167669,
+              0.93462,
+              0.710125
+            ],
+            "angleRadians": 0.180429,
+            "intensity": 0.698301
+          },
+          {
+            "index": 1,
+            "center": [
+              0.068399,
+              -0.030333,
+              -0.066271
+            ],
+            "scale": [
+              0.578261,
+              0.746062,
+              0.907547
+            ],
+            "angleRadians": -0.120272,
+            "intensity": 0.862621
+          },
+          {
+            "index": 2,
+            "center": [
+              0.013727,
+              0.358785,
+              0.085908
+            ],
+            "scale": [
+              0.69889,
+              0.677241,
+              0.954609
+            ],
+            "angleRadians": 0.17696,
+            "intensity": 0.806229
+          }
+        ],
+        "topology": {
+          "count": 3,
+          "nearestSpacingCoefficientVariation": 0.457324,
+          "orderedIntervalCoefficientVariation": 0.730784,
+          "nearestDirectionEntropy": 0.528321
+        }
+      }
+    },
+    {
+      "id": "translucidus",
+      "category": "variety",
+      "description": "An extensive layer whose greater part transmits enough direct light to reveal the Sun or Moon position.",
+      "representation": "optical-remap",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-volume",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -1,
+            1
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          10000,
+          500000
+        ],
+        "verticalExtentMeters": [
+          50,
+          4000
+        ],
+        "downwindExtentMeters": [
+          10000,
+          500000
+        ],
+        "wavelengthMeters": null,
+        "note": "Constrains integrated optical depth, not local alpha."
+      },
+      "placement": {
+        "method": "single",
+        "count": [
+          1,
+          1
+        ],
+        "scaleRelative": [
+          1,
+          1
+        ],
+        "minimumSeparation": 0,
+        "candidateCount": 0,
+        "jitterFraction": 0
+      },
+      "constraints": {
+        "genera": [
+          "altocumulus",
+          "altostratus",
+          "stratocumulus",
+          "stratus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [],
+        "dependencies": [],
+        "excludes": [
+          "opacus"
+        ],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "remap-extinction",
+          "opCode": 7,
+          "blend": "optical",
+          "blendCode": 5,
+          "anchor": "parent-volume",
+          "anchorCode": 1,
+          "parameters": {
+            "medianVisibleOpticalDepth": [
+              0.35,
+              1.8
+            ],
+            "opaqueAreaMaximum": 0.32,
+            "directDiscTransmissionMinimum": 0.12,
+            "conserveCondensateOrdering": true
+          },
+          "flags": [
+            "path-integrated",
+            "source-disc-visible"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVarieties"
+      ],
+      "referenceVariation": {
+        "seed": 476088466,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.757561,
+              1.054013,
+              1.138235
+            ],
+            "angleRadians": 0,
+            "intensity": 0.884224
+          }
+        ],
+        "topology": {
+          "count": 1,
+          "nearestSpacingCoefficientVariation": 0,
+          "orderedIntervalCoefficientVariation": 0,
+          "nearestDirectionEntropy": 0
+        }
+      }
+    },
+    {
+      "id": "perlucidus",
+      "category": "variety",
+      "description": "An extensive Ac or Sc field with genuine clear spaces between cloud elements.",
+      "representation": "placement-topology",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-layer-midplane",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.5,
+            0.5
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          8000,
+          250000
+        ],
+        "verticalExtentMeters": [
+          100,
+          2500
+        ],
+        "downwindExtentMeters": [
+          8000,
+          250000
+        ],
+        "wavelengthMeters": [
+          500,
+          15000
+        ],
+        "note": "Clear sky must be revealed by separated condensate owners, never a transparency checkerboard."
+      },
+      "placement": {
+        "method": "best-candidate-plane",
+        "count": [
+          8,
+          24
+        ],
+        "scaleRelative": [
+          0.09,
+          0.28
+        ],
+        "minimumSeparation": 0.1,
+        "candidateCount": 24,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "altocumulus",
+          "stratocumulus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "separate-elements",
+          "opCode": 8,
+          "blend": "placement",
+          "blendCode": 4,
+          "anchor": "parent-layer-midplane",
+          "anchorCode": 3,
+          "parameters": {
+            "clearGapFraction": [
+              0.12,
+              0.45
+            ],
+            "ownerRadiusVariation": [
+              0.18,
+              0.52
+            ],
+            "edgeErosionFraction": [
+              0.05,
+              0.22
+            ],
+            "permitTranslucidusCombination": true
+          },
+          "flags": [
+            "world-space-gaps",
+            "aperiodic-owners"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVarieties"
+      ],
+      "referenceVariation": {
+        "seed": 3184890765,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.114071,
+              0.052122,
+              -0.064781
+            ],
+            "scale": [
+              0.135218,
+              0.181201,
+              0.17356
+            ],
+            "angleRadians": 1.822532,
+            "intensity": 0.758931
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.850105,
+              -0.014032,
+              -0.235325
+            ],
+            "scale": [
+              0.142936,
+              0.141946,
+              0.114403
+            ],
+            "angleRadians": 1.233197,
+            "intensity": 0.677449
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.659847,
+              0.051085,
+              0.805324
+            ],
+            "scale": [
+              0.216023,
+              0.158364,
+              0.269277
+            ],
+            "angleRadians": 1.282261,
+            "intensity": 0.994712
+          },
+          {
+            "index": 3,
+            "center": [
+              0.813287,
+              -0.007373,
+              -0.75274
+            ],
+            "scale": [
+              0.256375,
+              0.132031,
+              0.270665
+            ],
+            "angleRadians": 5.261348,
+            "intensity": 0.92059
+          },
+          {
+            "index": 4,
+            "center": [
+              0.65204,
+              -0.004589,
+              0.771053
+            ],
+            "scale": [
+              0.079152,
+              0.103477,
+              0.069136
+            ],
+            "angleRadians": 3.527832,
+            "intensity": 0.702255
+          },
+          {
+            "index": 5,
+            "center": [
+              -0.120132,
+              0.009849,
+              0.524803
+            ],
+            "scale": [
+              0.24755,
+              0.250443,
+              0.233816
+            ],
+            "angleRadians": 3.421451,
+            "intensity": 0.993617
+          },
+          {
+            "index": 6,
+            "center": [
+              -0.263383,
+              0.013681,
+              -0.472346
+            ],
+            "scale": [
+              0.067158,
+              0.057132,
+              0.078188
+            ],
+            "angleRadians": 3.26098,
+            "intensity": 0.819293
+          },
+          {
+            "index": 7,
+            "center": [
+              0.752897,
+              -0.032622,
+              0.249662
+            ],
+            "scale": [
+              0.209772,
+              0.16644,
+              0.143272
+            ],
+            "angleRadians": 4.436702,
+            "intensity": 0.915071
+          },
+          {
+            "index": 8,
+            "center": [
+              0.209119,
+              -0.032011,
+              -0.731341
+            ],
+            "scale": [
+              0.182447,
+              0.123647,
+              0.180076
+            ],
+            "angleRadians": 2.294991,
+            "intensity": 0.974062
+          },
+          {
+            "index": 9,
+            "center": [
+              -0.603944,
+              0.008261,
+              -0.856582
+            ],
+            "scale": [
+              0.132587,
+              0.129529,
+              0.163503
+            ],
+            "angleRadians": 5.421658,
+            "intensity": 0.735386
+          },
+          {
+            "index": 10,
+            "center": [
+              0.539589,
+              0.052816,
+              -0.360229
+            ],
+            "scale": [
+              0.124084,
+              0.111732,
+              0.105198
+            ],
+            "angleRadians": 5.405167,
+            "intensity": 0.98289
+          },
+          {
+            "index": 11,
+            "center": [
+              0.174568,
+              -0.05746,
+              0.316476
+            ],
+            "scale": [
+              0.243615,
+              0.21535,
+              0.183176
+            ],
+            "angleRadians": 2.629903,
+            "intensity": 0.779249
+          },
+          {
+            "index": 12,
+            "center": [
+              -0.238803,
+              0.043561,
+              0.019871
+            ],
+            "scale": [
+              0.269343,
+              0.188716,
+              0.286785
+            ],
+            "angleRadians": 3.980014,
+            "intensity": 0.774932
+          },
+          {
+            "index": 13,
+            "center": [
+              -0.621912,
+              -0.041401,
+              0.069923
+            ],
+            "scale": [
+              0.138274,
+              0.089185,
+              0.112185
+            ],
+            "angleRadians": 3.401182,
+            "intensity": 0.728985
+          },
+          {
+            "index": 14,
+            "center": [
+              -0.468733,
+              0.058733,
+              0.384262
+            ],
+            "scale": [
+              0.280359,
+              0.231632,
+              0.273606
+            ],
+            "angleRadians": 2.865015,
+            "intensity": 0.794859
+          },
+          {
+            "index": 15,
+            "center": [
+              0.137851,
+              -0.029876,
+              -0.427172
+            ],
+            "scale": [
+              0.291804,
+              0.154815,
+              0.263177
+            ],
+            "angleRadians": 0.204546,
+            "intensity": 0.732205
+          },
+          {
+            "index": 16,
+            "center": [
+              0.231827,
+              -0.014357,
+              0.777446
+            ],
+            "scale": [
+              0.258848,
+              0.165766,
+              0.301785
+            ],
+            "angleRadians": 4.129095,
+            "intensity": 0.875501
+          },
+          {
+            "index": 17,
+            "center": [
+              0.85212,
+              -0.008718,
+              -0.032733
+            ],
+            "scale": [
+              0.230476,
+              0.185713,
+              0.182443
+            ],
+            "angleRadians": 3.756162,
+            "intensity": 0.92086
+          }
+        ],
+        "topology": {
+          "count": 18,
+          "nearestSpacingCoefficientVariation": 0.156699,
+          "orderedIntervalCoefficientVariation": 0.852307,
+          "nearestDirectionEntropy": 0.949708
+        }
+      }
+    },
+    {
+      "id": "opacus",
+      "category": "variety",
+      "description": "An extensive layer whose greater part completely masks the Sun or Moon.",
+      "representation": "optical-remap",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-volume",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -1,
+            1
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          10000,
+          600000
+        ],
+        "verticalExtentMeters": [
+          100,
+          7000
+        ],
+        "downwindExtentMeters": [
+          10000,
+          600000
+        ],
+        "wavelengthMeters": null,
+        "note": "Raises path optical depth through condensate while preserving real gaps when perlucidus is also present."
+      },
+      "placement": {
+        "method": "single",
+        "count": [
+          1,
+          1
+        ],
+        "scaleRelative": [
+          1,
+          1
+        ],
+        "minimumSeparation": 0,
+        "candidateCount": 0,
+        "jitterFraction": 0
+      },
+      "constraints": {
+        "genera": [
+          "altocumulus",
+          "altostratus",
+          "stratocumulus",
+          "stratus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [],
+        "dependencies": [],
+        "excludes": [
+          "translucidus"
+        ],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "remap-extinction",
+          "opCode": 7,
+          "blend": "optical",
+          "blendCode": 5,
+          "anchor": "parent-volume",
+          "anchorCode": 1,
+          "parameters": {
+            "medianVisibleOpticalDepth": [
+              4,
+              60
+            ],
+            "directDiscTransmissionMaximum": 0.018,
+            "opaqueAreaMinimum": 0.68,
+            "preservePerlucidusGaps": true
+          },
+          "flags": [
+            "path-integrated",
+            "source-disc-obscured"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVarieties"
+      ],
+      "referenceVariation": {
+        "seed": 531495806,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.929796,
+              0.706363,
+              0.78887
+            ],
+            "angleRadians": 0,
+            "intensity": 0.698604
+          }
+        ],
+        "topology": {
+          "count": 1,
+          "nearestSpacingCoefficientVariation": 0,
+          "orderedIntervalCoefficientVariation": 0,
+          "nearestDirectionEntropy": 0
+        }
+      }
+    },
+    {
+      "id": "mamma",
+      "category": "supplementary-feature",
+      "description": "Unequal, smooth-to-eroding lobes descending from a cloudy underside, commonly beneath a Cb anvil.",
+      "representation": "additive-attached-field",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-underside",
+        "normalizedSupport": {
+          "u": [
+            -0.92,
+            0.92
+          ],
+          "v": [
+            -0.52,
+            0.04
+          ],
+          "w": [
+            -0.92,
+            0.92
+          ]
+        },
+        "verticalOffsetMeters": [
+          -1500,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          800,
+          40000
+        ],
+        "verticalExtentMeters": [
+          120,
+          2000
+        ],
+        "downwindExtentMeters": [
+          800,
+          40000
+        ],
+        "wavelengthMeters": [
+          250,
+          3500
+        ],
+        "note": "Lobes originate at the underside and descend with unequal penetration; detached spheres are invalid."
+      },
+      "placement": {
+        "method": "best-candidate-plane",
+        "count": [
+          7,
+          26
+        ],
+        "scaleRelative": [
+          0.07,
+          0.22
+        ],
+        "minimumSeparation": 0.075,
+        "candidateCount": 24,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cirrus",
+          "cirrocumulus",
+          "altocumulus",
+          "altostratus",
+          "stratocumulus",
+          "cumulonimbus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [
+          "cloudy-underside",
+          "subcloud-detrainment-or-sublimation"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-udder-lobes",
+          "opCode": 9,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "parent-underside",
+          "anchorCode": 5,
+          "parameters": {
+            "attachmentNeckFraction": [
+              0.45,
+              0.78
+            ],
+            "penetrationToDiameter": [
+              0.55,
+              1.7
+            ],
+            "lobeAspect": [
+              0.62,
+              1.25
+            ],
+            "lateBreakawayFraction": [
+              0,
+              0.14
+            ],
+            "sublimationErosionFraction": [
+              0.06,
+              0.32
+            ]
+          },
+          "flags": [
+            "surface-attached",
+            "negative-buoyancy",
+            "aperiodic-lobes"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoMamma",
+        "mammatusSimulation"
+      ],
+      "referenceVariation": {
+        "seed": 2271784276,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.082931,
+              -0.029378,
+              -0.067647
+            ],
+            "scale": [
+              0.241294,
+              0.137445,
+              0.226233
+            ],
+            "angleRadians": 3.792669,
+            "intensity": 0.986449
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.647057,
+              -0.033954,
+              0.776748
+            ],
+            "scale": [
+              0.131178,
+              0.113704,
+              0.142874
+            ],
+            "angleRadians": 4.24545,
+            "intensity": 0.976014
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.620715,
+              0.045261,
+              -0.370572
+            ],
+            "scale": [
+              0.134342,
+              0.091902,
+              0.12246
+            ],
+            "angleRadians": 6.063568,
+            "intensity": 0.703653
+          },
+          {
+            "index": 3,
+            "center": [
+              0.375148,
+              0.009812,
+              0.782617
+            ],
+            "scale": [
+              0.088507,
+              0.094694,
+              0.078486
+            ],
+            "angleRadians": 3.069323,
+            "intensity": 0.720372
+          },
+          {
+            "index": 4,
+            "center": [
+              0.659552,
+              0.028679,
+              0.174353
+            ],
+            "scale": [
+              0.146797,
+              0.087859,
+              0.11105
+            ],
+            "angleRadians": 0.415096,
+            "intensity": 0.863161
+          },
+          {
+            "index": 5,
+            "center": [
+              -0.275671,
+              0.002619,
+              0.388015
+            ],
+            "scale": [
+              0.233787,
+              0.148242,
+              0.260164
+            ],
+            "angleRadians": 2.889932,
+            "intensity": 0.881886
+          },
+          {
+            "index": 6,
+            "center": [
+              0.289306,
+              0.022631,
+              -0.693098
+            ],
+            "scale": [
+              0.11164,
+              0.095196,
+              0.13511
+            ],
+            "angleRadians": 5.1466,
+            "intensity": 0.757902
+          },
+          {
+            "index": 7,
+            "center": [
+              -0.213634,
+              0.045196,
+              0.871601
+            ],
+            "scale": [
+              0.150288,
+              0.149431,
+              0.1531
+            ],
+            "angleRadians": 3.517943,
+            "intensity": 0.809615
+          },
+          {
+            "index": 8,
+            "center": [
+              -0.22275,
+              0.004564,
+              -0.831681
+            ],
+            "scale": [
+              0.090123,
+              0.113204,
+              0.107415
+            ],
+            "angleRadians": 3.242876,
+            "intensity": 0.851776
+          },
+          {
+            "index": 9,
+            "center": [
+              0.620194,
+              0.027305,
+              -0.344141
+            ],
+            "scale": [
+              0.120238,
+              0.061853,
+              0.090306
+            ],
+            "angleRadians": 5.300255,
+            "intensity": 0.869011
+          },
+          {
+            "index": 10,
+            "center": [
+              -0.415708,
+              -0.042471,
+              -0.009677
+            ],
+            "scale": [
+              0.255525,
+              0.16041,
+              0.170378
+            ],
+            "angleRadians": 1.279819,
+            "intensity": 0.884847
+          },
+          {
+            "index": 11,
+            "center": [
+              0.164706,
+              0.019816,
+              0.365148
+            ],
+            "scale": [
+              0.06266,
+              0.088312,
+              0.077361
+            ],
+            "angleRadians": 4.870403,
+            "intensity": 0.812302
+          },
+          {
+            "index": 12,
+            "center": [
+              -0.024861,
+              0.002199,
+              -0.492012
+            ],
+            "scale": [
+              0.160731,
+              0.219576,
+              0.147101
+            ],
+            "angleRadians": 5.594917,
+            "intensity": 0.626806
+          },
+          {
+            "index": 13,
+            "center": [
+              -0.620894,
+              -0.046736,
+              0.258951
+            ],
+            "scale": [
+              0.162278,
+              0.126734,
+              0.259315
+            ],
+            "angleRadians": 5.255831,
+            "intensity": 0.936122
+          },
+          {
+            "index": 14,
+            "center": [
+              0.833148,
+              -0.041223,
+              0.629161
+            ],
+            "scale": [
+              0.180568,
+              0.163295,
+              0.178578
+            ],
+            "angleRadians": 0.175465,
+            "intensity": 0.736911
+          },
+          {
+            "index": 15,
+            "center": [
+              -0.773778,
+              -0.045626,
+              -0.80261
+            ],
+            "scale": [
+              0.089082,
+              0.101184,
+              0.094044
+            ],
+            "angleRadians": 2.551268,
+            "intensity": 0.946439
+          },
+          {
+            "index": 16,
+            "center": [
+              0.418181,
+              -0.00709,
+              -0.119429
+            ],
+            "scale": [
+              0.095118,
+              0.093917,
+              0.084321
+            ],
+            "angleRadians": 0.12756,
+            "intensity": 0.79453
+          },
+          {
+            "index": 17,
+            "center": [
+              -0.038215,
+              -0.026896,
+              0.614218
+            ],
+            "scale": [
+              0.071018,
+              0.059398,
+              0.059558
+            ],
+            "angleRadians": 0.559202,
+            "intensity": 0.970099
+          },
+          {
+            "index": 18,
+            "center": [
+              -0.237263,
+              0.03111,
+              -0.372018
+            ],
+            "scale": [
+              0.083285,
+              0.056648,
+              0.073342
+            ],
+            "angleRadians": 6.009532,
+            "intensity": 0.967746
+          }
+        ],
+        "topology": {
+          "count": 19,
+          "nearestSpacingCoefficientVariation": 0.186552,
+          "orderedIntervalCoefficientVariation": 0.76151,
+          "nearestDirectionEntropy": 0.955192
+        }
+      }
+    },
+    {
+      "id": "fluctus",
+      "category": "supplementary-feature",
+      "description": "A short finite train of overturning Kelvin-Helmholtz curls on a cloud top or shear interface.",
+      "representation": "additive-warp-field",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-upper-surface",
+        "normalizedSupport": {
+          "u": [
+            -0.9,
+            0.9
+          ],
+          "v": [
+            -0.05,
+            0.55
+          ],
+          "w": [
+            -0.72,
+            0.72
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          1500
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          800,
+          30000
+        ],
+        "verticalExtentMeters": [
+          100,
+          1500
+        ],
+        "downwindExtentMeters": [
+          300,
+          10000
+        ],
+        "wavelengthMeters": [
+          500,
+          12000
+        ],
+        "note": "Billow wavelength follows shear-layer depth and curls overturn consistently with vorticity sign."
+      },
+      "placement": {
+        "method": "wave-train",
+        "count": [
+          3,
+          8
+        ],
+        "scaleRelative": [
+          0.09,
+          0.25
+        ],
+        "minimumSeparation": 0.03,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cirrus",
+          "altocumulus",
+          "stratocumulus",
+          "stratus",
+          "cumulus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [
+          "vertical-shear-at-least-3-mps",
+          "richardson-unstable-layer"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-kh-billow",
+          "opCode": 10,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "parent-upper-surface",
+          "anchorCode": 4,
+          "parameters": {
+            "wavelengthToShearDepth": [
+              6,
+              14
+            ],
+            "overturnFraction": [
+              0.32,
+              0.82
+            ],
+            "pairingProbability": [
+              0.05,
+              0.28
+            ],
+            "phaseJitterRadians": [
+              -0.18,
+              0.18
+            ],
+            "terminalDissipationFraction": [
+              0.12,
+              0.4
+            ]
+          },
+          "flags": [
+            "finite-wave-train",
+            "signed-vorticity",
+            "short-lived"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoFluctus",
+        "khObservation"
+      ],
+      "referenceVariation": {
+        "seed": 200261813,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              -0.836915,
+              0,
+              -0.041397
+            ],
+            "scale": [
+              0.133184,
+              0.072673,
+              0.101069
+            ],
+            "angleRadians": 0.005367,
+            "intensity": 0.634692
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.466102,
+              0.117874,
+              -0.07069
+            ],
+            "scale": [
+              0.136974,
+              0.078404,
+              0.18509
+            ],
+            "angleRadians": -0.091277,
+            "intensity": 0.646732
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.209253,
+              0.044175,
+              0.078982
+            ],
+            "scale": [
+              0.188159,
+              0.213228,
+              0.22103
+            ],
+            "angleRadians": -0.060429,
+            "intensity": 0.833713
+          },
+          {
+            "index": 3,
+            "center": [
+              0.138929,
+              -0.101319,
+              -0.069777
+            ],
+            "scale": [
+              0.276043,
+              0.159405,
+              0.240388
+            ],
+            "angleRadians": 0.03224,
+            "intensity": 0.673449
+          },
+          {
+            "index": 4,
+            "center": [
+              0.549074,
+              -0.082146,
+              0.02168
+            ],
+            "scale": [
+              0.109785,
+              0.078996,
+              0.116072
+            ],
+            "angleRadians": 0.114667,
+            "intensity": 0.909607
+          },
+          {
+            "index": 5,
+            "center": [
+              0.866911,
+              0.070534,
+              -0.059636
+            ],
+            "scale": [
+              0.122807,
+              0.125278,
+              0.181779
+            ],
+            "angleRadians": 0.119968,
+            "intensity": 0.873358
+          }
+        ],
+        "topology": {
+          "count": 6,
+          "nearestSpacingCoefficientVariation": 0.096371,
+          "orderedIntervalCoefficientVariation": 0.151573,
+          "nearestDirectionEntropy": 0.639432
+        }
+      }
+    },
+    {
+      "id": "asperitas",
+      "category": "supplementary-feature",
+      "description": "Chaotic, localized underside waves with multiple scales and occasional sharp descending points.",
+      "representation": "surface-displacement",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-underside",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.58,
+            0.08
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          -2000,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          5000,
+          120000
+        ],
+        "verticalExtentMeters": [
+          150,
+          2000
+        ],
+        "downwindExtentMeters": [
+          5000,
+          120000
+        ],
+        "wavelengthMeters": [
+          800,
+          18000
+        ],
+        "note": "Less horizontally organized than undulatus; correlated depth variation is required for its dramatic self-shadowing."
+      },
+      "placement": {
+        "method": "chaotic-wave-patches",
+        "count": [
+          5,
+          14
+        ],
+        "scaleRelative": [
+          0.12,
+          0.4
+        ],
+        "minimumSeparation": 0.04,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "altocumulus",
+          "stratocumulus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "mature",
+          "decaying"
+        ],
+        "requires": [
+          "settling-or-evaporation",
+          "vertical-shear"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "displace-underside",
+          "opCode": 11,
+          "blend": "warp",
+          "blendCode": 3,
+          "anchor": "parent-underside",
+          "anchorCode": 5,
+          "parameters": {
+            "octaveCount": 4,
+            "directionalCoherence": [
+              0.18,
+              0.55
+            ],
+            "amplitudeToWavelength": [
+              0.08,
+              0.28
+            ],
+            "cuspFraction": [
+              0.04,
+              0.2
+            ],
+            "opticalDepthCorrelation": [
+              0.35,
+              0.82
+            ]
+          },
+          "flags": [
+            "nonperiodic",
+            "multiscale",
+            "thickness-coupled"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoAsperitas",
+        "asperitasModel"
+      ],
+      "referenceVariation": {
+        "seed": 1567473641,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.140327,
+              0.021838,
+              -0.089241
+            ],
+            "scale": [
+              0.32523,
+              0.307143,
+              0.302903
+            ],
+            "angleRadians": 3.225625,
+            "intensity": 0.698521
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.462671,
+              0.011401,
+              0.617731
+            ],
+            "scale": [
+              0.257607,
+              0.182527,
+              0.337528
+            ],
+            "angleRadians": 5.677566,
+            "intensity": 0.841159
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.579432,
+              -0.002343,
+              -0.41906
+            ],
+            "scale": [
+              0.29889,
+              0.290941,
+              0.198845
+            ],
+            "angleRadians": 1.547621,
+            "intensity": 0.825022
+          },
+          {
+            "index": 3,
+            "center": [
+              0.63884,
+              -0.003357,
+              0.529378
+            ],
+            "scale": [
+              0.451247,
+              0.389081,
+              0.518392
+            ],
+            "angleRadians": 0.614143,
+            "intensity": 0.649507
+          },
+          {
+            "index": 4,
+            "center": [
+              0.5174,
+              0.041425,
+              -0.569236
+            ],
+            "scale": [
+              0.305925,
+              0.199419,
+              0.229943
+            ],
+            "angleRadians": 6.267115,
+            "intensity": 0.688708
+          },
+          {
+            "index": 5,
+            "center": [
+              -0.454407,
+              -0.053157,
+              0.107394
+            ],
+            "scale": [
+              0.143899,
+              0.144338,
+              0.15654
+            ],
+            "angleRadians": 6.087129,
+            "intensity": 0.621821
+          },
+          {
+            "index": 6,
+            "center": [
+              0.025164,
+              0.019053,
+              -0.64267
+            ],
+            "scale": [
+              0.397356,
+              0.346231,
+              0.28596
+            ],
+            "angleRadians": 5.494553,
+            "intensity": 0.879354
+          },
+          {
+            "index": 7,
+            "center": [
+              0.139512,
+              0.026446,
+              0.684626
+            ],
+            "scale": [
+              0.299293,
+              0.30825,
+              0.411455
+            ],
+            "angleRadians": 5.690895,
+            "intensity": 0.904275
+          },
+          {
+            "index": 8,
+            "center": [
+              0.627971,
+              0.010378,
+              -0.016385
+            ],
+            "scale": [
+              0.330377,
+              0.173856,
+              0.205277
+            ],
+            "angleRadians": 4.438444,
+            "intensity": 0.862908
+          },
+          {
+            "index": 9,
+            "center": [
+              -0.85783,
+              0.0089,
+              0.291627
+            ],
+            "scale": [
+              0.149257,
+              0.176435,
+              0.127279
+            ],
+            "angleRadians": 3.265485,
+            "intensity": 0.906541
+          }
+        ],
+        "topology": {
+          "count": 10,
+          "nearestSpacingCoefficientVariation": 0.061151,
+          "orderedIntervalCoefficientVariation": 0.981788,
+          "nearestDirectionEntropy": 0.840643
+        }
+      }
+    },
+    {
+      "id": "cavum",
+      "category": "supplementary-feature",
+      "description": "A finite circular or linear through-hole in supercooled droplet cloud with a glaciating, widening boundary.",
+      "representation": "subtractive-topology",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-layer-midplane",
+        "normalizedSupport": {
+          "u": [
+            -0.86,
+            0.86
+          ],
+          "v": [
+            -0.35,
+            0.35
+          ],
+          "w": [
+            -0.86,
+            0.86
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          1000,
+          50000
+        ],
+        "verticalExtentMeters": [
+          100,
+          2000
+        ],
+        "downwindExtentMeters": [
+          1000,
+          50000
+        ],
+        "wavelengthMeters": null,
+        "note": "The clear region penetrates the layer and expands at a gravity-wave front; central virga remains hydrometeor-owned."
+      },
+      "placement": {
+        "method": "single",
+        "count": [
+          1,
+          2
+        ],
+        "scaleRelative": [
+          0.16,
+          0.58
+        ],
+        "minimumSeparation": 0.18,
+        "candidateCount": 0,
+        "jitterFraction": 0
+      },
+      "constraints": {
+        "genera": [
+          "cirrocumulus",
+          "altocumulus",
+          "stratocumulus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed"
+        ],
+        "lifecycle": [
+          "incipient",
+          "growing",
+          "mature",
+          "glaciating",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [
+          "supercooled-liquid-layer"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {
+          "maximumTemperatureKelvin": 273.15
+        }
+      },
+      "operators": [
+        {
+          "code": "subtract-cavum",
+          "opCode": 12,
+          "blend": "subtract",
+          "blendCode": 2,
+          "anchor": "parent-layer-midplane",
+          "anchorCode": 3,
+          "parameters": {
+            "eccentricity": [
+              0,
+              0.55
+            ],
+            "throughLayerDepthFraction": [
+              1,
+              1.8
+            ],
+            "rimGlaciationWidthFraction": [
+              0.04,
+              0.18
+            ],
+            "growthFrontAsymmetry": [
+              0.02,
+              0.22
+            ],
+            "aircraftLinearProbability": 0.18
+          },
+          "flags": [
+            "real-through-hole",
+            "expanding-front",
+            "hydrometeor-anchor-at-center"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoCavum",
+        "holePunchSimulation"
+      ],
+      "referenceVariation": {
+        "seed": 417045887,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.521115,
+              0.577343,
+              0.613539
+            ],
+            "angleRadians": 0,
+            "intensity": 0.936528
+          }
+        ],
+        "topology": {
+          "count": 1,
+          "nearestSpacingCoefficientVariation": 0,
+          "orderedIntervalCoefficientVariation": 0,
+          "nearestDirectionEntropy": 0
+        }
+      }
+    },
+    {
+      "id": "arcus",
+      "category": "supplementary-feature",
+      "description": "A dense finite shelf or roll on the leading lower edge of a precipitation-driven gust front.",
+      "representation": "additive-attached-field",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-leading-lower-edge",
+        "normalizedSupport": {
+          "u": [
+            -0.96,
+            0.96
+          ],
+          "v": [
+            -0.5,
+            0.18
+          ],
+          "w": [
+            -0.28,
+            0.36
+          ]
+        },
+        "verticalOffsetMeters": [
+          -2000,
+          400
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          5000,
+          180000
+        ],
+        "verticalExtentMeters": [
+          200,
+          2500
+        ],
+        "downwindExtentMeters": [
+          500,
+          8000
+        ],
+        "wavelengthMeters": null,
+        "note": "A horizontally dense leading roll/wedge with ragged scud, not a symmetric halo around the storm."
+      },
+      "placement": {
+        "method": "front-chain",
+        "count": [
+          4,
+          14
+        ],
+        "scaleRelative": [
+          0.1,
+          0.35
+        ],
+        "minimumSeparation": 0.035,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cumulus",
+          "cumulonimbus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "mature",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [
+          "precipitation-driven-cold-pool",
+          "positive-outflow-speed"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-gust-front",
+          "opCode": 13,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "parent-leading-lower-edge",
+          "anchorCode": 7,
+          "parameters": {
+            "shelfToRoll": [
+              0,
+              1
+            ],
+            "leadingOverhangFraction": [
+              0.08,
+              0.35
+            ],
+            "undersideRaggedness": [
+              0.08,
+              0.32
+            ],
+            "alongFrontCurvature": [
+              -0.22,
+              0.22
+            ],
+            "detachedRollGapFraction": [
+              0,
+              0.18
+            ]
+          },
+          "flags": [
+            "cold-pool-normal",
+            "finite-front",
+            "precipitation-owned"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoFeatures"
+      ],
+      "referenceVariation": {
+        "seed": 3393908187,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              -0.895952,
+              -0.072331,
+              0
+            ],
+            "scale": [
+              0.149941,
+              0.098404,
+              0.155564
+            ],
+            "angleRadians": -0.016375,
+            "intensity": 0.957892
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.656189,
+              -0.017076,
+              0.054723
+            ],
+            "scale": [
+              0.13836,
+              0.17944,
+              0.124398
+            ],
+            "angleRadians": 0.07438,
+            "intensity": 0.842592
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.487027,
+              -0.11689,
+              0.102846
+            ],
+            "scale": [
+              0.209534,
+              0.230653,
+              0.226911
+            ],
+            "angleRadians": 0.080518,
+            "intensity": 0.664003
+          },
+          {
+            "index": 3,
+            "center": [
+              -0.303309,
+              -0.018809,
+              0.138564
+            ],
+            "scale": [
+              0.300174,
+              0.203472,
+              0.214795
+            ],
+            "angleRadians": 0.089254,
+            "intensity": 0.876421
+          },
+          {
+            "index": 4,
+            "center": [
+              -0.121565,
+              -0.111759,
+              0.157569
+            ],
+            "scale": [
+              0.143146,
+              0.117956,
+              0.154558
+            ],
+            "angleRadians": -0.103066,
+            "intensity": 0.87076
+          },
+          {
+            "index": 5,
+            "center": [
+              0.05468,
+              0.00727,
+              0.157569
+            ],
+            "scale": [
+              0.433369,
+              0.321027,
+              0.377357
+            ],
+            "angleRadians": -0.037802,
+            "intensity": 0.868469
+          },
+          {
+            "index": 6,
+            "center": [
+              0.281768,
+              -0.101183,
+              0.138564
+            ],
+            "scale": [
+              0.237055,
+              0.347424,
+              0.307053
+            ],
+            "angleRadians": 0.00505,
+            "intensity": 0.805289
+          },
+          {
+            "index": 7,
+            "center": [
+              0.535207,
+              -0.019926,
+              0.102846
+            ],
+            "scale": [
+              0.252635,
+              0.245478,
+              0.226771
+            ],
+            "angleRadians": 0.053586,
+            "intensity": 0.991161
+          },
+          {
+            "index": 8,
+            "center": [
+              0.734831,
+              -0.019139,
+              0.054723
+            ],
+            "scale": [
+              0.132545,
+              0.085894,
+              0.104326
+            ],
+            "angleRadians": 0.083328,
+            "intensity": 0.997754
+          },
+          {
+            "index": 9,
+            "center": [
+              0.920063,
+              -0.045026,
+              0
+            ],
+            "scale": [
+              0.18172,
+              0.158433,
+              0.122648
+            ],
+            "angleRadians": -0.119001,
+            "intensity": 0.782046
+          }
+        ],
+        "topology": {
+          "count": 10,
+          "nearestSpacingCoefficientVariation": 0.118732,
+          "orderedIntervalCoefficientVariation": 0.142816,
+          "nearestDirectionEntropy": 0.640643
+        }
+      }
+    },
+    {
+      "id": "tuba",
+      "category": "supplementary-feature",
+      "description": "A tapered, often curved condensation column descending from a vortical cumuliform base.",
+      "representation": "additive-attached-field",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "rain-free-base",
+        "normalizedSupport": {
+          "u": [
+            -0.45,
+            0.45
+          ],
+          "v": [
+            -1,
+            0.02
+          ],
+          "w": [
+            -0.45,
+            0.45
+          ]
+        },
+        "verticalOffsetMeters": [
+          -4000,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          50,
+          2000
+        ],
+        "verticalExtentMeters": [
+          100,
+          5000
+        ],
+        "downwindExtentMeters": [
+          50,
+          2000
+        ],
+        "wavelengthMeters": null,
+        "note": "The funnel begins with a broad attached condensation collar and narrows downward; ground contact is not implied."
+      },
+      "placement": {
+        "method": "tapered-path",
+        "count": [
+          1,
+          2
+        ],
+        "scaleRelative": [
+          0.05,
+          0.22
+        ],
+        "minimumSeparation": 0.2,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cumulus",
+          "cumulonimbus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "growing",
+          "mature",
+          "precipitating"
+        ],
+        "requires": [
+          "positive-convective-ascent",
+          "resolved-vorticity"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-vortex-funnel",
+          "opCode": 14,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "rain-free-base",
+          "anchorCode": 8,
+          "parameters": {
+            "topRadiusToLength": [
+              0.08,
+              0.34
+            ],
+            "terminalRadiusFraction": [
+              0.08,
+              0.55
+            ],
+            "curvatureFraction": [
+              0,
+              0.28
+            ],
+            "condensationCompleteness": [
+              0.25,
+              1
+            ],
+            "helicalPerturbation": [
+              0.01,
+              0.08
+            ]
+          },
+          "flags": [
+            "surface-attached",
+            "vorticity-aligned",
+            "no-ground-contact-assumption"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoFeatures"
+      ],
+      "referenceVariation": {
+        "seed": 1680112691,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.017362,
+              0,
+              -0.039264
+            ],
+            "scale": [
+              0.156332,
+              0.116957,
+              0.134224
+            ],
+            "angleRadians": 0.118694,
+            "intensity": 0.824734
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.009413,
+              -0.82,
+              -0.037502
+            ],
+            "scale": [
+              0.124507,
+              0.096345,
+              0.138527
+            ],
+            "angleRadians": -0.003883,
+            "intensity": 0.637619
+          }
+        ],
+        "topology": {
+          "count": 2,
+          "nearestSpacingCoefficientVariation": 0,
+          "orderedIntervalCoefficientVariation": 0,
+          "nearestDirectionEntropy": 0.333333
+        }
+      }
+    },
+    {
+      "id": "murus",
+      "category": "supplementary-feature",
+      "description": "A localized persistent lowering under the rain-free updraft base of a supercell.",
+      "representation": "additive-attached-field",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "rain-free-base",
+        "normalizedSupport": {
+          "u": [
+            -0.48,
+            0.48
+          ],
+          "v": [
+            -0.72,
+            0.02
+          ],
+          "w": [
+            -0.42,
+            0.42
+          ]
+        },
+        "verticalOffsetMeters": [
+          -2500,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          1000,
+          15000
+        ],
+        "verticalExtentMeters": [
+          250,
+          3000
+        ],
+        "downwindExtentMeters": [
+          800,
+          10000
+        ],
+        "wavelengthMeters": null,
+        "note": "An abrupt asymmetric lowering in the inflow/updraft sector, never centered under the precipitation core."
+      },
+      "placement": {
+        "method": "single",
+        "count": [
+          1,
+          1
+        ],
+        "scaleRelative": [
+          0.22,
+          0.58
+        ],
+        "minimumSeparation": 0,
+        "candidateCount": 0,
+        "jitterFraction": 0
+      },
+      "constraints": {
+        "genera": [
+          "cumulonimbus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "mature",
+          "precipitating"
+        ],
+        "requires": [
+          "storm-complex",
+          "supercell-mesocyclone",
+          "rain-free-updraft-base"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-wall-lowering",
+          "opCode": 15,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "rain-free-base",
+          "anchorCode": 8,
+          "parameters": {
+            "loweringDepthToWidth": [
+              0.12,
+              0.48
+            ],
+            "baseTiltRadians": [
+              -0.16,
+              0.16
+            ],
+            "inflowSideBias": [
+              0.28,
+              0.72
+            ],
+            "rotationStrength": [
+              0.15,
+              1
+            ],
+            "edgeScudFraction": [
+              0.04,
+              0.2
+            ]
+          },
+          "flags": [
+            "persistent-owner",
+            "updraft-sector",
+            "mesocyclone-aligned"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoMurus"
+      ],
+      "referenceVariation": {
+        "seed": 4234190871,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.353817,
+              0.286596,
+              0.359903
+            ],
+            "angleRadians": 0,
+            "intensity": 0.68161
+          }
+        ],
+        "topology": {
+          "count": 1,
+          "nearestSpacingCoefficientVariation": 0,
+          "orderedIntervalCoefficientVariation": 0,
+          "nearestDirectionEntropy": 0
+        }
+      }
+    },
+    {
+      "id": "cauda",
+      "category": "supplementary-feature",
+      "description": "A low horizontal tail joining the supercell precipitation region to murus at their shared base height.",
+      "representation": "additive-connector",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "precipitation-core-edge",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.18,
+            0.18
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          1000,
+          25000
+        ],
+        "verticalExtentMeters": [
+          150,
+          1500
+        ],
+        "downwindExtentMeters": [
+          500,
+          8000
+        ],
+        "wavelengthMeters": null,
+        "note": "Motion and narrowing run from precipitation toward murus; it is horizontal and must never resemble a funnel."
+      },
+      "placement": {
+        "method": "curve-chain",
+        "count": [
+          4,
+          11
+        ],
+        "scaleRelative": [
+          0.07,
+          0.24
+        ],
+        "minimumSeparation": 0.025,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cumulonimbus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "mature",
+          "precipitating"
+        ],
+        "requires": [
+          "storm-complex",
+          "supercell-inflow",
+          "precipitation-region"
+        ],
+        "dependencies": [
+          "murus"
+        ],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-tail-connector",
+          "opCode": 16,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "precipitation-core-edge",
+          "anchorCode": 9,
+          "parameters": {
+            "endHeightMismatchMaximumFraction": 0.08,
+            "narrowingTowardMurus": [
+              0.08,
+              0.34
+            ],
+            "upwardMotionNearJunction": [
+              0.2,
+              1
+            ],
+            "curvatureFraction": [
+              0.02,
+              0.24
+            ],
+            "verticalAspectMaximum": 0.28
+          },
+          "flags": [
+            "connects-to-murus",
+            "horizontal-not-funnel",
+            "inflow-directed"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoCauda"
+      ],
+      "referenceVariation": {
+        "seed": 3838100611,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              -0.789514,
+              0,
+              0.070095
+            ],
+            "scale": [
+              0.303363,
+              0.14383,
+              0.239972
+            ],
+            "angleRadians": 0.431556,
+            "intensity": 0.828213
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.553949,
+              0,
+              0.156204
+            ],
+            "scale": [
+              0.11045,
+              0.092205,
+              0.127893
+            ],
+            "angleRadians": 0.243513,
+            "intensity": 0.953474
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.337864,
+              0,
+              0.178464
+            ],
+            "scale": [
+              0.229497,
+              0.12232,
+              0.260372
+            ],
+            "angleRadians": -0.065079,
+            "intensity": 0.672188
+          },
+          {
+            "index": 3,
+            "center": [
+              -0.14064,
+              0,
+              0.127777
+            ],
+            "scale": [
+              0.080282,
+              0.053085,
+              0.067451
+            ],
+            "angleRadians": -0.338585,
+            "intensity": 0.812295
+          },
+          {
+            "index": 4,
+            "center": [
+              0.090415,
+              0,
+              0.024861
+            ],
+            "scale": [
+              0.242594,
+              0.141054,
+              0.287386
+            ],
+            "angleRadians": -0.459785,
+            "intensity": 0.962658
+          },
+          {
+            "index": 5,
+            "center": [
+              0.37003,
+              0,
+              -0.088217
+            ],
+            "scale": [
+              0.153473,
+              0.148775,
+              0.136692
+            ],
+            "angleRadians": -0.410992,
+            "intensity": 0.901228
+          },
+          {
+            "index": 6,
+            "center": [
+              0.622421,
+              0,
+              -0.165236
+            ],
+            "scale": [
+              0.190398,
+              0.196082,
+              0.171568
+            ],
+            "angleRadians": -0.195762,
+            "intensity": 0.800095
+          },
+          {
+            "index": 7,
+            "center": [
+              0.832481,
+              0,
+              -0.174715
+            ],
+            "scale": [
+              0.082781,
+              0.088206,
+              0.073601
+            ],
+            "angleRadians": 0.119688,
+            "intensity": 0.660732
+          }
+        ],
+        "topology": {
+          "count": 8,
+          "nearestSpacingCoefficientVariation": 0.102861,
+          "orderedIntervalCoefficientVariation": 0.111112,
+          "nearestDirectionEntropy": 0.520426
+        }
+      }
+    },
+    {
+      "id": "incus",
+      "category": "supplementary-feature",
+      "description": "Reuse of the attached glaciated Cb capillatus-incus macro volume; never a detached generic plate.",
+      "representation": "base-volume-reuse",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-top",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.25,
+            0.45
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          8000,
+          220000
+        ],
+        "verticalExtentMeters": [
+          500,
+          6000
+        ],
+        "downwindExtentMeters": [
+          8000,
+          260000
+        ],
+        "wavelengthMeters": null,
+        "note": "The existing lifecycle atlas supplies the storm-connected tower, back-shear and downwind outflow."
+      },
+      "placement": {
+        "method": "single",
+        "count": [
+          1,
+          1
+        ],
+        "scaleRelative": [
+          1,
+          1
+        ],
+        "minimumSeparation": 0,
+        "candidateCount": 0,
+        "jitterFraction": 0
+      },
+      "constraints": {
+        "genera": [
+          "cumulonimbus"
+        ],
+        "phases": [
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "glaciating",
+          "mature",
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [
+          "capillatus-stage"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "reuse-base-macro",
+          "opCode": 17,
+          "blend": "reuse",
+          "blendCode": 6,
+          "anchor": "parent-top",
+          "anchorCode": 10,
+          "parameters": {
+            "macroVolumeId": "cb-capillatus-incus",
+            "preserveParentOwner": true,
+            "independentStampForbidden": true,
+            "downwindAxisFromUpperWind": true
+          },
+          "flags": [
+            "existing-atlas",
+            "attached-to-updraft"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoFeatures"
+      ],
+      "referenceVariation": {
+        "seed": 1336212511,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.097853,
+              0.696037,
+              0.755575
+            ],
+            "angleRadians": 0,
+            "intensity": 0.773796
+          }
+        ],
+        "topology": {
+          "count": 1,
+          "nearestSpacingCoefficientVariation": 0,
+          "orderedIntervalCoefficientVariation": 0,
+          "nearestDirectionEntropy": 0
+        }
+      }
+    },
+    {
+      "id": "pileus",
+      "category": "accessory-cloud",
+      "description": "One or more thin smooth caps immediately above a rapidly rising cumuliform summit, often penetrated by it.",
+      "representation": "additive-attached-field",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-top",
+        "normalizedSupport": {
+          "u": [
+            -0.7,
+            0.7
+          ],
+          "v": [
+            -0.05,
+            0.32
+          ],
+          "w": [
+            -0.7,
+            0.7
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          1500
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          500,
+          12000
+        ],
+        "verticalExtentMeters": [
+          40,
+          700
+        ],
+        "downwindExtentMeters": [
+          500,
+          12000
+        ],
+        "wavelengthMeters": null,
+        "note": "A shallow curved shell fit to the summit pressure surface; multiple caps may be superposed."
+      },
+      "placement": {
+        "method": "layer-stack",
+        "count": [
+          1,
+          3
+        ],
+        "scaleRelative": [
+          0.34,
+          0.82
+        ],
+        "minimumSeparation": 0.05,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cumulus",
+          "cumulonimbus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "growing",
+          "mature"
+        ],
+        "requires": [
+          "positive-convective-ascent"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-cap-shell",
+          "opCode": 18,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "parent-top",
+          "anchorCode": 10,
+          "parameters": {
+            "shellThicknessToRadius": [
+              0.025,
+              0.12
+            ],
+            "summitClearanceToRadius": [
+              0.01,
+              0.18
+            ],
+            "domeEccentricity": [
+              0.08,
+              0.42
+            ],
+            "penetrationFraction": [
+              0,
+              0.38
+            ],
+            "stackedSpacingThicknesses": [
+              1.4,
+              4
+            ]
+          },
+          "flags": [
+            "summit-conformal",
+            "laminar-shell",
+            "parent-may-penetrate"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoPileus"
+      ],
+      "referenceVariation": {
+        "seed": 509051393,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.003616,
+              -0.332195,
+              0.013734
+            ],
+            "scale": [
+              0.577272,
+              0.505277,
+              0.565203
+            ],
+            "angleRadians": 0.152116,
+            "intensity": 0.660206
+          },
+          {
+            "index": 1,
+            "center": [
+              0.040746,
+              0.349038,
+              -0.082564
+            ],
+            "scale": [
+              0.418153,
+              0.274558,
+              0.378827
+            ],
+            "angleRadians": 0.086135,
+            "intensity": 0.985864
+          }
+        ],
+        "topology": {
+          "count": 2,
+          "nearestSpacingCoefficientVariation": 0,
+          "orderedIntervalCoefficientVariation": 0,
+          "nearestDirectionEntropy": 0.333333
+        }
+      }
+    },
+    {
+      "id": "velum",
+      "category": "accessory-cloud",
+      "description": "A broad shallow veil close above or attached to one or more cumuliform clouds that often pierce it.",
+      "representation": "additive-attached-field",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-upper-surface",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.12,
+            0.25
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          -300,
+          2000
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          5000,
+          80000
+        ],
+        "verticalExtentMeters": [
+          80,
+          1000
+        ],
+        "downwindExtentMeters": [
+          5000,
+          80000
+        ],
+        "wavelengthMeters": null,
+        "note": "Greater horizontal extent than pileus, with finite frayed edges and explicit tower intersections."
+      },
+      "placement": {
+        "method": "single",
+        "count": [
+          1,
+          2
+        ],
+        "scaleRelative": [
+          0.72,
+          1
+        ],
+        "minimumSeparation": 0,
+        "candidateCount": 0,
+        "jitterFraction": 0
+      },
+      "constraints": {
+        "genera": [
+          "cumulus",
+          "cumulonimbus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "growing",
+          "mature",
+          "glaciating"
+        ],
+        "requires": [
+          "positive-convective-ascent"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-veil-sheet",
+          "opCode": 19,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "parent-upper-surface",
+          "anchorCode": 4,
+          "parameters": {
+            "thicknessToWidth": [
+              0.008,
+              0.05
+            ],
+            "edgeFrayFraction": [
+              0.04,
+              0.2
+            ],
+            "towerIntersectionCount": [
+              1,
+              4
+            ],
+            "penetrationBlendFraction": [
+              0.02,
+              0.14
+            ],
+            "tiltRadians": [
+              -0.12,
+              0.12
+            ]
+          },
+          "flags": [
+            "finite-sheet",
+            "tower-pierced",
+            "advect-with-interface"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoVelum"
+      ],
+      "referenceVariation": {
+        "seed": 3825551086,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.134064,
+              0.750489,
+              0.672461
+            ],
+            "angleRadians": 0,
+            "intensity": 0.724504
+          }
+        ],
+        "topology": {
+          "count": 1,
+          "nearestSpacingCoefficientVariation": 0,
+          "orderedIntervalCoefficientVariation": 0,
+          "nearestDirectionEntropy": 0
+        }
+      }
+    },
+    {
+      "id": "pannus",
+      "category": "accessory-cloud",
+      "description": "A finite population of ragged low shreds in precipitation-moistened air below a parent cloud, sometimes merging into a layer.",
+      "representation": "additive-population",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "parent-lower-environment",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -1,
+            -0.05
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          -3000,
+          -100
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          2000,
+          120000
+        ],
+        "verticalExtentMeters": [
+          100,
+          1500
+        ],
+        "downwindExtentMeters": [
+          2000,
+          120000
+        ],
+        "wavelengthMeters": [
+          200,
+          4000
+        ],
+        "note": "Individual shreds retain concave erosion and separate motion until saturation merges them."
+      },
+      "placement": {
+        "method": "best-candidate-plane",
+        "count": [
+          8,
+          30
+        ],
+        "scaleRelative": [
+          0.05,
+          0.2
+        ],
+        "minimumSeparation": 0.055,
+        "candidateCount": 24,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "altostratus",
+          "nimbostratus",
+          "cumulus",
+          "cumulonimbus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "precipitating",
+          "decaying"
+        ],
+        "requires": [
+          "precipitation-moistened-layer",
+          "relative-humidity-at-least-0.85"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-fragments",
+          "opCode": 20,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "parent-lower-environment",
+          "anchorCode": 11,
+          "parameters": {
+            "raggednessOctaves": 4,
+            "concavityFraction": [
+              0.12,
+              0.42
+            ],
+            "saturationMergeFraction": [
+              0,
+              0.62
+            ],
+            "verticalJitterFraction": [
+              0.08,
+              0.38
+            ],
+            "independentWindFraction": [
+              0.04,
+              0.2
+            ]
+          },
+          "flags": [
+            "finite-shreds",
+            "aperiodic-population",
+            "subcloud-moisture-owned"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoPannus"
+      ],
+      "referenceVariation": {
+        "seed": 4163737518,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.054121,
+              0.007281,
+              -0.093977
+            ],
+            "scale": [
+              0.038633,
+              0.037754,
+              0.067111
+            ],
+            "angleRadians": 2.176964,
+            "intensity": 0.788489
+          },
+          {
+            "index": 1,
+            "center": [
+              0.763038,
+              -0.011206,
+              0.791084
+            ],
+            "scale": [
+              0.154116,
+              0.166523,
+              0.136812
+            ],
+            "angleRadians": 3.499819,
+            "intensity": 0.731793
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.72897,
+              0.037262,
+              0.377993
+            ],
+            "scale": [
+              0.102276,
+              0.054903,
+              0.063022
+            ],
+            "angleRadians": 2.429485,
+            "intensity": 0.675652
+          },
+          {
+            "index": 3,
+            "center": [
+              -0.765689,
+              -0.002244,
+              -0.639444
+            ],
+            "scale": [
+              0.154856,
+              0.073336,
+              0.10199
+            ],
+            "angleRadians": 4.947736,
+            "intensity": 0.964396
+          },
+          {
+            "index": 4,
+            "center": [
+              0.678626,
+              -0.054608,
+              -0.120635
+            ],
+            "scale": [
+              0.104856,
+              0.099974,
+              0.100419
+            ],
+            "angleRadians": 5.777871,
+            "intensity": 0.741054
+          },
+          {
+            "index": 5,
+            "center": [
+              -0.165592,
+              0.05832,
+              -0.854871
+            ],
+            "scale": [
+              0.09069,
+              0.077307,
+              0.091422
+            ],
+            "angleRadians": 0.610936,
+            "intensity": 0.849072
+          },
+          {
+            "index": 6,
+            "center": [
+              0.713092,
+              -0.024927,
+              -0.788785
+            ],
+            "scale": [
+              0.131832,
+              0.12547,
+              0.128005
+            ],
+            "angleRadians": 1.89528,
+            "intensity": 0.901294
+          },
+          {
+            "index": 7,
+            "center": [
+              0.102509,
+              0.015782,
+              0.510459
+            ],
+            "scale": [
+              0.040117,
+              0.036987,
+              0.064507
+            ],
+            "angleRadians": 2.897754,
+            "intensity": 0.824447
+          },
+          {
+            "index": 8,
+            "center": [
+              0.594249,
+              0.025208,
+              0.320604
+            ],
+            "scale": [
+              0.189586,
+              0.185477,
+              0.151526
+            ],
+            "angleRadians": 5.415462,
+            "intensity": 0.765189
+          },
+          {
+            "index": 9,
+            "center": [
+              -0.286728,
+              0.005296,
+              0.766097
+            ],
+            "scale": [
+              0.066953,
+              0.064671,
+              0.091014
+            ],
+            "angleRadians": 5.240319,
+            "intensity": 0.912488
+          },
+          {
+            "index": 10,
+            "center": [
+              -0.656109,
+              -0.023031,
+              -0.151399
+            ],
+            "scale": [
+              0.159034,
+              0.146408,
+              0.148348
+            ],
+            "angleRadians": 2.284175,
+            "intensity": 0.917476
+          },
+          {
+            "index": 11,
+            "center": [
+              0.274582,
+              -0.055517,
+              -0.56497
+            ],
+            "scale": [
+              0.082779,
+              0.07555,
+              0.083969
+            ],
+            "angleRadians": 3.094994,
+            "intensity": 0.798981
+          },
+          {
+            "index": 12,
+            "center": [
+              0.400853,
+              0.036554,
+              0.778339
+            ],
+            "scale": [
+              0.105166,
+              0.075698,
+              0.094246
+            ],
+            "angleRadians": 3.613268,
+            "intensity": 0.698109
+          },
+          {
+            "index": 13,
+            "center": [
+              -0.33567,
+              -0.004778,
+              0.127834
+            ],
+            "scale": [
+              0.19848,
+              0.166419,
+              0.125622
+            ],
+            "angleRadians": 2.458041,
+            "intensity": 0.723848
+          },
+          {
+            "index": 14,
+            "center": [
+              -0.31388,
+              -0.035577,
+              -0.296968
+            ],
+            "scale": [
+              0.13733,
+              0.156106,
+              0.158837
+            ],
+            "angleRadians": 0.395348,
+            "intensity": 0.671939
+          },
+          {
+            "index": 15,
+            "center": [
+              0.365754,
+              0.030546,
+              -0.190304
+            ],
+            "scale": [
+              0.076794,
+              0.086405,
+              0.110906
+            ],
+            "angleRadians": 3.679032,
+            "intensity": 0.837633
+          },
+          {
+            "index": 16,
+            "center": [
+              -0.587126,
+              0.010673,
+              0.642219
+            ],
+            "scale": [
+              0.235321,
+              0.170546,
+              0.174879
+            ],
+            "angleRadians": 6.18973,
+            "intensity": 0.884195
+          },
+          {
+            "index": 17,
+            "center": [
+              -0.09349,
+              -0.031179,
+              -0.514901
+            ],
+            "scale": [
+              0.103184,
+              0.065139,
+              0.125877
+            ],
+            "angleRadians": 2.434478,
+            "intensity": 0.6679
+          },
+          {
+            "index": 18,
+            "center": [
+              -0.210386,
+              -0.055287,
+              0.436412
+            ],
+            "scale": [
+              0.223698,
+              0.09961,
+              0.182306
+            ],
+            "angleRadians": 0.408216,
+            "intensity": 0.744581
+          },
+          {
+            "index": 19,
+            "center": [
+              0.097653,
+              -0.035229,
+              -0.376179
+            ],
+            "scale": [
+              0.186985,
+              0.126757,
+              0.17206
+            ],
+            "angleRadians": 3.663663,
+            "intensity": 0.628048
+          },
+          {
+            "index": 20,
+            "center": [
+              0.17845,
+              -0.055625,
+              0.150511
+            ],
+            "scale": [
+              0.115621,
+              0.124754,
+              0.152778
+            ],
+            "angleRadians": 0.644659,
+            "intensity": 0.812809
+          }
+        ],
+        "topology": {
+          "count": 21,
+          "nearestSpacingCoefficientVariation": 0.211397,
+          "orderedIntervalCoefficientVariation": 0.765679,
+          "nearestDirectionEntropy": 0.90507
+        }
+      }
+    },
+    {
+      "id": "flumen",
+      "category": "accessory-cloud",
+      "description": "A finite low-cloud inflow band parallel to low-level wind and moving toward a supercell, detached from and above murus.",
+      "representation": "world-placement",
+      "support": {
+        "frame": "parent-local-crosswind-altitude-downwind",
+        "finite": true,
+        "anchor": "storm-inflow-sector",
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.3,
+            0.3
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          -1000,
+          1500
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          5000,
+          80000
+        ],
+        "verticalExtentMeters": [
+          150,
+          1500
+        ],
+        "downwindExtentMeters": [
+          500,
+          8000
+        ],
+        "wavelengthMeters": null,
+        "note": "The band follows the pseudo-warm-front inflow and terminates near the updraft; it is not attached to murus."
+      },
+      "placement": {
+        "method": "inflow-chain",
+        "count": [
+          4,
+          14
+        ],
+        "scaleRelative": [
+          0.07,
+          0.26
+        ],
+        "minimumSeparation": 0.035,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [
+          "cumulonimbus"
+        ],
+        "phases": [
+          "liquid",
+          "mixed",
+          "ice"
+        ],
+        "lifecycle": [
+          "mature",
+          "precipitating"
+        ],
+        "requires": [
+          "storm-complex",
+          "supercell-inflow",
+          "pseudo-warm-front"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {}
+      },
+      "operators": [
+        {
+          "code": "add-inflow-band",
+          "opCode": 21,
+          "blend": "placement",
+          "blendCode": 4,
+          "anchor": "storm-inflow-sector",
+          "anchorCode": 12,
+          "parameters": {
+            "alignToLowLevelWindRadians": [
+              -0.08,
+              0.08
+            ],
+            "baseAboveMurusMeters": [
+              100,
+              1200
+            ],
+            "terminalUpdraftGapFraction": [
+              0.02,
+              0.16
+            ],
+            "broadBeaverTailProbability": 0.28,
+            "inflowSpeedMps": [
+              4,
+              35
+            ]
+          },
+          "flags": [
+            "detached-from-murus",
+            "inflow-directed",
+            "world-space-band"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoFlumen"
+      ],
+      "referenceVariation": {
+        "seed": 2543835150,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              -0.853381,
+              0.06,
+              -0.7
+            ],
+            "scale": [
+              0.078581,
+              0.050977,
+              0.068075
+            ],
+            "angleRadians": 0.611546,
+            "intensity": 0.632891
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.678644,
+              0.071111,
+              -0.534513
+            ],
+            "scale": [
+              0.195893,
+              0.215421,
+              0.176611
+            ],
+            "angleRadians": 0.690881,
+            "intensity": 0.920708
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.524315,
+              0.082222,
+              -0.373977
+            ],
+            "scale": [
+              0.091971,
+              0.079514,
+              0.080022
+            ],
+            "angleRadians": 0.658123,
+            "intensity": 0.886436
+          },
+          {
+            "index": 3,
+            "center": [
+              -0.379645,
+              0.093333,
+              -0.222744
+            ],
+            "scale": [
+              0.067601,
+              0.075773,
+              0.084199
+            ],
+            "angleRadians": 0.560197,
+            "intensity": 0.740683
+          },
+          {
+            "index": 4,
+            "center": [
+              -0.246919,
+              0.104444,
+              -0.084045
+            ],
+            "scale": [
+              0.120027,
+              0.101606,
+              0.131087
+            ],
+            "angleRadians": 0.560771,
+            "intensity": 0.913358
+          },
+          {
+            "index": 5,
+            "center": [
+              -0.066027,
+              0.115556,
+              0.040399
+            ],
+            "scale": [
+              0.115252,
+              0.06862,
+              0.107605
+            ],
+            "angleRadians": 0.601223,
+            "intensity": 0.868291
+          },
+          {
+            "index": 6,
+            "center": [
+              0.111066,
+              0.126667,
+              0.15059
+            ],
+            "scale": [
+              0.09535,
+              0.073306,
+              0.093516
+            ],
+            "angleRadians": 0.708986,
+            "intensity": 0.7088
+          },
+          {
+            "index": 7,
+            "center": [
+              0.326846,
+              0.137778,
+              0.248246
+            ],
+            "scale": [
+              0.148903,
+              0.115638,
+              0.102754
+            ],
+            "angleRadians": 0.582538,
+            "intensity": 0.8068
+          },
+          {
+            "index": 8,
+            "center": [
+              0.482098,
+              0.148889,
+              0.336598
+            ],
+            "scale": [
+              0.201382,
+              0.13351,
+              0.220027
+            ],
+            "angleRadians": 0.709786,
+            "intensity": 0.93358
+          },
+          {
+            "index": 9,
+            "center": [
+              0.627686,
+              0.16,
+              0.42
+            ],
+            "scale": [
+              0.093927,
+              0.077827,
+              0.090696
+            ],
+            "angleRadians": 0.650262,
+            "intensity": 0.969238
+          }
+        ],
+        "topology": {
+          "count": 10,
+          "nearestSpacingCoefficientVariation": 0.113022,
+          "orderedIntervalCoefficientVariation": 0.144812,
+          "nearestDirectionEntropy": 0.61548
+        }
+      }
+    },
+    {
+      "id": "polar-stratospheric",
+      "category": "upper-atmospheric",
+      "description": "A very thin polar-winter stratospheric condensate field following localized gravity-wave cold pockets.",
+      "representation": "upper-atmosphere-thin-layer",
+      "support": {
+        "frame": "earth-tangent-shell",
+        "finite": true,
+        "anchor": "tangent-shell",
+        "altitudeKm": [
+          15,
+          30
+        ],
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.1,
+            0.1
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          20000,
+          500000
+        ],
+        "verticalExtentMeters": [
+          100,
+          3000
+        ],
+        "downwindExtentMeters": [
+          20000,
+          500000
+        ],
+        "wavelengthMeters": [
+          5000,
+          120000
+        ],
+        "note": "Nitric-acid/water PSC may occur above the ice frost point; morphology follows mesoscale cold pools and mountain waves."
+      },
+      "placement": {
+        "method": "upper-wave-patches",
+        "count": [
+          2,
+          7
+        ],
+        "scaleRelative": [
+          0.18,
+          0.65
+        ],
+        "minimumSeparation": 0.08,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [],
+        "phases": [
+          "mixed"
+        ],
+        "lifecycle": [
+          "mature"
+        ],
+        "requires": [
+          "polar-winter-vortex",
+          "stratospheric-cold-pool"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {
+          "absoluteLatitudeDegrees": [
+            60,
+            90
+          ],
+          "season": "winter",
+          "altitudeKm": [
+            15,
+            30
+          ]
+        }
+      },
+      "operators": [
+        {
+          "code": "add-upper-wave-sheet",
+          "opCode": 22,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "tangent-shell",
+          "anchorCode": 13,
+          "parameters": {
+            "verticalThicknessMeters": [
+              100,
+              3000
+            ],
+            "primaryWaveAmplitudeMeters": [
+              100,
+              2000
+            ],
+            "primaryWavelengthMeters": [
+              5000,
+              120000
+            ],
+            "secondaryWaveFraction": [
+              0.05,
+              0.28
+            ],
+            "horizontalAnisotropy": [
+              1.5,
+              8
+            ],
+            "materialProfile": "psc-nitric-acid-water"
+          },
+          "flags": [
+            "earth-curvature",
+            "gravity-wave-cold-pockets",
+            "optically-thin"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoUpper",
+        "pscMicrophysics"
+      ],
+      "referenceVariation": {
+        "seed": 3736549025,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.227152,
+              -0.004085,
+              0.248039
+            ],
+            "scale": [
+              0.571924,
+              0.612038,
+              0.476101
+            ],
+            "angleRadians": 1.957061,
+            "intensity": 0.818857
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.693937,
+              0.001758,
+              -0.658
+            ],
+            "scale": [
+              0.708326,
+              0.529302,
+              0.519898
+            ],
+            "angleRadians": 0.994593,
+            "intensity": 0.842806
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.875349,
+              0.049613,
+              0.66444
+            ],
+            "scale": [
+              0.265302,
+              0.158373,
+              0.181463
+            ],
+            "angleRadians": 2.513719,
+            "intensity": 0.803473
+          },
+          {
+            "index": 3,
+            "center": [
+              0.140503,
+              0.029561,
+              -0.587264
+            ],
+            "scale": [
+              0.641,
+              0.641751,
+              0.670462
+            ],
+            "angleRadians": 1.424652,
+            "intensity": 0.845571
+          },
+          {
+            "index": 4,
+            "center": [
+              -0.234031,
+              -0.021378,
+              0.711058
+            ],
+            "scale": [
+              0.295833,
+              0.216043,
+              0.191608
+            ],
+            "angleRadians": 0.362097,
+            "intensity": 0.620466
+          }
+        ],
+        "topology": {
+          "count": 5,
+          "nearestSpacingCoefficientVariation": 0.129498,
+          "orderedIntervalCoefficientVariation": 0.539146,
+          "nearestDirectionEntropy": 0.507309
+        }
+      }
+    },
+    {
+      "id": "nacreous",
+      "category": "upper-atmospheric",
+      "description": "Ice PSC in thin often lenticular gravity-wave sheets with particle-size-coherent iridescence.",
+      "representation": "upper-atmosphere-thin-layer",
+      "support": {
+        "frame": "earth-tangent-shell",
+        "finite": true,
+        "anchor": "tangent-shell",
+        "altitudeKm": [
+          15,
+          30
+        ],
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.1,
+            0.1
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          10000,
+          350000
+        ],
+        "verticalExtentMeters": [
+          100,
+          2000
+        ],
+        "downwindExtentMeters": [
+          10000,
+          250000
+        ],
+        "wavelengthMeters": [
+          5000,
+          100000
+        ],
+        "note": "Stationary wave crests remain geometrically thin; mother-of-pearl colour is a view/source-dependent material operation, not baked RGB."
+      },
+      "placement": {
+        "method": "upper-wave-patches",
+        "count": [
+          2,
+          6
+        ],
+        "scaleRelative": [
+          0.2,
+          0.7
+        ],
+        "minimumSeparation": 0.1,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [],
+        "phases": [
+          "ice"
+        ],
+        "lifecycle": [
+          "mature"
+        ],
+        "requires": [
+          "polar-winter-vortex",
+          "below-ice-frost-point"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {
+          "absoluteLatitudeDegrees": [
+            60,
+            90
+          ],
+          "season": "winter",
+          "maximumTemperatureKelvin": 188.15,
+          "altitudeKm": [
+            15,
+            30
+          ],
+          "preferredSolarDepressionDegrees": [
+            1,
+            12
+          ]
+        }
+      },
+      "operators": [
+        {
+          "code": "add-upper-wave-sheet",
+          "opCode": 22,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "tangent-shell",
+          "anchorCode": 13,
+          "parameters": {
+            "verticalThicknessMeters": [
+              100,
+              2000
+            ],
+            "primaryWaveAmplitudeMeters": [
+              80,
+              1500
+            ],
+            "primaryWavelengthMeters": [
+              5000,
+              100000
+            ],
+            "secondaryWaveFraction": [
+              0.04,
+              0.2
+            ],
+            "horizontalAnisotropy": [
+              8,
+              80
+            ],
+            "crestStationarity": 1,
+            "boundaryIntermittency": [
+              0.05,
+              0.3
+            ],
+            "materialProfile": "psc-ice-nacreous-10um"
+          },
+          "flags": [
+            "earth-curvature",
+            "stationary-gravity-wave",
+            "diffraction-material-required"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoUpper",
+        "wmoNacreous",
+        "pscMicrophysics"
+      ],
+      "referenceVariation": {
+        "seed": 2110609269,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.200367,
+              -0.027064,
+              -0.061049
+            ],
+            "scale": [
+              0.376086,
+              0.306089,
+              0.417185
+            ],
+            "angleRadians": 1.960274,
+            "intensity": 0.758835
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.79737,
+              0.037008,
+              0.662587
+            ],
+            "scale": [
+              0.665329,
+              0.362371,
+              0.466377
+            ],
+            "angleRadians": 3.577218,
+            "intensity": 0.819848
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.582352,
+              0.058211,
+              -0.495647
+            ],
+            "scale": [
+              0.39361,
+              0.581212,
+              0.678084
+            ],
+            "angleRadians": 5.881605,
+            "intensity": 0.841243
+          },
+          {
+            "index": 3,
+            "center": [
+              0.342272,
+              0.007154,
+              0.519927
+            ],
+            "scale": [
+              0.418694,
+              0.292916,
+              0.374841
+            ],
+            "angleRadians": 2.387593,
+            "intensity": 0.944859
+          }
+        ],
+        "topology": {
+          "count": 4,
+          "nearestSpacingCoefficientVariation": 0.284038,
+          "orderedIntervalCoefficientVariation": 0.753945,
+          "nearestDirectionEntropy": 0.666667
+        }
+      }
+    },
+    {
+      "id": "noctilucent",
+      "category": "upper-atmospheric",
+      "description": "An exceptionally thin summer mesopause ice layer revealing nested gravity waves, billows and turbulence from kilometre to sub-kilometre scale.",
+      "representation": "upper-atmosphere-thin-layer",
+      "support": {
+        "frame": "earth-tangent-shell",
+        "finite": true,
+        "anchor": "tangent-shell",
+        "altitudeKm": [
+          80,
+          85
+        ],
+        "normalizedSupport": {
+          "u": [
+            -1,
+            1
+          ],
+          "v": [
+            -0.04,
+            0.04
+          ],
+          "w": [
+            -1,
+            1
+          ]
+        },
+        "verticalOffsetMeters": [
+          0,
+          0
+        ]
+      },
+      "physicalScale": {
+        "horizontalExtentMeters": [
+          20000,
+          1000000
+        ],
+        "verticalExtentMeters": [
+          50,
+          2000
+        ],
+        "downwindExtentMeters": [
+          20000,
+          1000000
+        ],
+        "wavelengthMeters": [
+          20,
+          100000
+        ],
+        "note": "A tangent-shell mesospheric field; fine bands and Kelvin-Helmholtz structures modulate ice albedo rather than becoming tropospheric cirrus."
+      },
+      "placement": {
+        "method": "upper-wave-patches",
+        "count": [
+          4,
+          12
+        ],
+        "scaleRelative": [
+          0.12,
+          0.5
+        ],
+        "minimumSeparation": 0.045,
+        "candidateCount": 0,
+        "jitterFraction": 0.18
+      },
+      "constraints": {
+        "genera": [],
+        "phases": [
+          "ice"
+        ],
+        "lifecycle": [
+          "mature"
+        ],
+        "requires": [
+          "polar-summer-mesopause",
+          "sunlit-upper-layer"
+        ],
+        "dependencies": [],
+        "excludes": [],
+        "environment": {
+          "absoluteLatitudeDegrees": [
+            50,
+            70
+          ],
+          "season": "summer",
+          "altitudeKm": [
+            80,
+            85
+          ],
+          "solarDepressionDegrees": [
+            6,
+            16
+          ]
+        }
+      },
+      "operators": [
+        {
+          "code": "add-upper-wave-sheet",
+          "opCode": 22,
+          "blend": "smooth-union",
+          "blendCode": 1,
+          "anchor": "tangent-shell",
+          "anchorCode": 13,
+          "parameters": {
+            "verticalThicknessMeters": [
+              50,
+              2000
+            ],
+            "primaryWaveAmplitudeMeters": [
+              20,
+              1000
+            ],
+            "primaryWavelengthMeters": [
+              4000,
+              100000
+            ],
+            "secondaryWaveFraction": [
+              0.08,
+              0.38
+            ],
+            "horizontalAnisotropy": [
+              1.5,
+              12
+            ],
+            "spectralBandsMeters": [
+              [
+                20,
+                250
+              ],
+              [
+                250,
+                4000
+              ],
+              [
+                4000,
+                100000
+              ]
+            ],
+            "khIntermittency": [
+              0.04,
+              0.3
+            ],
+            "turbulenceIntermittency": [
+              0.08,
+              0.46
+            ],
+            "materialProfile": "pmc-water-ice-60-100nm"
+          },
+          "flags": [
+            "earth-curvature",
+            "multiscale-gravity-waves",
+            "mesospheric-ice-albedo"
+          ]
+        }
+      ],
+      "sources": [
+        "wmoUpper",
+        "pmcDns",
+        "pmcMorphology"
+      ],
+      "referenceVariation": {
+        "seed": 1180161881,
+        "instances": [
+          {
+            "index": 0,
+            "center": [
+              0.218857,
+              -0.019438,
+              -0.171069
+            ],
+            "scale": [
+              0.328102,
+              0.386207,
+              0.413634
+            ],
+            "angleRadians": 4.009383,
+            "intensity": 0.756224
+          },
+          {
+            "index": 1,
+            "center": [
+              -0.366131,
+              -0.030986,
+              0.814989
+            ],
+            "scale": [
+              0.135638,
+              0.135402,
+              0.116273
+            ],
+            "angleRadians": 3.316818,
+            "intensity": 0.897236
+          },
+          {
+            "index": 2,
+            "center": [
+              -0.705142,
+              0.053066,
+              -0.339334
+            ],
+            "scale": [
+              0.252678,
+              0.230114,
+              0.358902
+            ],
+            "angleRadians": 5.796104,
+            "intensity": 0.968323
+          },
+          {
+            "index": 3,
+            "center": [
+              0.785517,
+              0.015672,
+              0.842549
+            ],
+            "scale": [
+              0.1994,
+              0.283052,
+              0.224464
+            ],
+            "angleRadians": 5.77473,
+            "intensity": 0.729421
+          },
+          {
+            "index": 4,
+            "center": [
+              0.817592,
+              0.032162,
+              -0.578781
+            ],
+            "scale": [
+              0.307049,
+              0.246005,
+              0.348101
+            ],
+            "angleRadians": 3.847718,
+            "intensity": 0.997816
+          },
+          {
+            "index": 5,
+            "center": [
+              -0.399066,
+              -0.021002,
+              0.180202
+            ],
+            "scale": [
+              0.388931,
+              0.261626,
+              0.350761
+            ],
+            "angleRadians": 3.902762,
+            "intensity": 0.959865
+          },
+          {
+            "index": 6,
+            "center": [
+              0.685073,
+              -0.055648,
+              0.233787
+            ],
+            "scale": [
+              0.110228,
+              0.118976,
+              0.151679
+            ],
+            "angleRadians": 1.533446,
+            "intensity": 0.687263
+          },
+          {
+            "index": 7,
+            "center": [
+              0.186872,
+              0.057547,
+              -0.716169
+            ],
+            "scale": [
+              0.316551,
+              0.210896,
+              0.3114
+            ],
+            "angleRadians": 1.679016,
+            "intensity": 0.904328
+          },
+          {
+            "index": 8,
+            "center": [
+              0.019018,
+              0.037839,
+              0.38905
+            ],
+            "scale": [
+              0.269912,
+              0.24965,
+              0.177486
+            ],
+            "angleRadians": 2.368572,
+            "intensity": 0.981503
+          }
+        ],
+        "topology": {
+          "count": 9,
+          "nearestSpacingCoefficientVariation": 0.107544,
+          "orderedIntervalCoefficientVariation": 0.853102,
+          "nearestDirectionEntropy": 0.732387
+        }
+      }
+    }
+  ],
+  "checksums": {
+    "algorithm": "SHA-256",
+    "payload": "3c1fb24ace5d70a38ae731fd498ff18836b119d847adf78f398c11fbcd183760"
+  },
+  "provenance": {
+    "sources": [
+      {
+        "id": "wmoVarieties",
+        "url": "https://cloudatlas.wmo.int/en/clouds-varieties.html"
+      },
+      {
+        "id": "wmoFeatures",
+        "url": "https://cloudatlas.wmo.int/en/clouds-supplementary-features.html"
+      },
+      {
+        "id": "wmoAccessories",
+        "url": "https://cloudatlas.wmo.int/en/principles-of-cloud-classification-accessory-clouds.html"
+      },
+      {
+        "id": "wmoUpper",
+        "url": "https://cloudatlas.wmo.int/en/upper-atmospheric-clouds.html"
+      },
+      {
+        "id": "wmoMamma",
+        "url": "https://cloudatlas.wmo.int/en/clouds-supplementary-features-mamma.html"
+      },
+      {
+        "id": "wmoFluctus",
+        "url": "https://cloudatlas.wmo.int/en/clouds-supplementary-features-fluctus.html"
+      },
+      {
+        "id": "wmoAsperitas",
+        "url": "https://cloudatlas.wmo.int/en/clouds-supplementary-features-asperitas.html"
+      },
+      {
+        "id": "wmoCavum",
+        "url": "https://cloudatlas.wmo.int/en/clouds-supplementary-features-cavum.html"
+      },
+      {
+        "id": "wmoMurus",
+        "url": "https://cloudatlas.wmo.int/en/clouds-supplementary-features-murus.html"
+      },
+      {
+        "id": "wmoCauda",
+        "url": "https://cloudatlas.wmo.int/clouds-supplementary-features-cauda.html"
+      },
+      {
+        "id": "wmoPileus",
+        "url": "https://cloudatlas.wmo.int/en/clouds-accessory-pileus.html"
+      },
+      {
+        "id": "wmoVelum",
+        "url": "https://cloudatlas.wmo.int/clouds-accessory-velum.html"
+      },
+      {
+        "id": "wmoPannus",
+        "url": "https://cloudatlas.wmo.int/en/clouds-accessory-pannus.html"
+      },
+      {
+        "id": "wmoFlumen",
+        "url": "https://cloudatlas.wmo.int/clouds-accessory-flumen.html"
+      },
+      {
+        "id": "wmoNacreous",
+        "url": "https://cloudatlas.wmo.int/nacreous-clouds.html"
+      },
+      {
+        "id": "mammatusSimulation",
+        "url": "https://doi.org/10.1175/2007JAS2469.1"
+      },
+      {
+        "id": "holePunchSimulation",
+        "url": "https://doi.org/10.1175/JAS-D-15-0211.1"
+      },
+      {
+        "id": "khObservation",
+        "url": "https://doi.org/10.1029/2011GL050120"
+      },
+      {
+        "id": "asperitasModel",
+        "url": "https://doi.org/10.1103/PhysRevFluids.7.010501"
+      },
+      {
+        "id": "pscMicrophysics",
+        "url": "https://doi.org/10.1029/2001JD001125"
+      },
+      {
+        "id": "pmcDns",
+        "url": "https://doi.org/10.1029/2021JD035834"
+      },
+      {
+        "id": "pmcMorphology",
+        "url": "https://doi.org/10.1016/j.jastp.2012.09.009"
+      },
+      {
+        "id": "cirrusFallstreakStochasticModel",
+        "url": "https://doi.org/10.1256/qj.04.144"
+      },
+      {
+        "id": "gpuGemsVolumeReconstruction",
+        "url": "https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-39-volume-rendering-techniques"
+      },
+      {
+        "id": "gpuGemsProceduralFilterWidth",
+        "url": "https://developer.nvidia.com/gpugems/gpugems/part-iv-image-processing/chapter-25-fast-filter-width-estimates-texture-maps"
+      },
+      {
+        "id": "horizonVolumetricCloudscapes",
+        "url": "https://advances.realtimerendering.com/s2015/index.html#_REAL-TIME_VOLUMETRIC_CLOUDSCAPES"
+      },
+      {
+        "id": "nubisEvolved",
+        "url": "https://advances.realtimerendering.com/s2022/index.html#Nubis"
+      }
+    ],
+    "excludedFromThisAsset": [
+      "virga",
+      "praecipitatio"
+    ],
+    "exclusionReason": "Falling hydrometeors are generated by the parent-owned hydrometeor system, not cloud morphology operators."
+  },
+  "limitations": [
+    "This manifest is a CPU/GPU operator contract and contains no renderer integration by itself.",
+    "Reference variations certify deterministic topology; production instances must be regenerated from each persistent parent seed.",
+    "Nacreous diffraction and NLC albedo require optical material work in addition to morphology."
+  ]
+}

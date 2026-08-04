@@ -69,6 +69,7 @@
 
 .base,
 .radianceCanvas,
+.legacyFallback,
 .edgeColor,
 .horizon,
 .celestialCanvas,
@@ -78,6 +79,10 @@
 .grain {
     position: absolute;
     pointer-events: none;
+}
+
+.legacyFallback {
+    inset: 0;
 }
 
 .base {
@@ -101,6 +106,10 @@
     height: 100%;
     display: block;
     contain: strict;
+}
+
+.rendererStatus {
+    display: none;
 }
 
 .edgeColor {

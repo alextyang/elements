@@ -2,15 +2,12 @@
 
 import { useEffect, useRef } from "react";
 
-import {
-    CLOUD_COMPOSITE,
-    CLOUD_FUNCTIONS,
-    CLOUD_UNIFORMS,
-    packCloudLayers,
-} from "./cloud-shader";
-import { createCloudNoise } from "./cloud-noise";
 import type { CloudScene } from "./cloud-scene";
+import type { HydrometeorSceneOverrides } from "./hydrometeor-system";
+import type { GroundAlbedoRgb } from "./atmospheric-composition";
 import type { SkyPalette } from "./sky-palettes";
+import type { ProductionWeatherSceneAuthoring } from "./weather-scene";
+import { cameraYawRadiansFromViewAzimuth } from "./camera-contract";
 import styles from "./sky.module.css";
 
 export interface SkyRadianceScene {
@@ -32,7 +29,11 @@ export interface SkyRadianceScene {
     inversion: number;
     stratosphericAerosol: number;
     groundAlbedo: number;
+    /** Optional physical linear RGB reflectance; legacy scalar stays valid. */
+    groundAlbedoRgb?: GroundAlbedoRgb;
     aerosolTint: [number, number, number];
+    /** Public compass heading; 180° is the legacy unrotated GPU reference. */
+    viewAzimuth?: number;
     horizontalFov: number;
     cameraProjection: boolean;
     viewElevation: number;
@@ -40,18 +41,32 @@ export interface SkyRadianceScene {
     cloudiness: number;
     /** Full meteorological cloud state driving the volumetric renderer. */
     cloudScene: CloudScene;
-    /** Scene-linear radiance of the Sun after atmospheric transmittance. */
+    /** Optional exact precipitation/surface-meteor authoring state. */
+    hydrometeors?: HydrometeorSceneOverrides;
+    /** Optional finite world-space optical/electrical weather phenomena. */
+    weather?: ProductionWeatherSceneAuthoring;
+    /** Unattenuated solar irradiance at TOA in the renderer's scene domain. */
+    solarTopOfAtmosphereIrradiance: [number, number, number];
+    /** Unattenuated lunar irradiance at TOA; phase and distance are included. */
+    moonTopOfAtmosphereIrradiance: [number, number, number];
+    /** Common post-transport photographic exposure multiplier (not EV). */
+    adaptationExposure: number;
+    /** @deprecated Legacy cloud-lighting field; use solarTopOfAtmosphereIrradiance. */
     sunRadiance: [number, number, number];
-    /** Scene-linear radiance of the Moon after atmospheric transmittance. */
+    /** Real solar direction in the renderer's local east/up/view frame. */
+    sunDirection: [number, number, number];
+    /** @deprecated Observer-attenuated legacy field; use moonTopOfAtmosphereIrradiance. */
     moonRadiance: [number, number, number];
+    /** Real lunar direction in the renderer's local east/up/view frame. */
+    moonDirection: [number, number, number];
     /** Hemispheric skylight reaching cloud tops. */
     cloudAmbient: [number, number, number];
     /** Light returned from the surface to cloud bases. */
     cloudGroundLight: [number, number, number];
-    /** View march steps, light march steps. */
-    cloudQuality: [number, number];
     /** Seconds of advection applied to the cloud fields. */
     cloudTime: number;
+    /** Laboratory-only offset applied without interrupting the live clock. */
+    cloudTimeOffset: number;
     edgeStrength: number;
     horizonStrength: number;
     airglowStrength: number;
@@ -76,7 +91,8 @@ in vec2 v_uv;
 out vec4 out_color;
 
 uniform vec2 u_resolution;
-uniform vec3 u_camera;
+// x=horizontal FOV, y=pitch, z=vertical FOV (zero for the dome), w=world yaw.
+uniform vec4 u_camera;
 uniform vec2 u_sun;
 uniform vec2 u_moon;
 uniform vec4 u_optics;
@@ -98,7 +114,6 @@ uniform vec3 u_left;
 uniform vec3 u_right;
 uniform vec3 u_glow;
 uniform vec3 u_haze;
-${CLOUD_UNIFORMS}
 
 const float PI = 3.141592653589793;
 
@@ -170,10 +185,17 @@ vec3 view_direction(vec2 uv) {
         ? u_camera.y + (0.5 - uv.y) * u_camera.z
         : mix(PI * 0.51, -0.035, pow(uv.y, 0.91));
     float cos_elevation = cos(elevation);
-    return normalize(vec3(
+    vec3 local = normalize(vec3(
         sin(azimuth) * cos_elevation,
         sin(elevation),
         cos(azimuth) * cos_elevation
+    ));
+    float cosine = cos(u_camera.w);
+    float sine = sin(u_camera.w);
+    return normalize(vec3(
+        local.x * cosine + local.z * sine,
+        local.y,
+        -local.x * sine + local.z * cosine
     ));
 }
 
@@ -183,10 +205,17 @@ vec3 source_direction(vec2 point) {
         ? u_camera.y + (0.5 - point.y) * u_camera.z
         : mix(PI * 0.51, -0.035, pow(clamp(point.y, 0.0, 1.15), 0.91));
     float cos_elevation = cos(elevation);
-    return normalize(vec3(
+    vec3 local = normalize(vec3(
         sin(azimuth) * cos_elevation,
         sin(elevation),
         cos(azimuth) * cos_elevation
+    ));
+    float cosine = cos(u_camera.w);
+    float sine = sin(u_camera.w);
+    return normalize(vec3(
+        local.x * cosine + local.z * sine,
+        local.y,
+        -local.x * sine + local.z * cosine
     ));
 }
 
@@ -195,7 +224,6 @@ float henyey_greenstein(float cosine, float g) {
     return (1.0 - g2) /
         max(0.12, 4.0 * PI * pow(1.0 + g2 - 2.0 * g * cosine, 1.5));
 }
-${CLOUD_FUNCTIONS}
 
 void main() {
     // WebGL has a bottom-left texture origin; convert to the screen's top-left.
@@ -396,8 +424,6 @@ void main() {
         (1.0 - night) * (0.004 + humidity * 0.005 + cloudiness * 0.006);
     vec3 ground_bounce_color = mix(aerosol_white, solar_scatter, low_sun_path * 0.36);
     radiance += ground_bounce_color * ground_bounce;
-
-${CLOUD_COMPOSITE}
 
     // Natural night is layered rather than uniformly blue: weak airglow,
     // integrated celestial radiance, moon aureole, and near-horizon extinction.
@@ -636,14 +662,6 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             return undefined;
         }
 
-        // Cloud noise volumes are generated once at start. Per-day variation
-        // comes from wind advection and the weather-map offset, not from
-        // regenerating 8 MB of texture on every scene change.
-        const noise = createCloudNoise(gl);
-        if (!noise) {
-            console.warn("Cloud noise unavailable; rendering clear sky");
-        }
-
         const buffer = gl.createBuffer();
         if (!buffer) return undefined;
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -695,13 +713,14 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             gl.enableVertexAttribArray(position);
             gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
             gl.uniform2f(uniform("u_resolution"), width, height);
-            gl.uniform3f(
+            gl.uniform4f(
                 uniform("u_camera"),
                 (current.horizontalFov * Math.PI) / 180,
                 (current.viewElevation * Math.PI) / 180,
                 current.cameraProjection
                     ? (current.verticalFov * Math.PI) / 180
                     : 0,
+                cameraYawRadiansFromViewAzimuth(current.viewAzimuth),
             );
             gl.uniform2f(uniform("u_sun"), current.sun[0], current.sun[1]);
             gl.uniform2f(uniform("u_moon"), current.moon[0], current.moon[1]);
@@ -735,59 +754,6 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             gl.uniform3fv(uniform("u_aerosol_tint"), current.aerosolTint);
             gl.uniform4fv(uniform("u_seed"), current.seed);
 
-            // Volumetric cloud state.
-            const packed = packCloudLayers(
-                current.cloudScene,
-                current.cloudTime,
-            );
-            gl.uniform4fv(uniform("u_layer_geometry"), packed.geometry);
-            gl.uniform4fv(uniform("u_layer_shape"), packed.shape);
-            gl.uniform4fv(uniform("u_layer_motion"), packed.motion);
-            gl.uniform4fv(uniform("u_layer_phase"), packed.phase);
-            gl.uniform4fv(uniform("u_layer_scale"), packed.scale);
-            gl.uniform4fv(uniform("u_layer_drift"), packed.drift);
-            gl.uniform3fv(uniform("u_cloud_sun_radiance"), current.sunRadiance);
-            gl.uniform3fv(uniform("u_cloud_moon_radiance"), current.moonRadiance);
-            gl.uniform3fv(uniform("u_cloud_ambient"), current.cloudAmbient);
-            gl.uniform3fv(
-                uniform("u_cloud_ground_light"),
-                current.cloudGroundLight,
-            );
-            gl.uniform4f(
-                uniform("u_cloud_quality"),
-                current.cloudQuality[0],
-                current.cloudQuality[1],
-                // Aerial-perspective falloff: clouds reach the sky colour over
-                // roughly 70 km, which matches the observed loss of contrast in
-                // a distant horizon deck.
-                1 / 70000,
-                noise && packed.active ? 1 : 0,
-            );
-            // Layer advection is wrapped per layer inside packCloudLayers; this
-            // uniform only drives the noctilucent sheet, so it is reduced here
-            // to keep it away from the precision floor of a raw timestamp.
-            gl.uniform1f(uniform("u_cloud_time"), current.cloudTime % 100000);
-            gl.uniform1f(uniform("u_cloud_fog"), current.cloudScene.fog);
-            gl.uniform1f(
-                uniform("u_cloud_noctilucent"),
-                current.cloudScene.noctilucent,
-            );
-
-            if (noise) {
-                gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_3D, noise.base);
-                gl.uniform1i(uniform("u_cloud_base"), 0);
-                gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_3D, noise.detail);
-                gl.uniform1i(uniform("u_cloud_detail"), 1);
-                gl.activeTexture(gl.TEXTURE2);
-                gl.bindTexture(gl.TEXTURE_2D, noise.weather);
-                gl.uniform1i(uniform("u_cloud_weather"), 2);
-                gl.activeTexture(gl.TEXTURE3);
-                gl.bindTexture(gl.TEXTURE_2D, noise.curl);
-                gl.uniform1i(uniform("u_cloud_curl"), 3);
-            }
-
             gl.uniform1f(uniform("u_airglow"), current.airglowStrength);
             gl.uniform1f(uniform("u_blackout"), current.nightBlackout);
             gl.uniform3fv(
@@ -817,7 +783,6 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             drawRef.current = null;
             resizeObserver.disconnect();
             document.removeEventListener("visibilitychange", visibilityHandler);
-            noise?.dispose();
             gl.deleteBuffer(buffer);
             gl.deleteProgram(program);
         };

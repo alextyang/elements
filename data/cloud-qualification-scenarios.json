@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "defaultRepeats": 3,
+  "defaultTimingSamples": 4,
+  "globalLimits": {
+    "coldWarmupGpuMs": 12,
+    "coldWarmupQueueMs": 50,
+    "unsafeTransportMs": 32,
+    "fatalTransportMs": 80,
+    "unsafeSampleCount": 0
+  },
+  "tiers": [
+    {
+      "id": "battery",
+      "updateRate": 1,
+      "limits": { "p95Ms": 5, "maxMs": 8, "firstTransportMs": 8, "minimumCadenceScale": 0.99 }
+    },
+    {
+      "id": "balanced",
+      "updateRate": 2,
+      "limits": { "p95Ms": 8, "maxMs": 12, "firstTransportMs": 10, "minimumCadenceScale": 0.99 }
+    },
+    {
+      "id": "high",
+      "updateRate": 4,
+      "limits": { "p95Ms": 8, "maxMs": 18, "firstTransportMs": 12, "minimumCadenceScale": 0.99 }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "fair-cumulus-day",
+      "label": "Fair cumulus, side-lit afternoon",
+      "viewport": { "width": 1440, "height": 900 },
+      "params": {
+        "date": "2026-07-25",
+        "time": "14:00",
+        "timezone": "America/Los_Angeles",
+        "manualClouds": "1",
+        "lowGenus": "cumulus",
+        "lowOktas": "3",
+        "lowBase": "1.25",
+        "lowThickness": "1.6",
+        "lowOptical": "0.72",
+        "cloudConvection": "0.46",
+        "cloudInstability": "0.5",
+        "cloudSeed": "0.421"
+      }
+    },
+    {
+      "id": "marine-stratocumulus",
+      "label": "Marine stratocumulus cells",
+      "viewport": { "width": 1720, "height": 720 },
+      "params": {
+        "date": "2026-06-12",
+        "time": "09:20",
+        "timezone": "America/Los_Angeles",
+        "manualClouds": "1",
+        "region": "marine",
+        "lowGenus": "stratocumulus",
+        "lowOktas": "6",
+        "lowBase": "0.75",
+        "lowThickness": "1.1",
+        "lowOptical": "0.68",
+        "lowTurbulence": "0.28",
+        "cloudConvection": "0.12",
+        "cloudSeed": "0.137"
+      }
+    },
+    {
+      "id": "frontal-multilayer",
+      "label": "Frontal multilayer deck",
+      "viewport": { "width": 900, "height": 1200 },
+      "params": {
+        "date": "2026-01-18",
+        "time": "11:10",
+        "timezone": "America/New_York",
+        "manualClouds": "1",
+        "lowGenus": "stratus",
+        "lowOktas": "4",
+        "lowBase": "0.45",
+        "lowThickness": "0.8",
+        "lowOptical": "0.52",
+        "midGenus": "altostratus",
+        "midOktas": "6",
+        "midBase": "2.4",
+        "midThickness": "2.8",
+        "midOptical": "0.7",
+        "highGenus": "cirrus",
+        "highOktas": "3",
+        "highBase": "9.5",
+        "highThickness": "0.8",
+        "highOptical": "0.16",
+        "cloudConvection": "0.08",
+        "cloudInstability": "0.2",
+        "cloudSeed": "0.684"
+      }
+    },
+    {
+      "id": "rain-overcast",
+      "label": "Precipitating nimbostratus overcast",
+      "viewport": { "width": 1440, "height": 900 },
+      "params": {
+        "date": "2026-02-15",
+        "time": "16:00",
+        "timezone": "Europe/London",
+        "manualClouds": "1",
+        "lowGenus": "clear",
+        "lowOktas": "0",
+        "midGenus": "nimbostratus",
+        "midOktas": "8",
+        "midBase": "1.8",
+        "midThickness": "4.2",
+        "midOptical": "0.96",
+        "midPrecipitation": "0.82",
+        "cloudInstability": "0.22",
+        "cloudSeed": "0.903"
+      }
+    },
+    {
+      "id": "deep-convection-sunset",
+      "label": "Deep convection near sunset",
+      "viewport": { "width": 1600, "height": 900 },
+      "params": {
+        "date": "2026-07-25",
+        "time": "19:45",
+        "timezone": "America/Chicago",
+        "manualClouds": "1",
+        "lowGenus": "cumulonimbus",
+        "lowOktas": "4",
+        "lowBase": "0.9",
+        "lowThickness": "11.5",
+        "lowOptical": "1",
+        "lowIce": "0.45",
+        "lowPrecipitation": "0.92",
+        "cloudConvection": "0.95",
+        "cloudInstability": "0.94",
+        "cloudSeed": "0.256"
+      }
+    },
+    {
+      "id": "cirrus-moonlight",
+      "label": "Moonlit cirrus and sparse low cloud",
+      "viewport": { "width": 900, "height": 1200 },
+      "params": {
+        "date": "2026-07-25",
+        "time": "23:30",
+        "timezone": "America/Los_Angeles",
+        "manualClouds": "1",
+        "lowGenus": "stratocumulus",
+        "lowOktas": "2",
+        "lowBase": "1.1",
+        "lowThickness": "1.2",
+        "lowOptical": "0.45",
+        "highGenus": "cirrus",
+        "highOktas": "5",
+        "highBase": "9.2",
+        "highThickness": "1.1",
+        "highOptical": "0.2",
+        "highIce": "1",
+        "highWind": "28",
+        "cloudConvection": "0.16",
+        "cloudInstability": "0.25",
+        "cloudSeed": "0.771"
+      }
+    }
+  ]
+}

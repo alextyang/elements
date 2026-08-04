@@ -12,6 +12,11 @@
  * @see https://cloudatlas.wmo.int/en/clouds-genera.html
  */
 
+import type { CloudMorphologyClassificationAssignment } from
+    "./cloud-morphology-modifiers";
+import type { CloudClassification } from "./cloud-state-map";
+import type { CloudSpecialOriginSource } from "./cloud-special-origin-source";
+
 export type CloudGenus =
     | "clear"
     // High: ice, 5-13 km temperate
@@ -29,6 +34,150 @@ export type CloudGenus =
     | "cumulonimbus";
 
 export type CloudLevel = "low" | "middle" | "high";
+
+/**
+ * Morphologically distinct WMO species represented by the volume renderer.
+ * The genus prefix is intentional: names such as fibratus, stratiformis and
+ * castellanus recur at different levels but have different physical scale,
+ * phase and optical structure.
+ */
+export type CloudSpecies =
+    | "generic"
+    | "cirrus-fibratus"
+    | "cirrus-uncinus"
+    | "cirrus-spissatus"
+    | "cirrus-castellanus"
+    | "cirrus-floccus"
+    | "cirrocumulus-stratiformis"
+    | "cirrocumulus-lenticularis"
+    | "cirrocumulus-castellanus"
+    | "cirrocumulus-floccus"
+    | "cirrostratus-fibratus"
+    | "cirrostratus-nebulosus"
+    | "altocumulus-stratiformis"
+    | "altocumulus-lenticularis"
+    | "altocumulus-castellanus"
+    | "altocumulus-floccus"
+    | "altocumulus-volutus"
+    | "altostratus-opacus"
+    | "nimbostratus-praecipitatio"
+    | "stratocumulus-stratiformis"
+    | "stratocumulus-lenticularis"
+    | "stratocumulus-castellanus"
+    | "stratocumulus-floccus"
+    | "stratocumulus-volutus"
+    | "stratus-nebulosus"
+    | "stratus-fractus"
+    | "cumulus-humilis"
+    | "cumulus-mediocris"
+    | "cumulus-congestus"
+    | "cumulus-fractus"
+    | "cumulonimbus-calvus"
+    | "cumulonimbus-capillatus"
+    | "cumulonimbus-capillatus-incus";
+
+export const CLOUD_SPECIES_CODE: Record<CloudSpecies, number> = {
+    generic: 0,
+    "cirrus-fibratus": 1,
+    "cirrus-uncinus": 2,
+    "cirrus-spissatus": 3,
+    "cirrocumulus-stratiformis": 4,
+    "cirrocumulus-castellanus": 5,
+    "cirrostratus-fibratus": 6,
+    "cirrostratus-nebulosus": 7,
+    "altocumulus-stratiformis": 8,
+    "altocumulus-lenticularis": 9,
+    "altocumulus-castellanus": 10,
+    "altostratus-opacus": 11,
+    "nimbostratus-praecipitatio": 12,
+    "stratocumulus-stratiformis": 13,
+    "stratocumulus-volutus": 14,
+    "stratus-nebulosus": 15,
+    "stratus-fractus": 16,
+    "cumulus-humilis": 17,
+    "cumulus-mediocris": 18,
+    "cumulus-congestus": 19,
+    "cumulonimbus-calvus": 20,
+    "cumulonimbus-capillatus-incus": 21,
+    "cirrus-castellanus": 22,
+    "cirrus-floccus": 23,
+    "cirrocumulus-lenticularis": 24,
+    "cirrocumulus-floccus": 25,
+    "altocumulus-floccus": 26,
+    "altocumulus-volutus": 27,
+    "stratocumulus-lenticularis": 28,
+    "stratocumulus-castellanus": 29,
+    "stratocumulus-floccus": 30,
+    "cumulus-fractus": 31,
+    "cumulonimbus-capillatus": 32,
+};
+
+/** Canonical owner genus for every renderer species key. */
+export const CLOUD_SPECIES_GENUS: Record<
+    Exclude<CloudSpecies, "generic">,
+    Exclude<CloudGenus, "clear">
+> = {
+    "cirrus-fibratus": "cirrus",
+    "cirrus-uncinus": "cirrus",
+    "cirrus-spissatus": "cirrus",
+    "cirrus-castellanus": "cirrus",
+    "cirrus-floccus": "cirrus",
+    "cirrocumulus-stratiformis": "cirrocumulus",
+    "cirrocumulus-lenticularis": "cirrocumulus",
+    "cirrocumulus-castellanus": "cirrocumulus",
+    "cirrocumulus-floccus": "cirrocumulus",
+    "cirrostratus-fibratus": "cirrostratus",
+    "cirrostratus-nebulosus": "cirrostratus",
+    "altocumulus-stratiformis": "altocumulus",
+    "altocumulus-lenticularis": "altocumulus",
+    "altocumulus-castellanus": "altocumulus",
+    "altocumulus-floccus": "altocumulus",
+    "altocumulus-volutus": "altocumulus",
+    "altostratus-opacus": "altostratus",
+    "nimbostratus-praecipitatio": "nimbostratus",
+    "stratocumulus-stratiformis": "stratocumulus",
+    "stratocumulus-lenticularis": "stratocumulus",
+    "stratocumulus-castellanus": "stratocumulus",
+    "stratocumulus-floccus": "stratocumulus",
+    "stratocumulus-volutus": "stratocumulus",
+    "stratus-nebulosus": "stratus",
+    "stratus-fractus": "stratus",
+    "cumulus-humilis": "cumulus",
+    "cumulus-mediocris": "cumulus",
+    "cumulus-congestus": "cumulus",
+    "cumulus-fractus": "cumulus",
+    "cumulonimbus-calvus": "cumulonimbus",
+    "cumulonimbus-capillatus": "cumulonimbus",
+    "cumulonimbus-capillatus-incus": "cumulonimbus",
+};
+
+/** The complete mutually-exclusive genus/species combinations in WMO 407. */
+export const WMO_CLOUD_SPECIES: readonly CloudSpecies[] = [
+    "cirrus-fibratus", "cirrus-uncinus", "cirrus-spissatus",
+    "cirrus-castellanus", "cirrus-floccus",
+    "cirrocumulus-stratiformis", "cirrocumulus-lenticularis",
+    "cirrocumulus-castellanus", "cirrocumulus-floccus",
+    "cirrostratus-fibratus", "cirrostratus-nebulosus",
+    "altocumulus-stratiformis", "altocumulus-lenticularis",
+    "altocumulus-castellanus", "altocumulus-floccus",
+    "altocumulus-volutus",
+    "stratocumulus-stratiformis", "stratocumulus-lenticularis",
+    "stratocumulus-castellanus", "stratocumulus-floccus",
+    "stratocumulus-volutus",
+    "stratus-nebulosus", "stratus-fractus",
+    "cumulus-humilis", "cumulus-mediocris", "cumulus-congestus",
+    "cumulus-fractus",
+    "cumulonimbus-calvus", "cumulonimbus-capillatus",
+] as const;
+
+export type CloudOrganization =
+    | "unorganized"
+    | "isolated"
+    | "streets"
+    | "open-cell"
+    | "closed-cell"
+    | "frontal"
+    | "banded";
 
 export const CLOUD_GENERA: CloudGenus[] = [
     "clear",
@@ -75,8 +224,10 @@ export const CLOUD_GENUS_LEVEL: Record<CloudGenus, CloudLevel> = {
 
 export interface CloudLayerState {
     genus: CloudGenus;
+    /** Explicit WMO morphology; `generic` is used by unconstrained daily skies. */
+    species: CloudSpecies;
     present: boolean;
-    /** Cloud base above the observer, metres. */
+    /** Cloud-base altitude above mean surface datum, metres. */
     baseAltitude: number;
     /** Geometric depth of the layer, metres. */
     thickness: number;
@@ -106,6 +257,46 @@ export interface CloudLayerState {
     turbulence: number;
     /** 0-1; drives virga and rain-shaft darkening. */
     precipitation: number;
+    /** Mesoscale layout of the layer, not merely its local texture. */
+    organization: CloudOrganization;
+    /** Convective/advective lifecycle: 0 growing, 0.5 mature, 1 dissipating. */
+    lifecycle: number;
+    /** Strength of organization and clustering, 0-1. */
+    organizationStrength: number;
+}
+
+export type CloudLayerIndex = 0 | 1 | 2;
+
+/**
+ * Persistent finite world domain for one explicitly authored cloud system.
+ *
+ * This is meteorological state, not a camera composition primitive.  The
+ * Earth-local east/north frame is shared by the generic runtime, radiative
+ * caches, hydrometeors, and every camera that may later observe the system.
+ */
+export interface CloudAuthoredSystemManifold {
+    centerEastKm: number;
+    centerNorthKm: number;
+    majorRadiusKm: number;
+    minorRadiusKm: number;
+    orientation: number;
+    boundaryTransitionKm: number;
+}
+
+/**
+ * One persistent cloud owner.  `layer` deliberately remains a complete
+ * CloudLayerState: two systems at the same WMO level may have independent
+ * bases, depths, winds, phase, lifecycle, and organization rather than being
+ * projected from one aggregate low/middle/high compatibility layer.
+ */
+export interface CloudAuthoredSystemState {
+    /** Stable scene identity used by classification and causal references. */
+    id: string;
+    /** WMO altitude family; this must agree with `layer.genus`. */
+    layerIndex: CloudLayerIndex;
+    layer: CloudLayerState;
+    /** Finite camera-independent formation domain in Earth-local kilometres. */
+    manifold: CloudAuthoredSystemManifold;
 }
 
 export interface CloudScene {
@@ -123,6 +314,26 @@ export interface CloudScene {
     fog: number;
     /** Rare noctilucent display, 0-1. Valid only at high latitude in summer. */
     noctilucent: number;
+    /** Camera-independent orthogonal WMO assignments keyed to stable owners. */
+    classifications?: readonly CloudMorphologyClassificationAssignment[];
+    /**
+     * Explicit finite owners for same-tier/multisystem meteorology.  A tier
+     * represented here suppresses only that tier's legacy generated owner
+     * population; unrepresented tiers continue to use `layers` unchanged.
+     */
+    authoredSystems?: readonly CloudAuthoredSystemState[];
+    /** Finite physical generators referenced by special-origin assignments. */
+    specialOriginSources?: readonly CloudSpecialOriginSource[];
+    /** Physical environment retained for upper-atmosphere validation. */
+    latitude?: number;
+    /** 0 midwinter through 1 midsummer in the observer's hemisphere. */
+    season?: number;
+    /** Positive degrees below the astronomical horizon. */
+    solarDepression?: number;
+    /** Resolved lower-stratosphere temperature for PSC admissibility. */
+    stratosphericTemperatureKelvin?: number;
+    /** Resolved summer-mesopause temperature for noctilucent ice. */
+    mesopauseTemperatureKelvin?: number;
     seed: [number, number, number, number];
 }
 
@@ -288,6 +499,7 @@ const altitudeScale = (latitude: number, season: number) => {
 
 export const EMPTY_LAYER: CloudLayerState = {
     genus: "clear",
+    species: "generic",
     present: false,
     baseAltitude: 1200,
     thickness: 0,
@@ -304,10 +516,14 @@ export const EMPTY_LAYER: CloudLayerState = {
     shear: 0,
     turbulence: 0,
     precipitation: 0,
+    organization: "unorganized",
+    lifecycle: 0.5,
+    organizationStrength: 0,
 };
 
 export interface LayerRequest {
     genus: CloudGenus;
+    species?: CloudSpecies;
     oktas: number;
     latitude?: number;
     season?: number;
@@ -321,6 +537,12 @@ export interface LayerRequest {
     detailStrength?: number;
     convection?: number;
     precipitation?: number;
+    baseAltitude?: number;
+    thickness?: number;
+    iceFraction?: number;
+    organization?: CloudOrganization;
+    lifecycle?: number;
+    organizationStrength?: number;
 }
 
 /** Builds one physically consistent layer from a genus and a coverage. */
@@ -334,31 +556,37 @@ export function createLayer(request: LayerRequest): CloudLayerState {
         convection = 0,
     } = request;
 
+    if (
+        request.species && request.species !== "generic" &&
+        CLOUD_SPECIES_GENUS[request.species] !== genus
+    ) {
+        throw new RangeError(
+            `${request.species} cannot be authored as genus ${genus}; ` +
+            `its canonical genus is ${CLOUD_SPECIES_GENUS[request.species]}.`,
+        );
+    }
+
     if (genus === "clear" || oktas <= 0) return { ...EMPTY_LAYER };
 
     const profile = GENUS_PROFILE[genus];
     const scale = altitudeScale(latitude, season);
-    const baseAltitude = lerp(
-        profile.altitude[0],
-        profile.altitude[1],
-        altitudeBias,
-    ) * scale;
+    const baseAltitude = request.baseAltitude ??
+        lerp(profile.altitude[0], profile.altitude[1], altitudeBias) * scale;
 
     // Convection deepens cumuliform cloud: humilis through congestus is a
     // continuum of thickness, not a separate genus.
     const convectiveDepth = profile.towerAmount > 0
         ? 1 + convection * 1.6 * profile.towerAmount
         : 1;
-    const thickness = lerp(
-        profile.thickness[0],
-        profile.thickness[1],
-        altitudeBias,
-    ) * scale * convectiveDepth;
+    const thickness = request.thickness ??
+        lerp(profile.thickness[0], profile.thickness[1], altitudeBias) *
+            scale * convectiveDepth;
 
     const coverage = clamp(oktas / 8);
 
     return {
         genus,
+        species: request.species ?? "generic",
         present: true,
         baseAltitude,
         thickness,
@@ -369,7 +597,7 @@ export function createLayer(request: LayerRequest): CloudLayerState {
         // Towers only grow where convection actually supports them.
         towerAmount: clamp(profile.towerAmount * (0.35 + convection * 0.65)),
         anvilAmount: clamp(profile.anvilAmount * convection),
-        iceFraction: profile.iceFraction,
+        iceFraction: clamp(request.iceFraction ?? profile.iceFraction),
         detailStrength: clamp(request.detailStrength ?? profile.detailStrength),
         windSpeed: request.windSpeed ?? 8,
         windDirection: request.windDirection ?? 0,
@@ -382,6 +610,21 @@ export function createLayer(request: LayerRequest): CloudLayerState {
                 profile.precipitation * clamp(coverage * 1.3) *
                     clamp(profile.opticalDepth * 1.2),
         ),
+        organization: request.organization ?? (
+            genus === "cumulus" || genus === "cumulonimbus"
+                ? "isolated"
+                : genus === "stratocumulus" || genus === "altocumulus" ||
+                    genus === "cirrocumulus"
+                    ? "closed-cell"
+            : genus === "cirrus"
+                        ? "unorganized"
+                        : genus === "altostratus" || genus === "nimbostratus" ||
+                            genus === "cirrostratus"
+                            ? "frontal"
+                            : "unorganized"
+        ),
+        lifecycle: clamp(request.lifecycle ?? 0.5),
+        organizationStrength: clamp(request.organizationStrength ?? 0.45),
     };
 }
 
@@ -396,8 +639,12 @@ export function constrainScene(scene: CloudScene): CloudScene {
 
     // Cumulonimbus requires deep convection and instability. Without it the
     // cell can only reach congestus, which we express as deep cumulus.
-    if (low.genus === "cumulonimbus" && scene.convection < 0.55) {
+    if (
+        low.genus === "cumulonimbus" &&
+        (scene.convection < 0.55 || scene.instability < 0.48)
+    ) {
         low.genus = "cumulus";
+        low.species = "cumulus-congestus";
         const profile = GENUS_PROFILE.cumulus;
         low.thickness = Math.min(low.thickness, profile.thickness[1] * 1.6);
         low.anvilAmount = 0;
@@ -429,28 +676,42 @@ export function constrainScene(scene: CloudScene): CloudScene {
         }
     });
 
-    // A deep overcast below removes any view of cloud above it. Keeping the
-    // upper layers alive would waste march steps on invisible geometry.
-    if (low.present && low.coverage > 0.94 && low.opticalDepth > 0.8) {
-        middle.present = false;
-        high.present = false;
-    }
-
-    // Nimbostratus is a merged middle/low deck: a separate low layer beneath it
-    // would double the optical depth of the same physical cloud.
+    // Nimbostratus is usually a deep merged layer, but ragged Stratus fractus
+    // and pannus can form as a genuinely separate, lower accessory population
+    // in the humid precipitation layer.  Preserve that underdeck instead of
+    // deleting the physical owner that the multilayer and accessory-cloud
+    // paths deliberately authored.  An anonymous low deck is still absorbed
+    // into the deep frontal shield.  Independent high ice can remain visible
+    // through thinner portions of the rain deck.
     if (middle.genus === "nimbostratus" && middle.present) {
-        low.present = false;
-        high.present = false;
+        const explicitPannus = scene.classifications?.some((assignment) =>
+            assignment.classification.accessoryClouds.includes("pannus")
+        ) ?? false;
+        const raggedUnderdeck = low.genus === "stratus" &&
+            low.species === "stratus-fractus";
+        if (!explicitPannus && !raggedUnderdeck) low.present = false;
     }
 
-    // Layers must not interpenetrate.
-    if (middle.present && low.present) {
+    // Ordinary stratiform layers remain separated. Deep convection is allowed
+    // to span the middle and high levels: forcing a cumulonimbus tower below an
+    // arbitrary shell boundary destroys its defining vertical structure.
+    const deepConvective = low.present && low.genus === "cumulonimbus";
+    const causalLayerBridge = (first: number, second: number) =>
+        scene.classifications?.some((assignment) =>
+            assignment.causalParent !== undefined &&
+            ((assignment.layerIndex === first &&
+                assignment.causalParent.layerIndex === second) ||
+                (assignment.layerIndex === second &&
+                    assignment.causalParent.layerIndex === first))) ?? false;
+    if (middle.present && low.present && !deepConvective &&
+        !causalLayerBridge(0, 1)) {
         middle.baseAltitude = Math.max(
             middle.baseAltitude,
             low.baseAltitude + low.thickness + 250,
         );
     }
-    if (high.present && middle.present) {
+    if (high.present && middle.present && !deepConvective &&
+        !causalLayerBridge(1, 2)) {
         high.baseAltitude = Math.max(
             high.baseAltitude,
             middle.baseAltitude + middle.thickness + 400,
@@ -461,8 +722,9 @@ export function constrainScene(scene: CloudScene): CloudScene {
     // layer), so layers must not share a velocity or they will read as one
     // rigid sheet sliding across the sky.
     layers.forEach((layer, index) => {
-        if (index === 0) return;
-        const below = layers[index - 1];
+        if (index === 0 || !layer.present) return;
+        const below = layers.slice(0, index).reverse().find((candidate) => candidate.present);
+        if (!below) return;
         if (Math.abs(layer.windDirection - below.windDirection) < 0.12) {
             layer.windDirection = below.windDirection + 0.35 + index * 0.22;
         }
@@ -474,15 +736,49 @@ export function constrainScene(scene: CloudScene): CloudScene {
     // condition is checked by the caller; latitude and season are checked here.
     const noctilucent = scene.noctilucent;
 
-    const totalOktas = Math.min(
-        8,
-        layers.reduce(
-            (sum, layer) => (layer.present ? sum + layer.oktas : sum),
-            0,
-        ),
+    // Combined cover is the union of independently projected layer masks, not
+    // their sum. Two 4/8 layers do not automatically make an overcast sky.
+    const authoredLayerIndices = new Set(
+        (scene.authoredSystems ?? []).map(({ layerIndex }) => layerIndex),
     );
+    const coverageStates = [
+        ...layers.filter((_, layerIndex) =>
+            !authoredLayerIndices.has(layerIndex as CloudLayerIndex)),
+        ...(scene.authoredSystems ?? []).map(({ layer }) => layer),
+    ];
+    const clearFraction = coverageStates.reduce(
+        (remaining, layer) =>
+            remaining * (1 - (layer.present ? clamp(layer.coverage) : 0)),
+        1,
+    );
+    const totalOktas = clamp(1 - clearFraction) * 8;
 
-    return { ...scene, layers, totalOktas, noctilucent };
+    const classifications = scene.classifications?.map((assignment) => ({
+        ...assignment,
+        classification: {
+            ...assignment.classification,
+            varieties: [...assignment.classification.varieties],
+            supplementaryFeatures: [
+                ...assignment.classification.supplementaryFeatures,
+            ],
+            accessoryClouds: [...assignment.classification.accessoryClouds],
+            origin: { ...assignment.classification.origin },
+        } as CloudClassification,
+    }));
+    const authoredSystems = scene.authoredSystems?.map((system) => ({
+        ...system,
+        layer: { ...system.layer },
+        manifold: { ...system.manifold },
+    }));
+
+    return {
+        ...scene,
+        layers,
+        totalOktas,
+        noctilucent,
+        ...(classifications ? { classifications } : {}),
+        ...(authoredSystems ? { authoredSystems } : {}),
+    };
 }
 
 /**
@@ -573,6 +869,173 @@ export interface DailyCloudRequest {
     /** Solar depression in degrees, used only for the noctilucent test. */
     solarDepression?: number;
 }
+
+const dailyBaseClassification = (
+    layer: CloudLayerState,
+): CloudClassification | undefined => {
+    const common = {
+        varieties: [] as CloudClassification["varieties"],
+        supplementaryFeatures: [] as CloudClassification["supplementaryFeatures"],
+        accessoryClouds: [] as CloudClassification["accessoryClouds"],
+        origin: { kind: "natural" } as const,
+    };
+    switch (layer.genus) {
+        case "cirrus": return { ...common, genus: "cirrus", species: "fibratus" };
+        case "cirrocumulus": return {
+            ...common, genus: "cirrocumulus", species: "stratiformis",
+        };
+        case "cirrostratus": return {
+            ...common, genus: "cirrostratus", species: "nebulosus",
+        };
+        case "altocumulus": return {
+            ...common, genus: "altocumulus", species: "stratiformis",
+        };
+        case "altostratus": return {
+            ...common, genus: "altostratus", species: null,
+            varieties: ["opacus"],
+        };
+        case "nimbostratus": return {
+            ...common, genus: "nimbostratus", species: null,
+            supplementaryFeatures: layer.precipitation > 0.08
+                ? ["praecipitatio"] : [],
+        };
+        case "stratocumulus": return {
+            ...common, genus: "stratocumulus", species: "stratiformis",
+        };
+        case "stratus": return {
+            ...common, genus: "stratus", species: "nebulosus",
+        };
+        case "cumulus": return {
+            ...common,
+            genus: "cumulus",
+            species: layer.towerAmount > 0.66 || layer.thickness > 2_400
+                ? "congestus"
+                : layer.towerAmount > 0.32 || layer.thickness > 900
+                    ? "mediocris" : "humilis",
+        };
+        case "cumulonimbus": return {
+            ...common,
+            genus: "cumulonimbus",
+            species: layer.lifecycle >= 0.46 ? "capillatus" : "calvus",
+            supplementaryFeatures: layer.anvilAmount > 0.52 &&
+                layer.lifecycle >= 0.56 ? ["incus"] : [],
+        };
+        case "clear": return undefined;
+    }
+};
+
+/**
+ * Restrained daily orthogonal state. Every present level gets one canonical
+ * assignment, while an actual modifier appears on only a minority of days and
+ * a second owner only in rare cases. Choices below have no unmet physical
+ * dependencies; conditional storm/accessory states are added only when their
+ * runtime requirements are already present.
+ */
+const dailyMorphologyAssignments = (
+    layers: CloudScene["layers"],
+    value: (index: number) => number,
+    context: {
+        latitude: number;
+        season: number;
+        solarDepression: number;
+        noctilucent: number;
+    },
+): CloudMorphologyClassificationAssignment[] => {
+    const assignments: CloudMorphologyClassificationAssignment[] = [];
+    layers.forEach((layer, layerIndex) => {
+        const classification = dailyBaseClassification(layer);
+        if (!classification || !layer.present) return;
+        const roll = value(36 + layerIndex * 3);
+        if (roll > 0.78) {
+            switch (classification.genus) {
+                case "cirrus":
+                    classification.varieties.push(roll > 0.91
+                        ? "vertebratus" : "intortus");
+                    break;
+                case "cirrocumulus":
+                case "cirrostratus":
+                    classification.varieties.push(roll > 0.9
+                        ? "duplicatus" : "undulatus");
+                    break;
+                case "altocumulus":
+                case "stratocumulus":
+                    classification.varieties.push(roll > 0.94
+                        ? "perlucidus" : roll > 0.86
+                            ? "duplicatus" : "undulatus");
+                    break;
+                case "stratus":
+                    classification.varieties.push(roll > 0.9
+                        ? "translucidus" : "undulatus");
+                    break;
+                case "cumulus":
+                    if (layer.lifecycle >= 0.14 && layer.lifecycle <= 0.68 &&
+                        layer.towerAmount > 0.24) {
+                        classification.accessoryClouds.push(
+                            roll > 0.92 ? "velum" : "pileus");
+                    }
+                    break;
+                case "cumulonimbus":
+                    if (layer.lifecycle >= 0.38 && layer.precipitation > 0.42) {
+                        classification.supplementaryFeatures.push("mamma");
+                    }
+                    break;
+                case "altostratus":
+                case "nimbostratus":
+                    // Their canonical opacus/praecipitatio states already
+                    // carry the restrained orthogonal distinction.
+                    break;
+            }
+        }
+        assignments.push({ layerIndex, systemIndex: 0, classification });
+
+        if (value(37 + layerIndex * 3) > 0.975) {
+            assignments.push({
+                layerIndex,
+                systemIndex: 1,
+                classification: {
+                    ...classification,
+                    varieties: [...classification.varieties],
+                    supplementaryFeatures: [
+                        ...classification.supplementaryFeatures,
+                    ],
+                    accessoryClouds: [...classification.accessoryClouds],
+                    origin: { ...classification.origin },
+                } as CloudClassification,
+            });
+        }
+    });
+
+    const absLatitude = Math.abs(context.latitude);
+    const upperHost: CloudClassification = {
+        genus: "cirrus",
+        species: "fibratus",
+        varieties: [],
+        supplementaryFeatures: [],
+        accessoryClouds: [],
+        origin: { kind: "natural" },
+    };
+    if (context.noctilucent > 0) {
+        assignments.push({
+            layerIndex: 2,
+            systemIndex: 11,
+            classification: upperHost,
+            upperAtmosphericCloud: "noctilucent",
+        });
+    } else if (absLatitude >= 60 && context.season < 0.25 && value(45) > 0.975) {
+        assignments.push({
+            layerIndex: 2,
+            systemIndex: 11,
+            classification: upperHost,
+            upperAtmosphericCloud: context.solarDepression >= 1 &&
+                context.solarDepression <= 9 && value(46) > 0.82
+                ? "nacreous"
+                : value(46) > 0.62 ? "polar-stratospheric-ice"
+                    : value(46) > 0.28 ? "polar-stratospheric-nat"
+                        : "polar-stratospheric-sts",
+        });
+    }
+    return assignments;
+};
 
 export function createDailyCloudScene(
     request: DailyCloudRequest,
@@ -676,6 +1139,60 @@ export function createDailyCloudScene(
         middleOktas = 8;
     }
 
+    const lowOrganization: CloudOrganization = (() => {
+        if (lowGenus === "cumulus" || lowGenus === "cumulonimbus") {
+            return value(24) < 0.24 ? "streets" : "isolated";
+        }
+        if (lowGenus === "stratocumulus") {
+            if (value(24) < 0.34) return "open-cell";
+            if (value(24) < 0.72) return "closed-cell";
+            return "streets";
+        }
+        return lowGenus === "stratus" ? "unorganized" : "frontal";
+    })();
+    const middleOrganization: CloudOrganization =
+        middleGenus === "altocumulus"
+            ? (value(25) < 0.46 ? "open-cell" : "closed-cell")
+            : middleGenus === "clear"
+                ? "unorganized"
+                : "frontal";
+    const highOrganization: CloudOrganization =
+        highGenus === "cirrocumulus"
+            ? "closed-cell"
+            : highGenus === "clear"
+                ? "unorganized"
+                : value(26) < 0.58 ? "banded" : "frontal";
+
+    const dailyOpticalDepth = (genus: CloudGenus, randomIndex: number) => {
+        const climatological: Record<CloudGenus, number> = {
+            clear: 0,
+            cirrus: 0.16,
+            cirrocumulus: 0.24,
+            cirrostratus: 0.2,
+            altocumulus: 0.56,
+            altostratus: 0.7,
+            nimbostratus: 1,
+            stratocumulus: 0.74,
+            stratus: 0.66,
+            cumulus: 0.82,
+            cumulonimbus: 1,
+        };
+        const denseWeather = genus === "nimbostratus" || genus === "cumulonimbus";
+        const variability = 0.7 + value(randomIndex) * 0.44;
+        const moisture = 0.88 + humidity * 0.2;
+        return clamp(
+            climatological[genus] * variability * moisture,
+            denseWeather ? 0.84 : 0,
+            1,
+        );
+    };
+
+    const lowOrganizationStrength = lowGenus === "cumulonimbus"
+        ? 0.56 + value(28) * 0.34
+        : lowGenus === "cumulus"
+            ? 0.38 + value(28) * 0.38
+            : 0.28 + value(28) * 0.68;
+
     const layers: CloudScene["layers"] = [
         createLayer({
             genus: lowGenus,
@@ -688,6 +1205,10 @@ export function createDailyCloudScene(
             windDirection,
             shear: 0.12 + value(13) * 0.24,
             turbulence: 0.25 + convection * 0.5,
+            opticalDepth: dailyOpticalDepth(lowGenus, 33),
+            organization: lowOrganization,
+            lifecycle: value(27),
+            organizationStrength: lowOrganizationStrength,
         }),
         createLayer({
             genus: middleGenus,
@@ -700,6 +1221,10 @@ export function createDailyCloudScene(
             windDirection: windDirection + 0.4 + value(15) * 0.5,
             shear: 0.18 + value(16) * 0.22,
             turbulence: 0.2 + value(17) * 0.3,
+            opticalDepth: dailyOpticalDepth(middleGenus, 34),
+            organization: middleOrganization,
+            lifecycle: value(29),
+            organizationStrength: 0.24 + value(30) * 0.58,
         }),
         createLayer({
             genus: highGenus,
@@ -712,6 +1237,10 @@ export function createDailyCloudScene(
             windDirection: windDirection + 0.8 + value(19) * 0.7,
             shear: 0.3 + value(20) * 0.35,
             turbulence: 0.12 + value(21) * 0.2,
+            opticalDepth: dailyOpticalDepth(highGenus, 35),
+            organization: highOrganization,
+            lifecycle: value(31),
+            organizationStrength: 0.22 + value(32) * 0.62,
         }),
     ];
 
@@ -736,6 +1265,13 @@ export function createDailyCloudScene(
         ? clamp(0.3 + value(23) * 0.7)
         : 0;
 
+    const classifications = dailyMorphologyAssignments(layers, value, {
+        latitude,
+        season,
+        solarDepression: depression,
+        noctilucent,
+    });
+
     return constrainScene({
         layers,
         totalOktas: 0,
@@ -744,6 +1280,10 @@ export function createDailyCloudScene(
         humidity,
         fog,
         noctilucent,
+        classifications,
+        latitude,
+        season,
+        solarDepression: depression,
         seed,
     });
 }

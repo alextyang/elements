@@ -1,0 +1,8 @@
+.codex-next/
+.playwright-cli/
+.verify-moon.*/
+node_modules/
+output/
+public/sky-benchmark/
+.DS_Store
+tsconfig.tsbuildinfo

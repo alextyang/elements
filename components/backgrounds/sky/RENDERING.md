@@ -1,289 +1,277 @@
-# Sky rendering model
+# Unified sky rendering architecture
 
-Celestial features are not independent overlays. The renderer treats the Moon
-and stars as radiance arriving from outside the atmosphere, attenuates them by
-airmass-dependent Rayleigh and aerosol optical depth, adds a restrained
-Rayleigh/Mie-inspired in-scattering lobe, and applies one photographic tone
-curve. Thin cloud and mist layers render above that result with ordinary alpha
-compositing so they both extinguish celestial contrast and add scattered light.
+## Goals and invariants
 
-The implementation is deliberately hybrid. A low-power WebGL2 pass evaluates
-the full-screen atmospheric radiance once when the scene or viewport changes;
-it has no animation loop. Slowly moving cloud and moisture fields remain in
-low-cost CSS, while a second transparent WebGL2 canvas handles the small,
-high-frequency celestial features. The Moon is drawn only when its scene or
-texture changes. Only visibly scintillating stars trigger the capped animation
-loop. This preserves a physically coherent base without creating a permanent
-full-screen GPU workload.
+The sky is a single radiometric scene, not a stack of decorative effects. Its
+atmosphere, astronomical bodies, clouds, fog, and aerial perspective share the
+same camera, light directions, linear-light color space, and final exposure.
 
-## Lunar and stellar photometry
+The implementation preserves these invariants:
 
-The Moon uses NASA SVS hourly LRO/LOLA frames for the real phase, libration,
-terrain, and shadow geometry. The display-referred JPEG black floor is removed
-before inverse transfer and scene-linear exposure, preventing compressed dark
-pixels from becoming a visible gray hemisphere. Earthshine is a separate,
-blue-biased illumination term. It is restricted to thin crescents, requires a
-dark adapted sky, and is suppressed by low altitude and atmospheric clarity.
-The renderer never raises exposure merely because the illuminated fraction is
-small. Regolith shading uses a Lommel-Seeliger/Lambert blend, with the extra
-opposition term limited to the very small phase angles where shadow hiding and
-coherent backscatter are observed.
+- `SkyCloudScene` is the canonical weather state. Rendering never invents an
+  impossible cloud combination after constraints have been applied.
+- Sun and Moon positions, lunar phase, catalog-star positions, extinction, and
+  limiting magnitude come from the astronomy model rather than screen-space
+  random placement.
+- All intermediate radiance is scene-linear. The final pass alone tone maps,
+  converts to sRGB, and dithers.
+- Production cloud placement is art-directed through world-space weather-system
+  domains on the real altitude shells. Individual layers are not screen-remapped
+  or opacity-masked; photographic camera views retain natural projection.
+- Weather stores an RGB affine camera operator rather than ordinary alpha. Its
+  composition is `Lweather + Tweather * Lbackground`, with componentwise
+  `Tweather`; alpha is derived photopic metadata only.
+- Variety is deterministic for a date/location/sky seed, while wind,
+  scintillation, and lifecycle phase keep a visible sky subtly alive.
 
-Illuminated area is never used as a proxy for lunar brightness. Disk-integrated
-irradiance follows the measured nonlinear lunar phase law, including a narrow
-opposition enhancement and Earth-Moon distance. The glow is then split into
-the phenomena that actually produce it: a compact eye/display point-spread
-function around the bright pixels, a spectrally tinted Rayleigh component, a
-two-lobe aerosol forward-scattering aureole, and a weak multiple-scattering
-floor. Source and view airmass both enter the single-scattering transport
-integral. Thin cloud and mist modulate that same angular field with correlated
-density, so humid nights develop broken luminous veils instead of a circular
-gradient stamp. Low-altitude extinction warms both the direct Moon and its
-near-source aerosol scatter while wider molecular scatter remains relatively
-blue.
+## Backend selection
 
-The textured Moon and every atmospheric lunar term share one screen-space
-projection and one attenuated source irradiance. The wide molecular, aerosol,
-cloud, and multiple-scattering fields stay centred on the ephemeris position;
-only the much smaller ocular PSF follows the centroid and extent of the
-actually illuminated phase. This prevents a detached glow and keeps a bright
-direct Moon coupled to a corresponding atmospheric response.
+`renderer-types.ts` resolves `auto`, `webgpu`, `webgl2`, and `fallback` without
+user-agent detection. `auto` selects WebGPU whenever the browser exposes it and
+otherwise selects the legacy no-cloud fallback. WebGL2 remains available only
+as an explicit Sky Lab diagnostic backend.
 
-The transparent celestial pass is composited as emitted radiance. A zero-light
-dark hemisphere is therefore neutral over the atmosphere rather than an opaque
-dark disc; visible earthshine only adds its measured, terrain-shaped signal.
-Measured earthshine surface brightness spans roughly +13.5 to +15.5 visual
-magnitudes per square arcsecond and varies strongly with phase and terrestrial
-weather. The display mapping therefore treats it as a separate secondary
-exposure: it reaches a subdued maximum below a ten-percent crescent, falls to
-zero by twenty percent illumination, and never supplies a generic dark-side
-fill. The star and Moon draws use separate WebGL vertex-array objects so the
-lunar quad cannot inherit catalogue-star attribute state.
+The WebGPU renderer requests the low-power adapter. Optional timestamp queries
+are enabled only when advertised. Device loss, uncaptured validation errors,
+or asset failure fall back safely. Adaptive cadence handles warmed transport
+pressure without lowering spatial quality.
 
-The direct lunar image is also filtered as one scene-linear radiance source.
-NASA texture, terrain, terminator, limb, earthshine, and the opposition term
-all pass through the same atmosphere-dependent point-spread function before
-tone mapping and compositing. A compact Moffat-like core approximates the
-long-exposure turbulence/optical PSF; an isotropic seventeen-tap kernel avoids
-directional sampling artifacts, while a separately weighted outer component
-adds the weaker non-Gaussian seeing wing. Airmass broadens and mildly stretches
-the direct core, but aerosol and thin-cloud optical depth primarily remove
-unscattered contrast and reappear in the additive sky aureole rather than
-turning the Moon into a defocused disc. Only very low Moon altitudes introduce
-a subpixel zenith-directed broadband dispersion. Clear, high-altitude Moons
-therefore retain terrain detail, while humid and horizon Moons lose contrast
-without acquiring an unrelated circular blur stamp. NASA phase frames do not
-contain earthshine, so the registered LROC albedo map supplies subdued maria
-and highland structure on the dark hemisphere when real viewing conditions
-make it visible. Its level is compensated for the photographic tone curve's
-dark toe, but still falls rapidly with illuminated fraction, sky brightness,
-airmass, and lost atmospheric clarity.
-The much wider moonlit-sky aureole remains in the atmospheric pass because it
-is angular sky radiance, not image blur. Its aerosol phase functions are
-normalised at the source direction before their energy is scaled. Particle size
-can consequently narrow or broaden the aureole without multiplying its peak
-radiance, while correlated cloud optical depth may still produce a broken,
-condition-dependent luminous veil.
+## WebGPU passes
 
-The star field contains 8,874 real Hipparcos entries through Johnson V=6.5,
-generated reproducibly from CDS VizieR I/239. Apparent magnitude is modified by
-Kasten-Young airmass extinction and local lunar glare, then converted from its
-logarithmic flux scale into a display-compressed intensity. The visibility
-cutoff fades separately, so threshold proximity no longer defines a star's
-brightness. B-V colour is mapped continuously along a restrained Planckian
-sequence, with faint stars desaturated for scotopic vision and low-altitude
-stars mildly reddened by extinction.
+### Atmosphere
 
-Stars use a compact Moffat-like seeing point-spread function. Diffraction
-crosses are omitted because they are imaging-aperture artifacts, not naked-eye
-stellar structure. Only sufficiently bright stars scintillate visibly. Their
-intensity follows mean-preserving, non-periodic noise at multiple atmospheric
-timescales; airmass controls its strength and the much weaker chromatic and
-angle-of-arrival variation. This avoids synchronized or sinusoidal twinkling
-while retaining the rapid, irregular behavior of low-altitude stars.
+The atmosphere pass evaluates a continuous five-knot palette spline in linear
+light, then adds view/source-angle Rayleigh and aerosol scattering, twilight
+volume, edge asymmetry, airglow, lunar scatter, and altitude-indexed
+transmittance-LUT modulation. Smooth interpolation and final dither prevent
+visible gradient bands.
 
-## Continuous radiance field
+### Stars
 
-The visible sky is no longer the direct interpolation of five CSS gradient
-stops. Palette samples now art-direct one continuous two-dimensional radiance
-field. Its altitude response uses broad zero-slope interpolation combined with
-an airmass curve; its azimuth response uses Rayleigh, forward Mie, reverse
-twilight, lunar, and edge-illumination terms. A wide multiple-scattering fill,
-weak correlated aerosol-density variation, and night-only airglow and zodiacal
-components add structure at different spatial scales without becoming cloud
-stamps or decorative blobs.
+The star pass uses catalog-derived positions, apparent magnitude, Planckian
+color, atmospheric visibility, and per-star scintillation state. Stars are
+instanced point-spread quads with multi-band, aperiodic brightness modulation.
+Catalogue detection, scene-linear flux, camera exposure, and PSF energy are
+separate quantities: changing catalogue depth cannot turn every detected star
+into an equally bright dot.
 
-All scattering additions are composed in scene-linear RGB and converted back
-to display sRGB only once. A fixed, decorrelated triangular RGB dither of about
-one 8-bit quantisation interval is applied in physical pixel space after the
-display transform, with slightly more amplitude in very dark gradients. The
-compact lunar glare independently uses stochastic alpha quantisation, keeping
-its faint falloff from collapsing into concentric transparency bands. Both
-patterns are fixed in physical pixels and therefore do not shimmer. The
-atmosphere pass renders at native Retina density on ordinary displays and uses
-a total-pixel budget on very large 4K/5K surfaces; it redraws only after a
-scene or viewport change. The legacy CSS gradient remains only as a WebGL
-fallback and does not animate behind the opaque radiance canvas.
+The unresolved core is retained at full resolution in `rgba16float`. Only the
+bright-source fraction enters a three-scale half/quarter/eighth-resolution PSF.
+Cloud transmittance is applied before that convolution, then the full-resolution
+core and energy-conserving glow levels are recombined with the atmosphere and
+cloud radiance before the display transform. This keeps the glow subordinate to
+the star, avoids halos over opaque cloud, and provides broad wings without a
+full-resolution blur. The WebGL2 fallback evaluates a compact analytic version
+of the same core/seeing/aureole model.
 
-## Atmospheric and palette constraints
+### Moon
 
-The color families are art-directed samples of real atmospheric regimes, not
-interchangeable color themes. Each family carries aerosol, humidity, natural
-night-floor, horizon-lift, and ground-skyglow parameters. Daily variants alter
-the grade inside that regime; they no longer wrap to an adjacent family's base
-palette. The runtime then derives a physical lighting regime from solar
-altitude, lunar altitude and illuminated fraction, cloud density, and the
-family optics.
+The Moon pass samples the current NASA lunar frame when available and otherwise
+uses the packaged LROC color map. Sphere normals, true illuminated fraction,
+orientation, incidence, earthshine, limb response, and exposure determine
+radiance. The atmosphere pass produces the angle-dependent aureole; the Moon
+texture itself has no baked glow or circular stamp.
 
-During daylight and twilight, each graded palette is composed against a
-solar-geometry envelope rather than accepted as a whole-dome tint. Clear,
-moist, and overcast reference domes constrain the zenith, upper sky, horizon,
-cloud, and haze independently in perceptual color space. Moisture and broad
-multiple scattering reduce dome chroma and contrast. Aerosol warmth is kept in
-the forward solar lobe; clean-air pink is kept in the bounded antisolar arch;
-ozone's low-Sun violet contribution is restricted to the optical paths where
-its Chappuis-band absorption matters. Family-specific constraint strengths
-leave already-physical clear and desert skies mostly intact while strongly
-correcting globally aqua, sage, rose, violet, smoke, and overcast combinations.
+### Clouds and weather
 
-The WebGL scattering pass follows the same separation. Rayleigh fill, low-Sun
-aerosol scattering, ozone-weighted twilight, and the Belt of Venus use
-independent spectral reference colors in scene-linear space. Palette colors
-provide only a restrained local grade. This prevents a decorative palette hue
-from becoming the color of molecular or aerosol illumination everywhere, while
-preserving the intended day-to-day diversity at the source-facing horizon,
-antisolar edge, cloud deck, and humidity veil.
+Cloud rendering is a bounded multipass subgraph. The interval pass intersects
+curved Earth-relative shells and supplies their complete entry/exit distances;
+there are no altitude-class distance caps that can clip a distant frontal
+owner into a circular contour. A half-resolution lighting pass caches near/far
+Sun and Moon optical depths for each layer. Three specialized full-frame
+transport passes then evaluate low, middle, and high surviving segments with
+one complete `march_layer` call apiece, progressive blue-noise jitter,
+directional atlas density integration with owner-scalar vertical calibration,
+atmosphere-derived source and hemispheric irradiance, and energy-bounded
+higher-order scattering. A separate marcher-free compositor depth-sorts the
+three scalar affine operators and writes the unchanged raw cloud G-buffer.
+The intermediate packet is three three-layer `rgba16float` textures: 72 bytes
+per cloud-resolution pixel, the minimum storage for spectral radiance and
+transmittance, first/mean depth, motion, and work without private packet arrays.
+Resolved clouds add a short fine-to-coarse source
+integral to a disjoint far/inter-layer residual cache. A six-resource,
+double-bank world-space light volume replaces the current layer with exact
+distinct-owner Sun/Moon Beer fields plus a four-level P1 multigrid solve only
+after every owner in that layer is resident, every active full-owner direct
+transform has maximum cell optical depth at most `0.75`, and the global
+normalized equation residual is at most two percent. Under-resolved direct
+owners remain on exact same-layer tracing. Each direct field is built in two bounded
+stages: a parallel exact morphology/optics query materializes source-aligned
+RGB extinction and occupancy into mip-zero scratch, then one thread per column
+performs the 32-cell Beer prefix at downstream cell faces. Geometric face
+interpolation recovers exact cell-center half steps, returns neutral transport
+sourceward of an owner, and preserves its full exit attenuation downstream.
+Sun completes before Moon reuses the
+scratch, and Moon completes before multigrid overwrites it; pass ordering and
+single-mip views make those hazards explicit without another volume. Legacy
+analytic stratiform layers without a finite owner keep their ordered
+twelve-point visible-segment quadrature. Finite atlas-owned stratiform layers
+use the bounded owner-event march, including physical step ceilings, camera
+footprint filtering, and active-owner traversal. Each accepted event resolves
+local RGB extinction, material/phase, receiver-local Sun/Moon visibility,
+directional sky, lower atmosphere, ground exchange, and the resident
+owner-union direct/P1 field before its emission-absorption update. Resident and
+legacy sources are confidence-crossfaded rather than added, preserving one
+source path and exact homogeneous-slab behavior while allowing finite lateral
+boundaries and ground-to-cloud-base exchange. Ordinary volumes, legacy
+analytic sheets, finite decks, hydrometeors, and upper-atmosphere condensate all integrate
+RGB camera Beer transport and compose front-to-back as affine operators. The
+compositor writes four `rgba16float` attachments: `Lrgb`, `Trgb`, geometry, and
+motion (32 bytes/sample, four of the portable eight color attachments). `Lrgb` and
+`Trgb` occupy the two layers of one array texture so raw transport and resolved
+history swap atomically. First/mean depth, photopic optical depth/opacity,
+blended velocity, dominant layer, and actual normalized work remain metadata.
+WMO genus is a morphology branch within the common physical model, not a
+palette label. See `CLOUDS.md` and `CLOUD-OPTICS.md` for details.
 
-Atmospheric composition is resolved into independent, daily seeded dimensions:
-aerosol optical depth, aerosol species, particle size, absorption, humidity,
-ozone column, observer altitude, boundary-layer inversion, stratospheric
-aerosol, and ground albedo. The atmosphere style then applies a small coupled
-weather bias rather than replacing those values. Altitude reduces effective
-airmass and boundary aerosol; humidity increases particle scattering while
-compressing chroma; particle size changes forward-scattering anisotropy;
-absorption changes low-Sun transmission; ozone changes twilight blue/violet;
-and ground albedo only returns energy into the lowest multiple-scattering layer.
-The unlisted laboratory exposes every dimension independently, while production
-uses family-constrained combinations.
+`CloudScene.classifications` is the stable owner-level WMO morphology API.
+Daily scenes deterministically assign canonical classifications to every
+present layer and may add valid orthogonal varieties, supplementary features,
+accessory clouds, or upper-atmosphere species without changing owner identity.
+The CPU compiles those assignments into ordered placement → warp → subtract →
+union → reuse → optical records, packs them into the fixed rgba32float binding
+30 texture, and inflates traversal shells for additive support. Both cached
+lighting and view transport execute the same records before material lookup.
+The version-two macro atlas likewise evaluates its signed-distance/detail/ice
+channels even when macro R is zero: permitted exterior detail displaces the
+SDF boundary using its central-difference normal, protected condensation bases,
+and conservative potential-density majorant rather than a post-density mask.
+Non-analytic high-ice owners additionally resolve the guarded 96³ source atlas
+through one RGBA8 sampled binding at group 0, binding 32. Its source transform
+is appended to the seven-`vec4` (stride-7) `CloudMacroBinding` record. Camera
+and directional Sun/Moon paths share the same owner-space footprint `q`,
+resolving fine material at `q <= 1` and returning to macro-R/coarse moments at
+`q >= 2`; macro R, SDF, and majorants remain authoritative support contracts.
+Source-backed Ci/Cc/Cs owners bypass the former procedural residual, analytic Ci
+fibratus remains specialized, and the legacy RG8 moment sidecar is offline
+provenance rather than a runtime texture.
 
-The two-dimensional radiance field now includes a subtle Rayleigh phase
-minimum, a solar-depression-driven Earth shadow, a bounded Belt of Venus,
-finite-height irregular inversion layers, elevated volcanic afterglow, and
-separate green and red airglow layers. Thin cloud optical depth is evaluated in
-the static atmospheric pass so it can extinguish and re-scatter sky radiance;
-the moving CSS cloud layers remain responsible only for slow temporal change.
-This preserves integration without adding a continuously animated full-screen
-shader.
+Polar stratospheric, nacreous, and noctilucent clouds are separate finite
+owners in curved 15–30 km and 80–85 km shells. Their wave-sheet condensate is
+integrated through Beer transport with atmosphere-attenuated Sun/Moon and
+hemispheric irradiance. Nitric-acid/water PSC, approximately 10 μm nacreous ice,
+and 60–100 nm mesospheric ice use distinct extinction and angular/spectral
+responses. The former decorative one-hit noctilucent overlay is not part of the
+production graph.
 
-Deep night is composed after the display palette is selected. Zenith and
-horizon luminance settle nonlinearly from nautical through astronomical
-twilight; chroma compresses for mesopic vision; haze lifts and desaturates the
-horizon; pristine air makes the zenith darker; a visible Moon raises the sky
-floor and illuminates clouds; moonless cloud decks become darker than the clear
-sky unless the family's intentional ground skyglow is strong enough to light
-their undersides. This produces materially different pristine, marine, alpine,
-desert, overcast, smoky, humid, polar, airglow, moonlit, and cloud-amplified
-nights without inventing impossible source-light combinations.
+Finite precipitation and surface obscuration use a separate sixteen-vector
+hydrometeor record but enter this same transport pass. Conservative
+wind-swept-field and curved-shell intervals eliminate empty marching and bound
+the exact ray segment; adaptive stratification resolves 10 m banks and narrow
+shafts. Rain, snow, hail, virga, fog, mist, ice fog, and diamond dust use their
+own extinction, albedo, phase, direct/diffuse response, and passive
+multiple-scattering weights with the shared physical Sun, Moon, sky, ground,
+atmosphere, and exposure. Clouds and hydrometeors are then composed by actual
+first-interaction depth and contribute compatible mean depth, velocity, and
+owner identity to temporal reconstruction. See `HYDROMETEORS.md` for the
+microphysics and sparse-particle energy contract.
 
-Every daily family has a real-world anchor:
+### Temporal composite
 
-| Family | Real atmospheric reference | Deliberate liberty |
-| --- | --- | --- |
-| Crystal Azure | low-aerosol continental or high-pressure sky | slightly clearer edge separation |
-| Marine Pearl | humid maritime boundary layer and sea haze | pearlescent horizon held a little longer |
-| Lavender Alpenglow | clean high-altitude air with distant aerosol/cirrus | restrained violet emphasis near twilight |
-| Desert Apricot | dry air with mineral aerosol near the horizon | apricot scattering is selectively enriched |
-| Storm Slate | thick, moisture-rich overcast | slate separation remains readable instead of flat gray |
-| Smoky Copper | absorbing smoke/dust aerosol | copper is confined to aerosol paths and the lower sky |
-| Humid Aqua | tropical humidity and hydrated aerosol | cyan-green lift is subtle and luminance-led |
-| Winter Ice | cold, dry, low-aerosol continental/polar air | blue-white clarity is gently emphasized |
-| Rose Afterglow | high cloud catching sunlight after ground sunset | rose remains localized to afterglow geometry |
-| Violet Nocturne | exceptionally clear blue hour and moonless high sky | violet is strongly desaturated in deep night |
-| Sage Haze | humid haze or marine stratus | sage is a low-chroma veil, never a saturated night fill |
-| Cobalt Gold | very clear dry air with strong low-sun contrast | cobalt/gold opposition is enhanced at the edges |
-| Post-storm Cerulean | aerosol-scavenged air with residual humidity and retreating cloud | washed clarity is held slightly longer |
-| Coastal Silver | coarse sea-salt aerosol in a bright humid maritime boundary layer | silver glare remains readable without cyan saturation |
-| Saharan Veil | transported coarse mineral dust over otherwise dry air | ochre forward scattering is selectively enriched |
-| Volcanic Amethyst | fine, weakly absorbing stratospheric sulfate after an eruption | rare elevated purple-orange afterglow is gently emphasized |
-| Urban Amber Inversion | absorbing fine pollution trapped below a temperature inversion | low amber skyglow remains localized to the boundary layer |
-| Monsoon Pewter | saturated tropical air beneath a deep stratiform cloud deck | muted pewter separation avoids a featureless flat gray |
+Cloud history reconstructs a mean-depth world point, advects it by the dominant
+layer wind, projects it through the previous transport camera, and rejects from
+matched current/previous first/mean
+depth, optical-depth change, layer identity, occupancy, and motion. Radiance is
+deliberately not an accept/reject signal: it is the high-variance quantity the
+history must estimate. Reprojection displacement comes from cloud simulation
+time rather than submission cadence, so repeated samples of a paused weather
+snapshot do not spuriously advect an immutable cloud field. During that exact
+camera/time epoch, every same-pixel transport sample contributes to the resolved
+operator: a stochastic boundary hit/miss is an anti-aliasing sample, not a real
+disocclusion. Immutable history is sampled directly at the display pixel rather
+than passed through a numerically redundant direction/projection round trip;
+this prevents bilinear mixing with neighbouring, younger history ages. Moving
+production scenes still reproject and reject silhouette, ownership, and
+optical discontinuities through the geometric path. Volume
+radiance moments are accumulated independently from transmittance: a compact
+radius-one/radius-two cross filter uses relative RGB transmittance as its edge
+guide, and its strength follows analytic temporal variance. Edge-local moment
+clipping therefore suppresses stochastic source speckle while clear/cloud and
+thin/thick optical boundaries remain sharp. The completed sky behind a cloud is
+not included in the cloud-radiance variance estimate.
+A joint bilateral cloud reconstruction compares occupancy, optical depth, and
+mean distance so clear sky is not averaged through cloud silhouettes. It runs
+only for the optional checkerboard transport path; normal full-frame transport
+uses direct linear reconstruction and therefore does not blur already complete
+cloud detail.
+A linear HDR feedback target persists cloud-radiance luminance mean/population
+variance, reconstruction confidence, and stable age so history filtering and
+trust adapt to local change. One history weight and one geometric accept/reject
+decision apply to both `Lrgb` and `Trgb`; transmittance discontinuities guide
+radiance filtering, while `Trgb` itself is only edge-locally bounded. Resolved
+transmittance alpha is recomputed photopically after filtering. Raw and resolved
+transport arrays clear to the affine identity (`Lrgb = 0`, `Trgb = 1`) and swap
+as whole arrays. The composite pass writes display, temporal metadata, resolved
+`Lrgb`, and resolved `Trgb` in four attachments (28 bytes/sample for the usual
+four-byte presentation format). Stars, glow, background, and transport debug
+views use RGB transmittance before the one final creative grade, photographic
+tone map, sRGB conversion, and dither. Depth controls aerial perspective. Debug
+modes expose coverage, density, transmittance, depth, velocity, history,
+lighting, and sample budget before the one display transform.
 
-The CIE General Sky supplies the clear-to-overcast daylight distribution
-constraint. Perez is used as a daylight reference only, since it does not model
-twilight or night. Twilight follows the measured rapid fall in sky radiance
-through solar depression rather than linear day-to-night interpolation. Night
-composition follows measured contributors—airglow, integrated starlight,
-zodiacal light, lunar scattering, aerosol extinction, and optional artificial
-skyglow—and the well-observed reversal whereby moonless natural clouds can be
-dark while light-polluted low clouds become brighter than clear sky.
+Photographic qualification runs the temporal reconstruction's complete,
+bounded 64-transport history horizon. Transport count is necessary but not
+sufficient: strict readiness also requires at least 90% current history
+acceptance, 0.75 occupied-pixel mean normalized stable age (48 consecutive
+samples), and 0.85 occupied-pixel mean persistent confidence. A
+post-composite 64 × 36 numerical audit separately reports raw radiance and raw
+transmittance temporal deltas, resolved-radiance delta, raw-to-resolved
+residual, history acceptance/age/confidence, raw/resolved spatial variation,
+first/mean/optical-depth deltas, and non-finite counts. This distinguishes a
+noisy lighting estimator from noisy density, temporal rejection, or display
+dither without using the screenshot itself as a diagnostic instrument.
+Paused qualification cannot run beyond the 64-sample horizon through ordinary
+prop redraws; only the existing one-sample decision probe may cross the bound,
+and only when no history decision has yet been measured.
 
-Primary technical references:
+## Sky Lab
 
-- Eric Bruneton and Fabrice Neyret,
-  [Precomputed Atmospheric Scattering](https://ebruneton.github.io/precomputed_atmospheric_scattering/)
-- Sébastien Hillaire,
-  [A Scalable and Production Ready Sky and Atmosphere Rendering Technique](https://sebh.github.io/publications/egsr2020.pdf)
-- Simon Schneegans et al.,
-  [Physically Based Real-Time Rendering of Atmospheres using Mie Theory](https://diglib.eg.org/items/1fb6b85a-b3f8-4817-975f-f65634020f03)
-- Alexander Wilkie et al.,
-  [A Fitted Radiance and Attenuation Model for Realistic Atmospheres](https://cgg.mff.cuni.cz/publications/skymodel-2021/)
-- Sergey Kocifaj et al.,
-  [The influence of tropospheric haze on twilight sky color](https://opg.optica.org/ao/abstract.cfm?URI=AO-56-19-G179)
-- Sergey Kocifaj et al.,
-  [The role of ozone and aerosols in the colouration of the twilight sky](https://acp.copernicus.org/articles/23/14829/2023/)
-- NASA Earth Observatory,
-  [Aerosols: Tiny Particles, Big Impact](https://science.nasa.gov/earth/earth-observatory/aerosols/)
-- NOAA Global Monitoring Laboratory,
-  [Aerosol hygroscopic growth measurements](https://gml.noaa.gov/aero/instrumentation/humid.html)
-- Hartmut Winkler,
-  [A revised simplified scattering model for the moonlit sky brightness profile](https://academic.oup.com/mnras/article/514/1/208/6589414)
-- Amy Jones et al.,
-  [An advanced scattered moonlight model for Cerro Paranal](https://arxiv.org/abs/1310.7030)
-- Kevin Krisciunas and Bradley Schaefer,
-  [A model of the brightness of moonlight](https://articles.adsabs.harvard.edu/pdf/1991PASP..103.1033K)
-- Henrik Wann Jensen et al.,
-  [A Physically-Based Night Sky Model](https://graphics.ucsd.edu/~henrik/papers/nightsky/)
-- CIE,
-  [Spatial distribution of daylight — CIE Standard General Sky](https://www.cie.co.at/publications/spatial-distribution-daylight-cie-standard-general-sky-0)
-- Andrew Crumey,
-  [Human contrast threshold and astronomical visibility](https://arxiv.org/abs/1405.4209)
-- Florian Jechow et al.,
-  [Tracking the dynamics of skyglow with differential photometry using a digital camera](https://doi.org/10.1088/2041-8205/826/2/L34)
-- Sergey Kocifaj et al.,
-  [The amplitude of night sky brightness due to scattered moonlight](https://academic.oup.com/mnras/article/470/1/731/3859529)
-- Julien Lalonde and Iain Matthews,
-  [Laval HDR Sky Database](https://lvsn.github.io/deepskymodel/)
-- Academy Software Foundation,
-  [ACES Output Transforms](https://docs.acescentral.com/system-components/output-transforms/)
-- S. Noll et al.,
-  [An atmospheric radiation model for Cerro Paranal](https://arxiv.org/abs/1205.2003)
-- Eduard Masana et al.,
-  [A multi-band map of the natural night sky brightness](https://arxiv.org/abs/2101.01500)
-- Madhukar Budagavi and Oscar Bici,
-  [Adaptive Debanding Filter](https://arxiv.org/abs/2009.10804)
-- U.S. Geological Survey,
-  [ROLO lunar model and database](https://www.usgs.gov/media/files/rolo-lunar-model-and-database)
-- Bruce Hapke,
-  [The wavelength dependence of the lunar phase curve](https://doi.org/10.1029/2011JE003916)
-- Peter Thejll et al.,
-  [On the colour of the dark side of the Moon](https://arxiv.org/abs/1401.1994)
-- Pilar Montañés-Rodríguez et al.,
-  [Measurements of the surface brightness of the earthshine](https://bbso.njit.edu/Research/EarthShine/literature/Montanes_etal_2007_AJ.pdf)
-- Salvador Bará and Carmen Bao-Varela,
-  [Skyglow inside your eyes](https://arxiv.org/abs/2212.09103)
-- Andrew Crumey,
-  [Human contrast threshold and astronomical visibility](https://arxiv.org/abs/1405.4209)
-- Andrew T. Young,
-  [The temporal power spectrum of scintillation](https://doi.org/10.1364/AO.8.000869)
-- ESA / DPAC,
-  [Gaia DR3 photometry documentation](https://gea.esac.esa.int/archive/documentation/GDR3/)
-- Bo Xin et al.,
-  [Monitoring the Atmospheric Turbulence Profile with High Angular Resolution Stellar Images](https://arxiv.org/abs/1805.02845)
-- P. Martínez et al.,
-  [Atmospheric image blur with finite outer scale or partial adaptive correction](https://arxiv.org/abs/astro-ph/0109067)
-- Mohamed E. Hanafy et al.,
-  [Atmospheric scattering point-spread function: modeling and application in remote sensing](https://opg.optica.org/abstract.cfm?uri=josaa-31-6-1312)
-- C. Y. Hsu et al.,
-  [Measurement of atmospheric point spread function by imaging the Moon's edge](https://aas.aanda.org/articles/aas/pdf/1997/16/ds5557.pdf)
-- L. S. Samland,
-  [Impact of atmospheric dispersion on high-contrast imaging](https://arxiv.org/abs/2112.01284)
+`/sky-lab` is intentionally unlisted. It serializes its state into the URL and
+can force backends, quality tiers, debug views, cloud composition, lens, and
+world-space weather-system placement regime,
+temporal reconstruction,
+resolution, cadence, date/time/location, palette variant, and all CloudScene
+parameters. Each layer exposes genus, oktas, altitude, thickness, optical
+depth, wind, shear, turbulence, ice fraction, precipitation, mesoscale
+organization, lifecycle, and organization strength. Presets cover
+clear, fair cumulus, marine cells, high cirrus, altocumulus, rain deck,
+thunderstorm, and radiation fog.
+
+Every select has previous/next controls with wraparound, so related palettes,
+weather states, render modes, compositions, and perspective lenses can be
+auditioned without reopening native select menus.
+
+Stellar controls are deliberately orthogonal: visibility changes the limiting
+magnitude, exposure changes displayed source energy, and glow changes only the
+wide PSF. This is the preferred way to diagnose a night composition without
+breaking photometric ordering.
+
+The on-canvas telemetry reports chosen backend, output/cloud resolution,
+estimated texture memory, temporal-history state, effective adaptive cadence,
+CPU submission time, separate interval/lighting/transport GPU costs, isolated
+cold-lighting GPU/queue cost, first-transport cost, density evaluations, and
+timing source. Renderer debug views are the first
+tool for diagnosing a visually implausible result; ordinary DOM inspection
+cannot reveal linear-light composition errors.
+
+## Important source files
+
+- `sky.tsx`: palette, weather, and astronomy integration.
+- `cloud-scene.ts`: constrained weather state and WMO morphology parameters.
+- `cloud-morphology-modifiers.ts`: selection, ordered compilation, packing,
+  stable owner resolution, and conservative bounds.
+- `cloud-morphology-modifiers-wgsl.ts`: the shared 22-operator GPU evaluator.
+- `sky-renderer-canvas.tsx`: backend selection, GPU resources, render graph,
+  scheduler, temporal state, and telemetry.
+- `webgpu-shaders.ts`: original atmosphere, star/stellar-PSF, Moon, cloud, and
+  composite WGSL.
+- `astronomy.tsx` and `star-catalog.ts`: astronomical state.
+- `sky-photograph-benchmark.ts`: reference-image calibration.
+
+## Extending the renderer
+
+New visual features should enter the HDR graph at the physically correct point.
+Do not add post-tone-map colored overlays for atmospheric phenomena. Add new
+weather controls to `CloudScene`, constrain them before rendering, expose them
+in Sky Lab, and add photographic benchmark cases. Any extra animated pass must
+have a hidden-tab stop, a pixel/work budget, and observable timing.

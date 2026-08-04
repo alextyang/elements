@@ -14,9 +14,14 @@
 /coverage
 /output/
 /.playwright-cli/
+/public/generated/cloud-previews/
 
 # next.js
 /.next/
+/.next-cloud-preview-production/
+/.next-cloud-preview-lab/
+/.cloud-preview-lab-server.lock/
+/.codex-next/
 /out/
 
 # production

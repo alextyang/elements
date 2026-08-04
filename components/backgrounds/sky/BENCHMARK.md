@@ -1,107 +1,177 @@
-# Sky and lunar rendering benchmarks
+# Sky validation and performance gate
 
-## Photographic sky diagnostic
+The completed delivery sequence and definition of done live in
+`CLOUD-IMPLEMENTATION-PLAN.md`. This document specifies the repeatable
+validation surface for the automatic production renderer.
 
-The unlisted `/sky-photographs` route compares the renderer with 188
-condition-known photographic skies. The set is balanced across solar-altitude
-regimes, cloud morphology, aerosol class, camera direction, latitude, clear
-air, twilight, moonlit atmosphere, and deep night. Its sources are GLOBE CLOUD
-GAZE and terminator observations, DLR Eye2Sky, Australian Antarctic Division
-Davis all-sky frames, and the high/medium-confidence atmospheric subset of the
-lunar corpus.
+Visual quality is evaluated against real photographs, not against another
+renderer's screenshots. Existing curated data lives in `data/sky-benchmark.json`
+and `data/moon-benchmark.json`; `/sky-photographs` and `/sky-benchmark` provide
+the review surfaces.
 
-This corpus is deliberately **not** a pixel-matching target. Camera response,
-exposure, white balance, display transform, and the reference datasets' own
-sampling biases are not the Elements art direction. Photographs are evidence
-for geometry, optical depth, tonal continuity, extinction, atmospheric
-coupling, plausible parameter combinations, and missing kinds of variation.
-The renderer retains an intentional bias toward vibrant editorial color and
-broad natural diversity.
+## Photographic matrix
 
-The automated report is therefore a regression and outlier detector rather
-than an optimizer. Global similarity scores can reveal a broken tone floor,
-clipped chroma, gradient band, or implausible cloud extinction; they cannot
-decide that a more average or less expressive sky is better.
+Every release-quality review should include:
 
-```sh
-npm run sky:curate
-npm run build
-SKY_BENCHMARK_URL=http://localhost:3000 npm run sky:render
-npm run sky:analyze
-```
+- dawn, sunrise, clear day, haze, sunset, dusk, nautical twilight, dark night,
+  moonlit night, and overcast states;
+- clear sky and every WMO genus, plus plausible multi-layer combinations;
+- 0–8 okta coverage, front/back/side lighting, low/high humidity and aerosol;
+- new/crescent/quarter/gibbous/full Moon states above and near the horizon;
+- dark rural and brighter urban limiting magnitudes;
+- multiple aspect ratios and both physical and art-directed camera modes.
 
-## Lunar rendering benchmark
+Photographic comparisons use one shared physical camera. When a case supplies
+horizontal and vertical FOV, cloud perspective is `natural`; applying an
+additional cloud-only wide or telephoto transform misregisters clouds from the
+atmosphere and celestial field. The non-natural cloud perspective options are
+diagnostic Sky Lab experiments only.
 
-The unlisted `/sky-benchmark` route studies the Elements renderer alongside 140
-astronomy-known references. It is an evidence tool, not a photo-matching target.
-Every case fixes UTC time, observer coordinates,
-Sun and Moon altitude/azimuth, phase, apparent lunar diameter, camera field of
-view, and the source's available exposure metadata. The render path uses the
-Moon's physical ~0.52° angular diameter; the normal app keeps its independent
-art-directed scale. Reference pixels never choose palette color, family,
-exposure, aerosol, humidity, or cloud density. Those controls come from
-astronomy, location/climate, semantic weather evidence, and deterministic
-editorial baselines.
+Reject a result for recognizable repeated noise, flat tint, hard altitude bands,
+boiling, history trails, identical layer motion, implausible genus geometry,
+unattenuated celestial objects, over-visible lunar dark side, halo stamps,
+gradient stops, clipped twilight color, or night palettes too bright to reveal
+astronomy.
 
-## Evidence classes
+The existing analyzer measures exposure offset, chromaticity, dynamic range,
+dark-sky fraction, vertical tone profile, gradient curvature, and lunar halo
+falloff. These measurements are guides: morphology and integration still need
+side-by-side human review with provenance-safe reference photographs.
 
-- **55 AADC Davis all-sky frames** span every main phase class, day through
-  deep night, horizon through high Moon, polar sky color, cloud veil, and
-  brightness distribution. Their 720×576 imagery is not used for lunar-edge
-  or surface-detail conclusions.
-- **24 DLR Eye2Sky OLUOL frames** use the station's published radial camera
-  calibration and exact 80 ms exposure. The full-Moon, moon-centred views are
-  the strongest benchmark for PSF, halo falloff, sky suppression, and stars
-  near the Moon.
-- **19 NASA SVS 2026 frames** provide LRO/LOLA/LROC-derived phase, libration,
-  limb, terminator, earthshine, and surface truth. A 2° virtual telephoto view
-  gives the renderer enough pixels for structural analysis. These frames are
-  not treated as atmospheric exposure references.
-- **42 visually audited Wikimedia Commons photographs** have structured camera
-  location, exact EXIF local time converted with the location's IANA timezone,
-  camera exposure/aperture/ISO/focal length where available, and a per-file
-  free license. Eclipses, occultations, composites, sequences, time-lapses,
-  and semantically false “Moon” results are excluded. They cover landscape,
-  city, cloud, haze, clear air, daylight, twilight, deep night, wide angle,
-  normal, and telephoto compositions.
+## Automated gates
 
-## Reproduce
+Run:
 
 ```sh
-npm run moon:curate
+npm run typecheck
+npm test
+npm run sky:validate-webgpu
 npm run build
-SKY_BENCHMARK_URL=http://localhost:3000 npm run moon:render
-npm run moon:analyze
 ```
 
-`SKY_BENCHMARK_CLASS`, `SKY_BENCHMARK_SOURCE`, and `SKY_BENCHMARK_LIMIT` can
-restrict a capture run. Captures and reports are written under ignored
-`output/sky-benchmark/`.
+`npm test` checks CloudScene constraints, scheduling policy, generated-asset
+invariants, and static render-graph contracts. `sky:validate-webgpu` is a
+self-contained, bounded real-browser validation: it starts an ephemeral local
+server, opens an isolated Playwright session, compiles all eight WGSL modules,
+creates all thirteen pipeline variants, uploads the conservative weather
+hierarchy, creates exact production bind groups, submits the interval →
+lighting-cache → transport → persistent-temporal-composite graph, then closes
+the browser and server on either success or failure. The page reports its
+active GPU stage and the command fails on a bounded timeout rather than waiting
+indefinitely. Use `node scripts/validate-webgpu-shaders.mjs --serve` only when
+an explicitly persistent, manually inspected validator page is desired.
+Full-page browser validation must additionally confirm:
 
-## Analysis
+- all WGSL modules report no compilation errors or warnings;
+- WebGPU creates every render pipeline and completes frames without uncaptured
+  validation errors;
+- `auto` selects WebGPU, explicit WebGL2 remains diagnostic, and forced fallback
+  reproduces the legacy hourly sky;
+- pausing and hiding the tab stop frame scheduling, and resuming restarts it;
+- changing genus, layer physics, time, debug mode, and quality does not recreate
+  the GPU device or leak textures.
 
-The analyzer reports exposure offset, chromaticity, scene dynamic range,
-dark-sky fraction, vertical tone profile, gradient curvature, point-source
-counts, physical Moon radius, dark-disc contrast, radial halo falloff, and halo
-ring curvature. Results are grouped by evidence class, source, lunar phase,
-solar regime, and lunar altitude. These are diagnostic dimensions, not an
-optimization loss. Camera exposure and white balance are especially useful for
-revealing missing physical coupling, but must not flatten the app's deliberate
-subtlety, vibrancy, or day-to-day diversity.
+### Render-ready image reviews
 
-Metrics have deliberate boundaries:
+Use `npm run cloud:review -- <case-id> <debug-view>` for human image review.
+This is deliberately stricter than waiting for the page or canvas to exist. The
+capture page is not ready until the currently selected case has a healthy WebGPU
+history, has completed the 64-transport temporal horizon, its G-buffer reduction
+reports both nonzero projected opacity and nonzero occupied sky, and the
+reconstruction audit proves mature history: at least 90% current acceptance,
+0.75 mean normalized stable age, and 0.85 persistent confidence.
 
-- AADC contributes global sky statistics only; its Moon-local detections are
-  too low-resolution for edge or halo claims.
-- Contextual photographs contribute photographic distribution and state
-  coverage, but not pixel registration because optical-axis metadata is absent.
-- NASA contributes lunar-disc structure, not camera PSF or sky exposure.
-- DLR contributes local Moon/atmosphere metrics, but its available 80 ms night
-  frames are limited to full-Moon nights.
-- Photographs teach relationships—limb-to-sky continuity, non-negative
-  earthshine, PSF shape, cloud occlusion, scattering falloff, extinction, and
-  depth. They do not prescribe a single photographic exposure or color grade.
+The review harness writes no screenshot before that contract passes. A failed
+renderer or a legitimately empty cloud result terminates with evidence and no
+image, so reviewers cannot accidentally evaluate the clear placeholder frame,
+an earlier selector case, or a numerically valid but under-resolved/ghosted
+transport history. The readiness
+attributes remain on `/cloud-photographs?capture=render` for other automation,
+but screenshot tools should use this guarded path rather than their own delay.
 
-The renderer is one-shot: WebGL atmosphere, cloud, celestial, and star passes
-render only when inputs change. The benchmark adds no permanent animation loop
-and therefore does not alter production thermal behavior.
+The current source checkout may live on file-provider-backed storage with an
+incompletely hydrated `node_modules`. For the production gate, use a clean
+temporary checkout, `npm ci`, the bundled Codex Node runtime, and
+`ELEMENTS_NEXT_DIST_DIR=.next-sky next build --turbopack`; do not interpret a
+missing package inside a partially hydrated local install as a source failure.
+
+The first historical full-page timestamp-query baseline at 1932×1087 output and 618×348
+balanced cloud resolution measured roughly 0.07 ms interval, 0.39 ms lighting,
+and 1.57–2.56 ms transport at 2 Hz checkerboard cadence. This identifies
+transport as the optimization target but does not qualify the device. The same
+run exposed a 3/8 fair-cumulus coverage failure. The diagnostic GPU reduction
+now measures mean opacity, visible footprint, and interval acceptance; its first
+recalibrated 0–8 sweep is recorded in `CLOUD-IMPLEMENTATION-PLAN.md`. Multiple
+seeds, genera, aspect ratios, and elevations remain a release gate; screenshots
+alone are not an adequate coverage test.
+
+The historical clean empty-space A/B gate used the deterministic 3/8 fair-cumulus
+scene at 1932×1087 with a 618×348 balanced cloud buffer, 18 view steps, 3 light
+steps, 2 Hz cadence, and checkerboard transport:
+
+| Traversal | Mean density evaluations | GPU p50 | GPU p95 | Mean opacity | Footprint |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Exact shell reference | 8.7 | 1.51 ms | 1.90 ms | 35.2% | 62.5% |
+| Four-step conservative block bound | 7.9 | 2.49 ms | 3.08 ms | 33.4% | 60.5% |
+
+The bound was rejected and removed: a roughly nine-percent evaluation saving
+does not justify the additional weather/base hierarchy traffic or the measured
+GPU regression. Future accelerators must beat the exact reference on both
+evaluated work and p50/p95 while preserving opacity, footprint, and imagery.
+
+A separate final exact-reference production reload exposed one 38.08 ms cold
+sample (18.74 ms lighting and 19.33 ms transport). The following 30 seconds
+recovered to 1.05 ms p50 and 2.16 ms p95 over six samples, with mean work near
+eight density evaluations, but cadence correctly remained temporarily reduced
+while recovering. This is a cold residency/first-use defect, not steady-state
+cost, and it remains a release blocker: bounded step-count warm-up alone is not
+enough. Qualification must prove that lighting and transport first use are
+split or prewarmed without presenting a long contiguous GPU submission.
+
+The renderer now performs that split. It clears new cloud history to a neutral
+radiance/transmittance state, submits the exact interval and lighting-cache
+passes, waits asynchronously for GPU completion, and starts transport on the
+next animation frame. Cold lighting, conservative queue completion, and first
+transport are reported independently. On the current adapter, five balanced
+production reloads after the change measured:
+
+| Signal | Observed range |
+| --- | ---: |
+| Isolated cold interval + lighting GPU | 0.39–5.90 ms |
+| Conservative cold-submission queue completion | 9.10–28.20 ms |
+| First balanced transport update | 1.31–2.10 ms |
+| Balanced steady sample window | 1.84–3.54 ms p95 |
+
+All balanced runs retained the requested 2 Hz cadence. A historical high-quality run at
+2348×1321 output and 986×554 cloud resolution measured 3.41 ms isolated cold
+lighting and 4.65 ms first transport, but later reached about 9 ms and invoked
+cadence throttling. That adaptation remains intentional: spatial quality stays
+fixed while only the background transport cadence yields.
+
+## Performance budgets
+
+Balanced quality is the shipping default. At a full-window desktop viewport:
+
+- output resolution stays under the tier pixel budget;
+- cloud transport is 48% linear resolution and 2 Hz before adaptation;
+- high quality is 62% and 4 Hz; battery is 24% and 1 Hz;
+- star scintillation never raises presentation above 6 Hz;
+- spatial quality remains fixed when load adaptation lowers cadence;
+- immutable cloud assets remain roughly 10 MB plus the LUT and bounded HDR
+  render targets, including two full-resolution temporal-statistics targets;
+- hidden tabs submit no frames.
+
+Sky Lab displays hardware timestamp-query timing when available; otherwise it
+shows conservative asynchronous queue-completion timing. The fallback never
+blocks rendering on a GPU timing promise. If balanced cloud transport sustains
+more than roughly 8 ms, cadence adapts downward. Device, asset, or validation
+failure switches directly to the legacy sky; it never starts procedural asset
+generation or a second expensive cloud path.
+
+## Manual sign-off
+
+Use a cool-start and a five-minute steady-state run. Inspect the battery/energy
+panel, not only frame rate. Validate low-power and integrated GPUs, standard and
+high-DPI displays, resize/orientation changes, device loss, reduced motion,
+offline Moon-texture fallback, and long Sky Lab sessions. A visually excellent
+frame that causes continuous maximum GPU duty is not a passing background.

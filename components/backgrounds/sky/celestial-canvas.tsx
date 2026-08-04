@@ -15,15 +15,24 @@ in vec3 a_color;
 in float a_scintillation;
 in float a_phase;
 in float a_chromatic;
+in float a_radiance;
+in float a_detection;
+in float a_glow;
+in float a_seeing;
 
 uniform float u_time;
 uniform float u_pixel_ratio;
 uniform float u_global_opacity;
+uniform float u_stellar_exposure;
+uniform float u_stellar_glow;
 uniform vec2 u_viewport;
 
 out vec3 v_color;
 out float v_opacity;
 out float v_bright;
+out float v_core_scale;
+out float v_glow;
+out float v_seeing;
 
 float hash11(float value) {
     return fract(sin(value * 127.1) * 43758.5453123);
@@ -59,10 +68,16 @@ void main() {
 
     gl_Position = vec4(a_position.x * 2.0 - 1.0, 1.0 - a_position.y * 2.0, 0.0, 1.0);
     gl_Position.xy += wander * vec2(2.0 / u_viewport.x, 2.0 / u_viewport.y);
-    gl_PointSize = a_size * u_pixel_ratio * (1.0 + max(0.0, shimmer) * a_scintillation * 0.07);
+    float glow = a_glow * u_stellar_glow * a_detection;
+    float totalSize = a_size + glow * mix(7.0, 11.0, a_seeing);
+    gl_PointSize = totalSize * u_pixel_ratio * (1.0 + max(0.0, shimmer) * a_scintillation * 0.07);
     v_color = clamp(a_color + spectralVariation, 0.0, 1.0);
-    v_opacity = a_opacity * u_global_opacity * intensity;
-    v_bright = smoothstep(3.2, 5.8, a_size);
+    v_opacity = pow(max(a_radiance, 0.000001), 0.48) *
+        u_stellar_exposure * u_global_opacity * intensity;
+    v_bright = smoothstep(0.08, 0.55, glow);
+    v_core_scale = totalSize / max(a_size, 0.5);
+    v_glow = glow;
+    v_seeing = a_seeing;
 }`;
 
 const STAR_FRAGMENT_SHADER = `#version 300 es
@@ -71,6 +86,9 @@ precision highp float;
 in vec3 v_color;
 in float v_opacity;
 in float v_bright;
+in float v_core_scale;
+in float v_glow;
+in float v_seeing;
 out vec4 out_color;
 
 void main() {
@@ -78,10 +96,12 @@ void main() {
     float radius = length(p);
     if (radius > 1.0) discard;
 
-    float radius2 = radius * radius;
-    float seeing = pow(1.0 + radius2 * 5.8, -2.35) * 1.08;
-    float core = exp(-radius2 * 22.0) * 0.32;
-    float aureole = exp(-radius2 * 2.7) * 0.055 * v_bright;
+    float coreRadius = radius * v_core_scale;
+    float radius2 = coreRadius * coreRadius;
+    float seeing = pow(1.0 + radius2 * mix(7.4, 4.5, v_seeing), -2.42) * 0.92;
+    float core = exp(-radius2 * 24.0) * 0.28;
+    float aureole = pow(1.0 + radius * radius * 4.0, -2.1) *
+        v_glow * 0.22;
     float alpha = clamp((seeing + core + aureole) * v_opacity, 0.0, 1.0);
     vec3 spectralCore = mix(
         v_color,
@@ -581,7 +601,7 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
 
         gl.bindVertexArray(starVertexArray);
         gl.bindBuffer(gl.ARRAY_BUFFER, starBuffer);
-        const starStride = 10 * Float32Array.BYTES_PER_ELEMENT;
+        const starStride = 14 * Float32Array.BYTES_PER_ELEMENT;
         const starAttributes: Array<[string, number, number]> = [
             ["a_position", 2, 0],
             ["a_size", 1, 2],
@@ -590,6 +610,10 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
             ["a_scintillation", 1, 7],
             ["a_phase", 1, 8],
             ["a_chromatic", 1, 9],
+            ["a_radiance", 1, 10],
+            ["a_detection", 1, 11],
+            ["a_glow", 1, 12],
+            ["a_seeing", 1, 13],
         ];
         starAttributes.forEach(([name, size, offset]) => {
             const location = gl.getAttribLocation(starProgram, name);
@@ -671,9 +695,9 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
             gl.enable(gl.BLEND);
 
             if (uploadedScene !== current) {
-                const starData = new Float32Array(current.stars.length * 10);
+                const starData = new Float32Array(current.stars.length * 14);
                 current.stars.forEach((star, index) => {
-                    const offset = index * 10;
+                    const offset = index * 14;
                     const color = parseRgb(star.color);
                     starData.set(
                         [
@@ -687,6 +711,10 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                             star.scintillation,
                             star.phaseOffset,
                             star.chromaticScintillation,
+                            star.radiance,
+                            star.detection,
+                            star.glow,
+                            star.seeing,
                         ],
                         offset,
                     );
@@ -708,6 +736,14 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                 gl.uniform1f(
                     uniform(starProgram, "u_global_opacity"),
                     current.starsOpacity,
+                );
+                gl.uniform1f(
+                    uniform(starProgram, "u_stellar_exposure"),
+                    current.stellarExposure,
+                );
+                gl.uniform1f(
+                    uniform(starProgram, "u_stellar_glow"),
+                    current.stellarGlow,
                 );
                 gl.uniform2f(
                     uniform(starProgram, "u_viewport"),

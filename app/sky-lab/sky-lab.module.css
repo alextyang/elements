@@ -159,6 +159,37 @@
     font-weight: 650;
 }
 
+.selectStepper {
+    display: grid;
+    grid-template-columns: 31px minmax(0, 1fr) 31px;
+    gap: 5px;
+    align-items: center;
+}
+
+.selectStepper button {
+    height: 34px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.78);
+    background: rgba(6, 10, 17, 0.4);
+    cursor: pointer;
+    font: inherit;
+    font-size: 18px;
+    line-height: 1;
+    transition: background 140ms ease, border-color 140ms ease;
+}
+
+.selectStepper button:hover {
+    border-color: rgba(255, 255, 255, 0.23);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.selectStepper button:focus-visible {
+    outline: 2px solid rgba(152, 205, 255, 0.78);
+    outline-offset: 1px;
+}
+
 .field select,
 .field input {
     width: 100%;
@@ -210,6 +241,65 @@
 
 .disabled {
     opacity: 0.38;
+}
+
+.layerControls {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.layerControls summary {
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 10px;
+    font-weight: 720;
+    cursor: pointer;
+}
+
+.layerControls[open] summary {
+    margin-bottom: 4px;
+}
+
+.rendererReadout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 10px;
+    padding: 9px;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.56);
+    background: rgba(0, 0, 0, 0.14);
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+}
+
+.presetGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.presetGrid button {
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9px;
+    color: rgba(255, 255, 255, 0.74);
+    background: rgba(255, 255, 255, 0.045);
+    font-size: 9px;
+    cursor: pointer;
+}
+
+.presetGrid button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.validationStatus {
+    margin: 0;
+    color: rgba(166, 225, 255, 0.68);
+    font-size: 9px;
 }
 
 .toggle,

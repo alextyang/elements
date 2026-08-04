@@ -1,0 +1,4100 @@
+{
+  "schema": "elements-cloud-optics",
+  "version": 1,
+  "generatorVersion": "1.1.0",
+  "phaseTexture": {
+    "url": "cloud-optics-phase-rgba16float-v1.bin",
+    "file": "cloud-optics-phase-rgba16float-v1.bin",
+    "format": "rgba16float",
+    "dimensions": {
+      "width": 512,
+      "height": 67,
+      "depthOrArrayLayers": 1
+    },
+    "byteLength": 274432,
+    "encoding": "log2-phase-per-steradian",
+    "channels": {
+      "r": "red-band",
+      "g": "green-band",
+      "b": "blue-band",
+      "a": "reserved-zero"
+    },
+    "angleMapping": {
+      "angleRadians": "index / (width - 1) * PI",
+      "sampleCoordinate": "(0.5 + acos(clamp(cosTheta,-1,1)) / PI * (width - 1)) / width"
+    }
+  },
+  "parameterBuffer": {
+    "url": "cloud-optics-parameters-f32-v1.bin",
+    "file": "cloud-optics-parameters-f32-v1.bin",
+    "format": "float32-little-endian",
+    "strideFloats": 32,
+    "strideBytes": 128,
+    "byteLength": 8576,
+    "layout": {
+      "0": "phaseClass,effectiveRadiusMicrons,habitIndex,roughness",
+      "4": "massExtinctionRgbM2PerKg,phaseTextureRow",
+      "8": "singleScatteringAlbedoRgb,meanAsymmetry",
+      "12": "forwardG,draineG,draineAlpha,draineWeight",
+      "16": "backwardG,backwardWeight,analyticRmsLog2,forward10DegreeEnergy",
+      "20": "rainbowCenter,width,contrast,energy",
+      "24": "gloryCenter,width,contrast,energy",
+      "28": "asymmetryRgb,schemaVersion"
+    }
+  },
+  "integration": {
+    "wavelengthsMicrons": [
+      0.42,
+      0.46,
+      0.5,
+      0.54,
+      0.58,
+      0.63,
+      0.68
+    ],
+    "liquidEffectiveVariance": 0.1,
+    "liquidRadiusQuadratureRatios": [
+      0.42,
+      0.62,
+      0.82,
+      1,
+      1.2,
+      1.48,
+      1.9
+    ],
+    "normalization": "integral over 4pi steradians equals one per RGB band",
+    "convention": "cosTheta=1 is zero-deflection forward scattering; negate a direction-to-light vector when forming the incident propagation vector"
+  },
+  "rows": [
+    {
+      "id": "liquid-r4",
+      "phase": "liquid",
+      "effectiveRadiusMicrons": 4,
+      "phaseRow": 0,
+      "massExtinctionRgbM2PerKg": [
+        409.69045143703977,
+        405.6866881225885,
+        402.98074013441334
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.9999995,
+        0.9999995,
+        0.9999995
+      ],
+      "asymmetryRgb": [
+        0.8436568917431942,
+        0.8440115540996428,
+        0.8461900566210634
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.978353779712,
+        "draineG": 0.5190060621004801,
+        "draineAlpha": 12.812646251544445,
+        "draineWeight": 0.42853333450752,
+        "backwardG": -0.36000000000000004,
+        "backwardWeight": 0,
+        "loss": 0.15020290900345074,
+        "rmsLog2": 0.3875602004894862
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 2.4837640548929087,
+          "widthRadians": 0.2151775790129995,
+          "contrast": 3.2288197014830478,
+          "energy": 0.012301205582398205
+        },
+        "glory": {
+          "centerRadians": 3.141592653589793,
+          "widthRadians": 0.0860710316051998,
+          "contrast": 2.5474542718506377,
+          "energy": 0.0029280159441185537
+        },
+        "forwardTenDegreeEnergy": 0.513998943274612
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999996,
+          1.0000000000000004,
+          0.9999999999999977
+        ],
+        "minimumPhaseRgb": [
+          0.0022697157024162695,
+          0.0022838855979072695,
+          0.0017524457832413525
+        ]
+      }
+    },
+    {
+      "id": "liquid-r6",
+      "phase": "liquid",
+      "effectiveRadiusMicrons": 6,
+      "phaseRow": 1,
+      "massExtinctionRgbM2PerKg": [
+        267.54846366515625,
+        265.8638325202009,
+        265.37214722600197
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.9999995,
+        0.9999995,
+        0.9999995
+      ],
+      "asymmetryRgb": [
+        0.8512680378129733,
+        0.8544024464495421,
+        0.8573373035728447
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.98007725133824,
+        "draineG": 0.517622119424,
+        "draineAlpha": 26.46368447927649,
+        "draineWeight": 0.42480533450752,
+        "backwardG": -0.36000000000000004,
+        "backwardWeight": 0,
+        "loss": 0.18431245375352587,
+        "rmsLog2": 0.4293162630899578
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 2.4837640548929087,
+          "widthRadians": 0.1721420632103996,
+          "contrast": 4.2299619701920355,
+          "energy": 0.012393212725567739
+        },
+        "glory": {
+          "centerRadians": 3.141592653589793,
+          "widthRadians": 0.018443792486828592,
+          "contrast": 4.010354461701357,
+          "energy": 0.0022398764368933414
+        },
+        "forwardTenDegreeEnergy": 0.5266643820457649
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000016,
+          0.9999999999999994,
+          0.9999999999999999
+        ],
+        "minimumPhaseRgb": [
+          0.0017098247692754875,
+          0.001508177734760588,
+          0.001613139705312122
+        ]
+      }
+    },
+    {
+      "id": "liquid-r8",
+      "phase": "liquid",
+      "effectiveRadiusMicrons": 8,
+      "phaseRow": 2,
+      "massExtinctionRgbM2PerKg": [
+        197.26877656567353,
+        198.25782720295655,
+        197.54626231603993
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.9999995,
+        0.9999995,
+        0.9999995
+      ],
+      "asymmetryRgb": [
+        0.8586776017493203,
+        0.8625786819432528,
+        0.863705443315521
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.9745030310502399,
+        "draineG": 0.52297337090048,
+        "draineAlpha": 55.320983351069046,
+        "draineWeight": 0.39840533450752,
+        "backwardG": -0.35537671897088,
+        "backwardWeight": 0.0015708860743680003,
+        "loss": 0.26328146362180327,
+        "rmsLog2": 0.5131096019582982
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 2.489911985721852,
+          "widthRadians": 0.1475503398946283,
+          "contrast": 5.415397389074895,
+          "energy": 0.013061072129785753
+        },
+        "glory": {
+          "centerRadians": 3.141592653589793,
+          "widthRadians": 0.018443792486828592,
+          "contrast": 4.442952789055324,
+          "energy": 0.0018893491000633743
+        },
+        "forwardTenDegreeEnergy": 0.5345354429144986
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999994,
+          1.0000000000000013,
+          0.999999999999999
+        ],
+        "minimumPhaseRgb": [
+          0.0015871142698850346,
+          0.0014026144702292073,
+          0.0014111244680984052
+        ]
+      }
+    },
+    {
+      "id": "liquid-r10",
+      "phase": "liquid",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 3,
+      "massExtinctionRgbM2PerKg": [
+        157.2333999192149,
+        155.9239862015986,
+        155.42420723658077
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.9999995,
+        0.9999995,
+        0.9999995
+      ],
+      "asymmetryRgb": [
+        0.862624721203213,
+        0.8619638566191564,
+        0.8636806094805456
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.9777150369382399,
+        "draineG": 0.5190060621004801,
+        "draineAlpha": 96.61851436249982,
+        "draineWeight": 0.39840533450752,
+        "backwardG": -0.34952742617088,
+        "backwardWeight": 0.0028019372359680004,
+        "loss": 0.2880110886870662,
+        "rmsLog2": 0.5366666457746989
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 2.471468193235023,
+          "widthRadians": 0.11681068574991427,
+          "contrast": 7.441492516615686,
+          "energy": 0.013635048303193228
+        },
+        "glory": {
+          "centerRadians": 3.141592653589793,
+          "widthRadians": 0.012295861657885876,
+          "contrast": 5.105511537869243,
+          "energy": 0.0015560049612147841
+        },
+        "forwardTenDegreeEnergy": 0.5330341189372735
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999999,
+          1.0000000000000018,
+          0.9999999999999998
+        ],
+        "minimumPhaseRgb": [
+          0.0013367038574308007,
+          0.0013353689419575367,
+          0.0013939011152064888
+        ]
+      }
+    },
+    {
+      "id": "liquid-r14",
+      "phase": "liquid",
+      "effectiveRadiusMicrons": 14,
+      "phaseRow": 4,
+      "massExtinctionRgbM2PerKg": [
+        110.73714441693487,
+        110.63368398296139,
+        110.4946491093234
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.9999995,
+        0.9999995,
+        0.9999995
+      ],
+      "asymmetryRgb": [
+        0.8652946574241573,
+        0.8649406853013852,
+        0.8650265024014178
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.98396703105024,
+        "draineG": 0.54023550210048,
+        "draineAlpha": 96.61851436249982,
+        "draineWeight": 0.42633333450752,
+        "backwardG": -0.34952742617088,
+        "backwardWeight": 0.0032581820743680006,
+        "loss": 0.310678548538248,
+        "rmsLog2": 0.5573854577742838
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 2.4468764699192516,
+          "widthRadians": 0.10451482409202795,
+          "contrast": 10.269180144407159,
+          "energy": 0.01353075251759917
+        },
+        "glory": {
+          "centerRadians": 3.141592653589793,
+          "widthRadians": 0.012295861657885876,
+          "contrast": 7.006168773337999,
+          "energy": 0.001329176606659579
+        },
+        "forwardTenDegreeEnergy": 0.5322065790919235
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000004,
+          1.0000000000000002,
+          0.9999999999999977
+        ],
+        "minimumPhaseRgb": [
+          0.0012713307788695682,
+          0.0011537353533513013,
+          0.0010664890840471819
+        ]
+      }
+    },
+    {
+      "id": "liquid-r20",
+      "phase": "liquid",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 5,
+      "massExtinctionRgbM2PerKg": [
+        76.93567743841508,
+        76.91304233577245,
+        76.77408451258025
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.9999995,
+        0.9999995,
+        0.9999995
+      ],
+      "asymmetryRgb": [
+        0.8655268692049187,
+        0.8651769610521469,
+        0.863008381662244
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.985,
+        "draineG": 0.5801545026764802,
+        "draineAlpha": 96.61851436249982,
+        "draineWeight": 0.48353333450752,
+        "backwardG": -0.31664678617088005,
+        "backwardWeight": 0.004771701522432,
+        "loss": 0.32401691253071163,
+        "rmsLog2": 0.5692248347803455
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 2.4468764699192516,
+          "widthRadians": 0.0860710316051998,
+          "contrast": 11.319225766441052,
+          "energy": 0.013406689849127034
+        },
+        "glory": {
+          "centerRadians": 3.141592653589793,
+          "widthRadians": 0.00614793082894316,
+          "contrast": 11.059937206086692,
+          "energy": 0.001097545991605951
+        },
+        "forwardTenDegreeEnergy": 0.5200848169388037
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999976,
+          0.9999999999999992,
+          1.0000000000000002
+        ],
+        "minimumPhaseRgb": [
+          0.0011722282224653853,
+          0.00116699580633469,
+          0.0011390843825569113
+        ]
+      }
+    },
+    {
+      "id": "liquid-r30",
+      "phase": "liquid",
+      "effectiveRadiusMicrons": 30,
+      "phaseRow": 6,
+      "massExtinctionRgbM2PerKg": [
+        50.99292999609002,
+        50.93391250787856,
+        50.983240502645145
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.9999995,
+        0.9999995,
+        0.9999995
+      ],
+      "asymmetryRgb": [
+        0.8602414584909046,
+        0.855216475406904,
+        0.8472473787715044
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.985,
+        "draineG": 0.5879340621004802,
+        "draineAlpha": 96.61851436249982,
+        "draineWeight": 0.5248053345075201,
+        "backwardG": -0.31664678617088005,
+        "backwardWeight": 0.005138740838400001,
+        "loss": 0.3745662576520692,
+        "rmsLog2": 0.6120181840861179
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 2.440728539090309,
+          "widthRadians": 0.06147930828942805,
+          "contrast": 11.23726276660871,
+          "energy": 0.014887940665369165
+        },
+        "glory": {
+          "centerRadians": 3.141592653589793,
+          "widthRadians": 0.00614793082894316,
+          "contrast": 13.223673403520296,
+          "energy": 0.0010080898693094963
+        },
+        "forwardTenDegreeEnergy": 0.4713614257812554
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.000000000000001,
+          0.9999999999999976,
+          1.0000000000000009
+        ],
+        "minimumPhaseRgb": [
+          0.0011627332568922783,
+          0.0011511930520430392,
+          0.0012220249638539866
+        ]
+      }
+    },
+    {
+      "id": "ice-general-smooth-r10",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 7,
+      "massExtinctionRgbM2PerKg": [
+        163.2497273718648,
+        163.57688113413306,
+        164.06761177753543
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7857290401239823,
+        0.7868349488157266,
+        0.7879406682126179
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83797731454976,
+        "draineG": 0.5190060621004801,
+        "draineAlpha": 4.161477984111523,
+        "draineWeight": 0.22048805429248,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.008808214664421561,
+        "loss": 0.019391944212392865,
+        "rmsLog2": 0.13925496117694647
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2520153388209521
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999989,
+          0.9999999999999996,
+          1.0000000000000009
+        ],
+        "minimumPhaseRgb": [
+          0.009104863421722953,
+          0.009054629009814297,
+          0.009004389330432436
+        ]
+      }
+    },
+    {
+      "id": "ice-general-smooth-r20",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 8,
+      "massExtinctionRgbM2PerKg": [
+        81.6248636859324,
+        81.78844056706653,
+        82.03380588876772
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8058662039607272,
+        0.806972089345625,
+        0.8080777844400828
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.8386692858879999,
+        "draineG": 0.36900606210048,
+        "draineAlpha": 299.9999999999999,
+        "draineWeight": 0.105642317824,
+        "backwardG": -0.18752534822912,
+        "backwardWeight": 0.003421133666797892,
+        "loss": 0.02341688610612612,
+        "rmsLog2": 0.15302576941850715
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.27669949651908404
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.999999999999999,
+          1.0000000000000004,
+          0.9999999999999991
+        ],
+        "minimumPhaseRgb": [
+          0.007952412910013543,
+          0.007899591793837004,
+          0.007846836467441057
+        ]
+      }
+    },
+    {
+      "id": "ice-general-smooth-r35",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 9,
+      "massExtinctionRgbM2PerKg": [
+        46.64277924910422,
+        46.73625175260944,
+        46.876460507867264
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8187618893005054,
+        0.819867746175047,
+        0.8209734115608645
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.849464,
+        "draineG": 0.5336780621004801,
+        "draineAlpha": 175.7638820694209,
+        "draineWeight": 0.15019466549248,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.009259606108213088,
+        "loss": 0.022514845939487726,
+        "rmsLog2": 0.15004947830461698
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.29795666035591073
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000002,
+          0.9999999999999999,
+          1.0000000000000002
+        ],
+        "minimumPhaseRgb": [
+          0.007307451908513876,
+          0.00725507102280071,
+          0.00720258980098018
+        ]
+      }
+    },
+    {
+      "id": "ice-general-smooth-r55",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 10,
+      "massExtinctionRgbM2PerKg": [
+        29.68176861306632,
+        29.741251115296915,
+        29.830474868642803
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.828395685716363,
+        0.8295015139679384,
+        0.8306071494800429
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.88289859454976,
+        "draineG": 0.6390060621004799,
+        "draineAlpha": 3.870473867501847,
+        "draineWeight": 0.33682149429248004,
+        "backwardG": -0.42400806617088,
+        "backwardWeight": 0.008640581875511862,
+        "loss": 0.02602373019436312,
+        "rmsLog2": 0.16131872239254538
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.31643796764425747
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999984,
+          0.9999999999999987,
+          1.0000000000000002
+        ],
+        "minimumPhaseRgb": [
+          0.006861983442403438,
+          0.0068103022693368175,
+          0.006758541635711453
+        ]
+      }
+    },
+    {
+      "id": "ice-general-smooth-r90",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 11,
+      "massExtinctionRgbM2PerKg": [
+        18.138858596873863,
+        18.175209014903672,
+        18.22973464194838
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8384289077396965,
+        0.8395346982139079,
+        0.840640294216176
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.87797731454976,
+        "draineG": 0.5379340621004801,
+        "draineAlpha": 11.039926106605735,
+        "draineWeight": 0.18767210549248,
+        "backwardG": -0.32335321382912,
+        "backwardWeight": 0.00568489056433146,
+        "loss": 0.03206013941161369,
+        "rmsLog2": 0.17905345406222603
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.3381386944999209
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000018,
+          0.9999999999999994,
+          1.000000000000001
+        ],
+        "minimumPhaseRgb": [
+          0.006422062065625341,
+          0.0063712355029641845,
+          0.006320373763566398
+        ]
+      }
+    },
+    {
+      "id": "ice-general-moderate-r10",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 12,
+      "massExtinctionRgbM2PerKg": [
+        163.2497273718648,
+        163.57688113413306,
+        164.06761177753543
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7639210950260745,
+        0.7650122368986019,
+        0.7661032748790231
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.7907947141120001,
+        "draineG": 0.49741663387648,
+        "draineAlpha": 31.49438066484187,
+        "draineWeight": 0.13646666549248,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.0098174692921209,
+        "loss": 0.001687619588984961,
+        "rmsLog2": 0.041080647377870774
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2062817223699034
+      },
+      "validation": {
+        "normalizationRgb": [
+          1,
+          1.0000000000000004,
+          1.0000000000000004
+        ],
+        "minimumPhaseRgb": [
+          0.009907197565255552,
+          0.009857848836310574,
+          0.009808427688968823
+        ]
+      }
+    },
+    {
+      "id": "ice-general-moderate-r20",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 13,
+      "massExtinctionRgbM2PerKg": [
+        81.6248636859324,
+        81.78844056706653,
+        82.03380588876772
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7867348071388987,
+        0.787825940844063,
+        0.7889169702965455
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83805237426176,
+        "draineG": 0.60511737090048,
+        "draineAlpha": 3.4454878898300914,
+        "draineWeight": 0.38368578766848,
+        "backwardG": -0.38682733068288006,
+        "backwardWeight": 0.00543922912390114,
+        "loss": 0.002587552840054366,
+        "rmsLog2": 0.05086799426018649
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.22706854880004076
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000007,
+          0.9999999999999994,
+          1.000000000000001
+        ],
+        "minimumPhaseRgb": [
+          0.0086039627110598,
+          0.008551875953553655,
+          0.008499720719321847
+        ]
+      }
+    },
+    {
+      "id": "ice-general-moderate-r35",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 14,
+      "massExtinctionRgbM2PerKg": [
+        46.64277924910422,
+        46.73625175260944,
+        46.876460507867264
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8009510763873634,
+        0.8020421983196095,
+        0.8031332155462265
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84,
+        "draineG": 0.6338879309004799,
+        "draineAlpha": 4.369976393066454,
+        "draineWeight": 0.3428160542924801,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.0073893089522958505,
+        "loss": 0.0021106818703042598,
+        "rmsLog2": 0.04594215787601035
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.24482765980848514
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.000000000000003,
+          1.000000000000001,
+          0.9999999999999981
+        ],
+        "minimumPhaseRgb": [
+          0.007871960829221827,
+          0.00782053992929086,
+          0.007769088443446783
+        ]
+      }
+    },
+    {
+      "id": "ice-general-moderate-r55",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 15,
+      "massExtinctionRgbM2PerKg": [
+        29.68176861306632,
+        29.741251115296915,
+        29.830474868642803
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8114561657426684,
+        0.8125472759591197,
+        0.8136382810117294
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.8393612572262399,
+        "draineG": 0.5190060621004801,
+        "draineAlpha": 26.648803603501747,
+        "draineWeight": 0.18270831255552,
+        "backwardG": -0.21047257382912,
+        "backwardWeight": 0.002380788154368,
+        "loss": 0.0053896391132993,
+        "rmsLog2": 0.07341416153099686
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.26035232064147534
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999994,
+          1.0000000000000022,
+          1
+        ],
+        "minimumPhaseRgb": [
+          0.0073678523927246204,
+          0.0073174908945882544,
+          0.007267160023429953
+        ]
+      }
+    },
+    {
+      "id": "ice-general-moderate-r90",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 16,
+      "massExtinctionRgbM2PerKg": [
+        18.138858596873863,
+        18.175209014903672,
+        18.22973464194838
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8223229596332017,
+        0.8234140548724567,
+        0.8245050443406841
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.843590565888,
+        "draineG": 0.6390060621004799,
+        "draineAlpha": 21.734297373006704,
+        "draineWeight": 0.22073255473151998,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.007588838646172909,
+        "loss": 0.0025984665598504835,
+        "rmsLog2": 0.05097515630040268
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2787484953049609
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.999999999999998,
+          1.0000000000000018,
+          1.0000000000000009
+        ],
+        "minimumPhaseRgb": [
+          0.006870671044465582,
+          0.006821739202310358,
+          0.006772755302510556
+        ]
+      }
+    },
+    {
+      "id": "ice-general-severe-r10",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 17,
+      "massExtinctionRgbM2PerKg": [
+        163.2497273718648,
+        163.57688113413306,
+        164.06761177753543
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7434037101849813,
+        0.7444799561534745,
+        0.7455561819945906
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.778669285888,
+        "draineG": 0.50404537090048,
+        "draineAlpha": 5.259433581807662,
+        "draineWeight": 0.23468738353152002,
+        "backwardG": -0.27504678617088,
+        "backwardWeight": 0.00344589169799207,
+        "loss": 0.0001081463427411892,
+        "rmsLog2": 0.010399343380290372
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.17191983508668665
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999997,
+          0.9999999999999998,
+          0.9999999999999998
+        ],
+        "minimumPhaseRgb": [
+          0.010675972256558204,
+          0.0106272493056536,
+          0.010578583263436334
+        ]
+      }
+    },
+    {
+      "id": "ice-general-severe-r20",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 18,
+      "massExtinctionRgbM2PerKg": [
+        81.6248636859324,
+        81.78844056706653,
+        82.03380588876772
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7688937298109536,
+        0.7699699742392032,
+        0.7710461984129644
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.788811059712,
+        "draineG": 0.61083649789952,
+        "draineAlpha": 6.660549236053728,
+        "draineWeight": 0.31019466549248004,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.005940076252844753,
+        "loss": 0.00011197101320201285,
+        "rmsLog2": 0.010581635658158565
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.18992569612690624
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.000000000000001,
+          1.0000000000000013,
+          0.9999999999999999
+        ],
+        "minimumPhaseRgb": [
+          0.009229655824910109,
+          0.009177934005967113,
+          0.009126327762994983
+        ]
+      }
+    },
+    {
+      "id": "ice-general-severe-r35",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 19,
+      "massExtinctionRgbM2PerKg": [
+        46.64277924910422,
+        46.73625175260944,
+        46.876460507867264
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7844303385759618,
+        0.7855065785364628,
+        0.7865827980599801
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.78950303105024,
+        "draineG": 0.63679294210048,
+        "draineAlpha": 231.87624421819174,
+        "draineWeight": 0.25879466549248004,
+        "backwardG": -0.42400806617088,
+        "backwardWeight": 0.006122815964743445,
+        "loss": 0.00039012356107880525,
+        "rmsLog2": 0.019751545789603538
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2051246472033255
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999994,
+          1.0000000000000013,
+          0.9999999999999999
+        ],
+        "minimumPhaseRgb": [
+          0.008405172456731997,
+          0.008354564101442292,
+          0.00830384704177234
+        ]
+      }
+    },
+    {
+      "id": "ice-general-severe-r55",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 20,
+      "massExtinctionRgbM2PerKg": [
+        29.68176861306632,
+        29.741251115296915,
+        29.830474868642803
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.795806481669537,
+        0.7968827170598549,
+        0.7979589318304882
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83305603454976,
+        "draineG": 0.6390060621004799,
+        "draineAlpha": 3.6784990737294665,
+        "draineWeight": 0.41366133450752,
+        "backwardG": -0.12674537177088,
+        "backwardWeight": 0.0035181306255320996,
+        "loss": 0.0008122806826508883,
+        "rmsLog2": 0.028500538287037462
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.21846475606176136
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999996,
+          1.0000000000000007,
+          0.9999999999999984
+        ],
+        "minimumPhaseRgb": [
+          0.00783502587939776,
+          0.007785846906869041,
+          0.007736598101061902
+        ]
+      }
+    },
+    {
+      "id": "ice-general-severe-r90",
+      "phase": "ice",
+      "habit": "general",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 21,
+      "massExtinctionRgbM2PerKg": [
+        18.138858596873863,
+        18.175209014903672,
+        18.22973464194838
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8075065326229786,
+        0.8085827623052648,
+        0.8096589711326494
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83343459454976,
+        "draineG": 0.6480915021004799,
+        "draineAlpha": 5.108459914000201,
+        "draineWeight": 0.34719989450752003,
+        "backwardG": -0.18752534822912,
+        "backwardWeight": 0.0034820473159680003,
+        "loss": 0.0008016968279198045,
+        "rmsLog2": 0.028314251321901563
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.23440115949644436
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999989,
+          1.0000000000000004,
+          0.9999999999999996
+        ],
+        "minimumPhaseRgb": [
+          0.00726954776758062,
+          0.0072221784904321976,
+          0.007174810726072199
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-smooth-r10",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 22,
+      "massExtinctionRgbM2PerKg": [
+        148.55725190839695,
+        148.85496183206106,
+        149.30152671755724
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7529318983462061,
+        0.7541038285322268,
+        0.7552756978621721
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.78492128,
+        "draineG": 0.34793699942399997,
+        "draineAlpha": 30.867432628800987,
+        "draineWeight": 0.09280010549248,
+        "backwardG": -0.27337464102912007,
+        "backwardWeight": 0.006758310412928873,
+        "loss": 0.0026322780880944233,
+        "rmsLog2": 0.05130573153259218
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.19724426141012422
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999996,
+          1.0000000000000013,
+          0.9999999999999999
+        ],
+        "minimumPhaseRgb": [
+          0.010633014547073119,
+          0.010581276922067765,
+          0.010529657818504345
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-smooth-r20",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 23,
+      "massExtinctionRgbM2PerKg": [
+        74.27862595419847,
+        74.42748091603053,
+        74.65076335877862
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7733454511321256,
+        0.7745173729338095,
+        0.7756892335715581
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.82851331454976,
+        "draineG": 0.5379340621004801,
+        "draineAlpha": 3.870473867501847,
+        "draineWeight": 0.30006666549248,
+        "backwardG": -0.22172121382912,
+        "backwardWeight": 0.006502982074368001,
+        "loss": 0.00492787185864718,
+        "rmsLog2": 0.07019880240180155
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.21631170670997965
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000013,
+          0.9999999999999994,
+          1.000000000000001
+        ],
+        "minimumPhaseRgb": [
+          0.009538939951595637,
+          0.009485284239805271,
+          0.009431714308278688
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-smooth-r35",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 24,
+      "massExtinctionRgbM2PerKg": [
+        42.44492911668485,
+        42.529989094874594,
+        42.657579062159215
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7864644377106225,
+        0.7876363487363903,
+        0.7888081982315195
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.8337480058879999,
+        "draineG": 0.5190060621004801,
+        "draineAlpha": 4.989110894710025,
+        "draineWeight": 0.24908805429248004,
+        "backwardG": -0.21047257382912,
+        "backwardWeight": 0.0032581820743680006,
+        "loss": 0.006574642403721307,
+        "rmsLog2": 0.08108416863803505
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.23266860575642423
+      },
+      "validation": {
+        "normalizationRgb": [
+          1,
+          0.9999999999999982,
+          0.9999999999999989
+        ],
+        "minimumPhaseRgb": [
+          0.008869731767110225,
+          0.008816873887717503,
+          0.008763945721125281
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-smooth-r55",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 25,
+      "massExtinctionRgbM2PerKg": [
+        27.010409437890353,
+        27.064538514920194,
+        27.145732130464953
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.796278670416554,
+        0.7974505709412968,
+        0.7986224095697707
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83674896306176,
+        "draineG": 0.5743340621004801,
+        "draineAlpha": 5.996687743071341,
+        "draineWeight": 0.23553354549248,
+        "backwardG": -0.26332121382912005,
+        "backwardWeight": 0.010700656006498884,
+        "loss": 0.004402066223094997,
+        "rmsLog2": 0.06634806872166663
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.24695528981773204
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000004,
+          0.9999999999999988,
+          0.9999999999999996
+        ],
+        "minimumPhaseRgb": [
+          0.008393012034024452,
+          0.008341099093704457,
+          0.008289175108704897
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-smooth-r90",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 26,
+      "massExtinctionRgbM2PerKg": [
+        16.506361323155218,
+        16.539440203562343,
+        16.589058524173026
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8065085853634172,
+        0.8076804726149047,
+        0.8088522974904552
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84,
+        "draineG": 0.5190060621004801,
+        "draineAlpha": 12.007975931726776,
+        "draineWeight": 0.15019466549248,
+        "backwardG": -0.28175321382912005,
+        "backwardWeight": 0.008982376670714427,
+        "loss": 0.00601415404917907,
+        "rmsLog2": 0.0775509771000925
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.26385206856234733
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000007,
+          0.9999999999999998,
+          1.0000000000000002
+        ],
+        "minimumPhaseRgb": [
+          0.00791517716596893,
+          0.007864416965733171,
+          0.00781363413678837
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-moderate-r10",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 27,
+      "massExtinctionRgbM2PerKg": [
+        148.55725190839695,
+        148.85496183206106,
+        149.30152671755724
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.732658284020386,
+        0.733785696284139,
+        0.7349130749801244
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.7774409344000001,
+        "draineG": 0.50650207387648,
+        "draineAlpha": 3.3586305432341756,
+        "draineWeight": 0.26798144309248007,
+        "backwardG": -0.3104405738291201,
+        "backwardWeight": 0.004319314570759603,
+        "loss": 0.0006220364824854955,
+        "rmsLog2": 0.02494065922315398
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.16266031693384259
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999999,
+          1,
+          0.9999999999999998
+        ],
+        "minimumPhaseRgb": [
+          0.011346351606394123,
+          0.011295706876023732,
+          0.011245179340996945
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-moderate-r20",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 28,
+      "massExtinctionRgbM2PerKg": [
+        74.27862595419847,
+        74.42748091603053,
+        74.65076335877862
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7556239327618515,
+        0.7567513425762272,
+        0.7578787187004312
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.7806387427737601,
+        "draineG": 0.50404537090048,
+        "draineAlpha": 15.14792339449024,
+        "draineWeight": 0.18605117646848,
+        "backwardG": -0.39244265177088006,
+        "backwardWeight": 0.004932581919242696,
+        "loss": 0.0008464830483251737,
+        "rmsLog2": 0.029094381731275435
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.17898569822582294
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000007,
+          0.999999999999999,
+          0.9999999999999992
+        ],
+        "minimumPhaseRgb": [
+          0.010109206809971195,
+          0.01005639434155248,
+          0.010003644897503725
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-moderate-r35",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 29,
+      "massExtinctionRgbM2PerKg": [
+        42.44492911668485,
+        42.529989094874594,
+        42.657579062159215
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7699629619024128,
+        0.771090367167019,
+        0.772217738581417
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.7867883742617601,
+        "draineG": 0.60260606210048,
+        "draineAlpha": 16.293591725440344,
+        "draineWeight": 0.21646666549248,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.008917242112825042,
+        "loss": 0.0003563517220973646,
+        "rmsLog2": 0.01887728058003495
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.1928079711782886
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000007,
+          0.9999999999999991,
+          0.9999999999999999
+        ],
+        "minimumPhaseRgb": [
+          0.009348073460868916,
+          0.009296329885168158,
+          0.009244531582263541
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-moderate-r55",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 30,
+      "massExtinctionRgbM2PerKg": [
+        27.010409437890353,
+        27.064538514920194,
+        27.145732130464953
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7805672359801888,
+        0.7816946367446741,
+        0.782822003501002
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.7943852800000001,
+        "draineG": 0.61023550210048,
+        "draineAlpha": 42.25302494106696,
+        "draineWeight": 0.20159466549248,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.008297706302138236,
+        "loss": 0.0005376118116082376,
+        "rmsLog2": 0.02318645750450546
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.20492398564572992
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.999999999999998,
+          1.0000000000000004,
+          0.999999999999999
+        ],
+        "minimumPhaseRgb": [
+          0.008806327686205304,
+          0.00875584029295868,
+          0.008705401443225015
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-moderate-r90",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 31,
+      "massExtinctionRgbM2PerKg": [
+        16.506361323155218,
+        16.539440203562343,
+        16.589058524173026
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.791542132563798,
+        0.7926695277630287,
+        0.7937968887518991
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.79896703105024,
+        "draineG": 0.7240453709004799,
+        "draineAlpha": 2.8635963838107816,
+        "draineWeight": 0.41019466549248,
+        "backwardG": -0.38659335897088004,
+        "backwardWeight": 0.010516802016788092,
+        "loss": 0.00040334031822793264,
+        "rmsLog2": 0.020083334340391105
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.21936583731906872
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000018,
+          0.9999999999999989,
+          1.0000000000000004
+        ],
+        "minimumPhaseRgb": [
+          0.008262811748699427,
+          0.00821398796096647,
+          0.008165081177446994
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-severe-r10",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 32,
+      "massExtinctionRgbM2PerKg": [
+        148.55725190839695,
+        148.85496183206106,
+        149.30152671755724
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.71425206879419,
+        0.7153349195376826,
+        0.7164177634583974
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.7606409344,
+        "draineG": 0.57404537090048,
+        "draineAlpha": 1.825051771638225,
+        "draineWeight": 0.43762911690752,
+        "backwardG": -0.3674933482291201,
+        "backwardWeight": 0.003982397113763541,
+        "loss": 0.0000482925741635655,
+        "rmsLog2": 0.006949285874358998
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.1369320554068163
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999997,
+          0.9999999999999996,
+          0.9999999999999998
+        ],
+        "minimumPhaseRgb": [
+          0.012007330323239137,
+          0.011957761955287936,
+          0.01190829619525722
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-severe-r20",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 33,
+      "massExtinctionRgbM2PerKg": [
+        74.27862595419847,
+        74.42748091603053,
+        74.65076335877862
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7397696991173426,
+        0.7408525503595366,
+        0.7419353947352039
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.76595424894976,
+        "draineG": 0.5280915021004801,
+        "draineAlpha": 6.152320557235177,
+        "draineWeight": 0.28045770135552,
+        "backwardG": -0.2,
+        "backwardWeight": 0,
+        "loss": 0.0005864726507416912,
+        "rmsLog2": 0.0242171974171598
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.15145882251960333
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999997,
+          1.0000000000000002,
+          1.0000000000000004
+        ],
+        "minimumPhaseRgb": [
+          0.010634167259355724,
+          0.010582109158384811,
+          0.010530064946971262
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-severe-r35",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 34,
+      "massExtinctionRgbM2PerKg": [
+        42.44492911668485,
+        42.529989094874594,
+        42.657579062159215
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7553286629098662,
+        0.7564115127458392,
+        0.7574943556441022
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.7763070714879999,
+        "draineG": 0.622661428224,
+        "draineAlpha": 3.3151001154350244,
+        "draineWeight": 0.40592789450752004,
+        "backwardG": -0.3674933482291201,
+        "backwardWeight": 0.003388444712193481,
+        "loss": 0.00008004033881108409,
+        "rmsLog2": 0.008946526633900113
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.16357283757497462
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999992,
+          1.000000000000001,
+          1.0000000000000016
+        ],
+        "minimumPhaseRgb": [
+          0.009776972121431457,
+          0.009726278454722924,
+          0.009675523886901325
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-severe-r55",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 35,
+      "massExtinctionRgbM2PerKg": [
+        27.010409437890353,
+        27.064538514920194,
+        27.145732130464953
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7667228777476633,
+        0.7678057260651582,
+        0.7688885673741408
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.78069197133824,
+        "draineG": 0.6174166338764802,
+        "draineAlpha": 5.3239890580455365,
+        "draineWeight": 0.32566154549248,
+        "backwardG": -0.3704725738291201,
+        "backwardWeight": 0.002380788154368,
+        "loss": 0.0002655323089664761,
+        "rmsLog2": 0.016295162133789162
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.17422777963184846
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000004,
+          1.0000000000000007,
+          0.9999999999999992
+        ],
+        "minimumPhaseRgb": [
+          0.00916374692340581,
+          0.009114663365756713,
+          0.009065614770625154
+        ]
+      }
+    },
+    {
+      "id": "ice-aggregate-severe-r90",
+      "phase": "ice",
+      "habit": "aggregate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 36,
+      "massExtinctionRgbM2PerKg": [
+        16.506361323155218,
+        16.539440203562343,
+        16.589058524173026
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7784426295574287,
+        0.7795254760577203,
+        0.7806083154601505
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.781228351488,
+        "draineG": 0.6338879309004799,
+        "draineAlpha": 33.94130474329959,
+        "draineWeight": 0.23829055690752,
+        "backwardG": -0.27606228877312,
+        "backwardWeight": 0.0046137176878037,
+        "loss": 0.00015202567398273374,
+        "rmsLog2": 0.01232986917946552
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.18702965061188206
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000018,
+          0.9999999999999996,
+          1.000000000000001
+        ],
+        "minimumPhaseRgb": [
+          0.008543972372012784,
+          0.008496998064152118,
+          0.008450039060330627
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-smooth-r10",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 37,
+      "massExtinctionRgbM2PerKg": [
+        186.10468920392586,
+        186.47764449291168,
+        187.0370774263904
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8026440035593293,
+        0.8036025166496203,
+        0.8045605572962108
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84422930866176,
+        "draineG": 0.5280915021004801,
+        "draineAlpha": 10.931549693436054,
+        "draineWeight": 0.19768805429248001,
+        "backwardG": -0.35991078617088,
+        "backwardWeight": 0.009259128572311402,
+        "loss": 0.0964626550978561,
+        "rmsLog2": 0.31058437677683676
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.27088806474333627
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.999999999999999,
+          0.9999999999999986,
+          0.9999999999999998
+        ],
+        "minimumPhaseRgb": [
+          0.008118713757311399,
+          0.008071078722966047,
+          0.008023534820334174
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-smooth-r20",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 38,
+      "massExtinctionRgbM2PerKg": [
+        93.05234460196293,
+        93.23882224645584,
+        93.5185387131952
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8221625001497685,
+        0.8231209714343805,
+        0.8240789682456228
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.8803395289497601,
+        "draineG": 0.6390060621004799,
+        "draineAlpha": 4.651444836546555,
+        "draineWeight": 0.39267210549248,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.008830463425550402,
+        "loss": 0.10320500735473914,
+        "rmsLog2": 0.32125536159687534
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.29756824963495687
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000009,
+          0.9999999999999996,
+          0.9999999999999989
+        ],
+        "minimumPhaseRgb": [
+          0.006933221430821509,
+          0.006882737104363486,
+          0.006832329480792528
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-smooth-r35",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 39,
+      "massExtinctionRgbM2PerKg": [
+        53.17276834397882,
+        53.27932699797476,
+        53.439164978968684
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8345585584198305,
+        0.8355169790722041,
+        0.836474922764951
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.88289859454976,
+        "draineG": 0.6390060621004799,
+        "draineAlpha": 6.822427315356067,
+        "draineWeight": 0.34053354549248,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.00820742691218301,
+        "loss": 0.1110275633290694,
+        "rmsLog2": 0.3332079880931269
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.32049812068783773
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000009,
+          0.9999999999999999,
+          0.999999999999999
+        ],
+        "minimumPhaseRgb": [
+          0.006310866115142266,
+          0.0062605914429147685,
+          0.006210191771119038
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-smooth-r55",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 40,
+      "massExtinctionRgbM2PerKg": [
+        33.83721621889561,
+        33.90502627143849,
+        34.006741350252796
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8437887248819443,
+        0.8447470933096431,
+        0.8457049820806052
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.8842293086617601,
+        "draineG": 0.6390060621004799,
+        "draineAlpha": 11.421141922842303,
+        "draineWeight": 0.28802092902399995,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.008470860184323172,
+        "loss": 0.11848942213076032,
+        "rmsLog2": 0.3442229250511365
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.3403528404246162
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000002,
+          1.0000000000000004,
+          0.9999999999999986
+        ],
+        "minimumPhaseRgb": [
+          0.005891578153770108,
+          0.005841719390183466,
+          0.005791861809898176
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-smooth-r90",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 41,
+      "massExtinctionRgbM2PerKg": [
+        20.67829880043621,
+        20.71973827699019,
+        20.781897491821155
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8533820362816876,
+        0.854340333323052,
+        0.8552981467982737
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.88492128,
+        "draineG": 0.6390060621004799,
+        "draineAlpha": 54.67722486049164,
+        "draineWeight": 0.23421605429248002,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.008528152432907912,
+        "loss": 0.12824341762374733,
+        "rmsLog2": 0.3581109012914119
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.36355197004829115
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999988,
+          0.9999999999999992,
+          1.0000000000000004
+        ],
+        "minimumPhaseRgb": [
+          0.005482653621095389,
+          0.005433488844832274,
+          0.00538424320163329
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-moderate-r10",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 42,
+      "massExtinctionRgbM2PerKg": [
+        186.10468920392586,
+        186.47764449291168,
+        187.0370774263904
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7804437398891686,
+        0.7814539148480708,
+        0.7824638309057553
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83049696894976,
+        "draineG": 0.5190060621004801,
+        "draineAlpha": 4.805299791637489,
+        "draineWeight": 0.26773344,
+        "backwardG": -0.21919193382911997,
+        "backwardWeight": 0.0033779751455065813,
+        "loss": 0.01101314677989069,
+        "rmsLog2": 0.10494354091553558
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.22718814930932302
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000009,
+          1.0000000000000004,
+          0.9999999999999987
+        ],
+        "minimumPhaseRgb": [
+          0.009047318110396819,
+          0.008999546121989041,
+          0.008951742688541466
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-moderate-r20",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 43,
+      "massExtinctionRgbM2PerKg": [
+        93.05234460196293,
+        93.23882224645584,
+        93.5185387131952
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.802917249277469,
+        0.8039274093970228,
+        0.8049373099341709
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84186709426176,
+        "draineG": 0.60260606210048,
+        "draineAlpha": 6.789397076294643,
+        "draineWeight": 0.31997632309248003,
+        "backwardG": -0.40237606617088,
+        "backwardWeight": 0.005692655160978856,
+        "loss": 0.010317535038101266,
+        "rmsLog2": 0.10157526784656423
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.25020781783555757
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000002,
+          1.0000000000000002,
+          0.9999999999999992
+        ],
+        "minimumPhaseRgb": [
+          0.0077048055013340735,
+          0.007653967264559276,
+          0.007603242572425074
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-moderate-r35",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 44,
+      "massExtinctionRgbM2PerKg": [
+        53.17276834397882,
+        53.27932699797476,
+        53.439164978968684
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8168587803360732,
+        0.817868920571937,
+        0.8188788003806406
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84492128,
+        "draineG": 0.62404537090048,
+        "draineAlpha": 14.066742746466101,
+        "draineWeight": 0.28044506570752004,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.006586205836095674,
+        "loss": 0.010722041030599379,
+        "rmsLog2": 0.10354728886165672
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.26991061360974566
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999991,
+          0.9999999999999997,
+          1.0000000000000016
+        ],
+        "minimumPhaseRgb": [
+          0.006992441710299591,
+          0.006942156901499082,
+          0.006891812033052887
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-moderate-r55",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 45,
+      "massExtinctionRgbM2PerKg": [
+        33.83721621889561,
+        33.90502627143849,
+        34.006741350252796
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.827141935859083,
+        0.8281520560913204,
+        0.8291619150231828
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.849464,
+        "draineG": 0.6200780621004801,
+        "draineAlpha": 183.3133477179809,
+        "draineWeight": 0.23655167690752,
+        "backwardG": -0.35824678617088007,
+        "backwardWeight": 0.006396652960649711,
+        "loss": 0.011827860799869142,
+        "rmsLog2": 0.10875596903098764
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2870944997197313
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000009,
+          1.000000000000001,
+          0.9999999999999984
+        ],
+        "minimumPhaseRgb": [
+          0.0065129841361315334,
+          0.006463612512298541,
+          0.006414155735976918
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-moderate-r90",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 46,
+      "massExtinctionRgbM2PerKg": [
+        20.67829880043621,
+        20.71973827699019,
+        20.781897491821155
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.837766874982659,
+        0.8387769690723741,
+        0.8397868006717537
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.85148668545024,
+        "draineG": 0.71861605732352,
+        "draineAlpha": 23.15826949331663,
+        "draineWeight": 0.32194949429248004,
+        "backwardG": -0.35824678617088007,
+        "backwardWeight": 0.009381768361597095,
+        "loss": 0.01173608045523081,
+        "rmsLog2": 0.10833319184456262
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.30738423053688485
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.999999999999999,
+          1.0000000000000004,
+          0.9999999999999998
+        ],
+        "minimumPhaseRgb": [
+          0.0060461300480609236,
+          0.0059978710615663355,
+          0.005949605522860222
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-severe-r10",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 47,
+      "massExtinctionRgbM2PerKg": [
+        186.10468920392586,
+        186.47764449291168,
+        187.0370774263904
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7582425753144482,
+        0.7593041156145027,
+        0.7603656072366956
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.783889779712,
+        "draineG": 0.50138394267648,
+        "draineAlpha": 17.49560927758925,
+        "draineWeight": 0.16506666549248,
+        "backwardG": -0.38240806617087997,
+        "backwardWeight": 0.006320349634612229,
+        "loss": 0.00026098785982722327,
+        "rmsLog2": 0.016155118688119356
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.19340706632136923
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999991,
+          1.0000000000000007,
+          0.9999999999999994
+        ],
+        "minimumPhaseRgb": [
+          0.00998612922555947,
+          0.009937940804617702,
+          0.009889714821315673
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-severe-r20",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 48,
+      "massExtinctionRgbM2PerKg": [
+        93.05234460196293,
+        93.23882224645584,
+        93.5185387131952
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7836707315681778,
+        0.784732268030492,
+        0.7857937555856984
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.832594714112,
+        "draineG": 0.62138394267648,
+        "draineAlpha": 3.352521354369247,
+        "draineWeight": 0.44750661119999996,
+        "backwardG": -0.20175321382912,
+        "backwardWeight": 0.004579670859202219,
+        "loss": 0.0003845952151343343,
+        "rmsLog2": 0.019611099284189408
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.21360991703601653
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000002,
+          0.9999999999999979,
+          1.0000000000000013
+        ],
+        "minimumPhaseRgb": [
+          0.008497999566592817,
+          0.008446651605457687,
+          0.008395191252350977
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-severe-r35",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 49,
+      "massExtinctionRgbM2PerKg": [
+        53.17276834397882,
+        53.27932699797476,
+        53.439164978968684
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7991573457204634,
+        0.8002188745439568,
+        0.801280354146183
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83797731454976,
+        "draineG": 0.62404537090048,
+        "draineAlpha": 4.651444836546555,
+        "draineWeight": 0.39020056526848007,
+        "backwardG": -0.22362733068288002,
+        "backwardWeight": 0.003181092177024164,
+        "loss": 0.0006321453820739343,
+        "rmsLog2": 0.025142501507883705
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.23074730919407294
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999992,
+          1.0000000000000004,
+          0.9999999999999986
+        ],
+        "minimumPhaseRgb": [
+          0.007688360867373637,
+          0.007637821630864248,
+          0.007587197136422568
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-severe-r55",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 50,
+      "massExtinctionRgbM2PerKg": [
+        33.83721621889561,
+        33.90502627143849,
+        34.006741350252796
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8104930937433312,
+        0.811554614811335,
+        0.8126160863406082
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84,
+        "draineG": 0.62916350210048,
+        "draineAlpha": 6.425440214034407,
+        "draineWeight": 0.342091122176,
+        "backwardG": -0.21047257382912,
+        "backwardWeight": 0.002380788154368,
+        "loss": 0.0007979170491728223,
+        "rmsLog2": 0.02824742553176877
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2457655790524465
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999991,
+          1,
+          1.0000000000000018
+        ],
+        "minimumPhaseRgb": [
+          0.007139035961924308,
+          0.0070897968525625125,
+          0.007040438067833087
+        ]
+      }
+    },
+    {
+      "id": "ice-plate-severe-r90",
+      "phase": "ice",
+      "habit": "plate",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 51,
+      "massExtinctionRgbM2PerKg": [
+        20.67829880043621,
+        20.71973827699019,
+        20.781897491821155
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8221491176964357,
+        0.8232106289210085,
+        0.8242720901914303
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83930802866176,
+        "draineG": 0.62916350210048,
+        "draineAlpha": 24.450134763270402,
+        "draineWeight": 0.25587909015552,
+        "backwardG": -0.19050457382912,
+        "backwardWeight": 0.0031542366764830644,
+        "loss": 0.0007985010791567381,
+        "rmsLog2": 0.028257761396769172
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2636484962764002
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000007,
+          0.999999999999998,
+          1.0000000000000002
+        ],
+        "minimumPhaseRgb": [
+          0.0066002773572746195,
+          0.006552700842921857,
+          0.0065051213955665925
+        ]
+      }
+    },
+    {
+      "id": "ice-column-smooth-r10",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 52,
+      "massExtinctionRgbM2PerKg": [
+        173.0447110141767,
+        173.39149400218105,
+        173.91166848418757
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8094464556688418,
+        0.8104748756757443,
+        0.8115029545572922
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.843889779712,
+        "draineG": 0.36313081090048,
+        "draineAlpha": 270.8297555879655,
+        "draineWeight": 0.09891261646848,
+        "backwardG": -0.28495321382912003,
+        "backwardWeight": 0.00453080615047225,
+        "loss": 0.06089973786491251,
+        "rmsLog2": 0.24677872247200022
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.3015351578487398
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000007,
+          1.0000000000000004,
+          0.9999999999999994
+        ],
+        "minimumPhaseRgb": [
+          0.00794036739401391,
+          0.007891365640159069,
+          0.007842460444011918
+        ]
+      }
+    },
+    {
+      "id": "ice-column-smooth-r20",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 53,
+      "massExtinctionRgbM2PerKg": [
+        86.52235550708835,
+        86.69574700109052,
+        86.95583424209379
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8292517007929135,
+        0.8302800638797835,
+        0.831308082911877
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.88385074866176,
+        "draineG": 0.6390060621004799,
+        "draineAlpha": 5.135029741487212,
+        "draineWeight": 0.32566154549248,
+        "backwardG": -0.38074406617088,
+        "backwardWeight": 0.012010194711814371,
+        "loss": 0.06271870273999153,
+        "rmsLog2": 0.25043702350090236
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.33103232746163325
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000009,
+          0.9999999999999994,
+          0.9999999999999988
+        ],
+        "minimumPhaseRgb": [
+          0.006733697073414326,
+          0.006681688212724615,
+          0.006629637207604135
+        ]
+      }
+    },
+    {
+      "id": "ice-column-smooth-r35",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 54,
+      "massExtinctionRgbM2PerKg": [
+        49.44134600405048,
+        49.540426857766015,
+        49.68904813833931
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8418791273377991,
+        0.8429074207939072,
+        0.8439353665302542
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.88,
+        "draineG": 0.5379340621004801,
+        "draineAlpha": 30.717305847843065,
+        "draineWeight": 0.18767210549248,
+        "backwardG": -0.37855791628288005,
+        "backwardWeight": 0.005804768108071656,
+        "loss": 0.07367737036135555,
+        "rmsLog2": 0.27143575733745096
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.3563612191173309
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000009,
+          0.9999999999999998,
+          0.9999999999999994
+        ],
+        "minimumPhaseRgb": [
+          0.00610307546851368,
+          0.006051071141772797,
+          0.005999077055674257
+        ]
+      }
+    },
+    {
+      "id": "ice-column-smooth-r55",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 55,
+      "massExtinctionRgbM2PerKg": [
+        31.462674729850303,
+        31.525726182214733,
+        31.620303360761373
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8512960728333756,
+        0.8523242932559636,
+        0.8533521618883286
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.8887720286617601,
+        "draineG": 0.65793406210048,
+        "draineAlpha": 20.55509548886854,
+        "draineWeight": 0.24806200526848002,
+        "backwardG": -0.35824678617088007,
+        "backwardWeight": 0.01275043941965182,
+        "loss": 0.07229415073248521,
+        "rmsLog2": 0.2688757161449974
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.37822387194682666
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999982,
+          1,
+          1
+        ],
+        "minimumPhaseRgb": [
+          0.005678621319204418,
+          0.005627046945687719,
+          0.005575424112610914
+        ]
+      }
+    },
+    {
+      "id": "ice-column-smooth-r90",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "smooth",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 56,
+      "massExtinctionRgbM2PerKg": [
+        19.2271901126863,
+        19.265721555797896,
+        19.323518720465287
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8610927812571946,
+        0.86212089986209,
+        0.863148660617704
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.9112916830617601,
+        "draineG": 0.65793406210048,
+        "draineAlpha": 6.504949247243699,
+        "draineWeight": 0.29669349429248004,
+        "backwardG": -0.35824678617088007,
+        "backwardWeight": 0.009799509656878726,
+        "loss": 0.08327622942894582,
+        "rmsLog2": 0.288576210781391
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.403668651817144
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000002,
+          1.0000000000000007,
+          1.0000000000000004
+        ],
+        "minimumPhaseRgb": [
+          0.005264790981249171,
+          0.005213795007331287,
+          0.005162665901053928
+        ]
+      }
+    },
+    {
+      "id": "ice-column-moderate-r10",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 57,
+      "massExtinctionRgbM2PerKg": [
+        173.0447110141767,
+        173.39149400218105,
+        173.91166848418757
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7870413622405051,
+        0.7880899375809721,
+        0.7891383263935555
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83930802866176,
+        "draineG": 0.50916350210048,
+        "draineAlpha": 5.036386888875219,
+        "draineWeight": 0.25682149429248,
+        "backwardG": -0.21047257382912,
+        "backwardWeight": 0.0032581820743680006,
+        "loss": 0.00673325446419211,
+        "rmsLog2": 0.08205641025655527
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.248023902147908
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000027,
+          1.0000000000000002,
+          1.0000000000000004
+        ],
+        "minimumPhaseRgb": [
+          0.00881839621430127,
+          0.008769898345226575,
+          0.008721473348604607
+        ]
+      }
+    },
+    {
+      "id": "ice-column-moderate-r20",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 58,
+      "massExtinctionRgbM2PerKg": [
+        86.52235550708835,
+        86.69574700109052,
+        86.95583424209379
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8096726509148938,
+        0.8107212065362469,
+        0.8117695746963803
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84,
+        "draineG": 0.50916350210048,
+        "draineAlpha": 86.30534493770485,
+        "draineWeight": 0.18084288309248,
+        "backwardG": -0.3283453717708801,
+        "backwardWeight": 0.00441648953626159,
+        "loss": 0.007087057071536562,
+        "rmsLog2": 0.0841846605477302
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2730620428199156
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000009,
+          1.0000000000000018,
+          0.9999999999999996
+        ],
+        "minimumPhaseRgb": [
+          0.00745595753519585,
+          0.0074044017292794915,
+          0.007352734788855069
+        ]
+      }
+    },
+    {
+      "id": "ice-column-moderate-r35",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 59,
+      "massExtinctionRgbM2PerKg": [
+        49.44134600405048,
+        49.540426857766015,
+        49.68904813833931
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8237415026766316,
+        0.8247900321773323,
+        0.8258383730512482
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84811908837376,
+        "draineG": 0.62916350210048,
+        "draineAlpha": 73.96843601099798,
+        "draineWeight": 0.23019466549248002,
+        "backwardG": -0.42400806617088,
+        "backwardWeight": 0.008868582662685734,
+        "loss": 0.006150668621614174,
+        "rmsLog2": 0.07842619856664082
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.29451591099261965
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999992,
+          1.0000000000000002,
+          1.0000000000000002
+        ],
+        "minimumPhaseRgb": [
+          0.006741371079647263,
+          0.006690113537580801,
+          0.006638877163672048
+        ]
+      }
+    },
+    {
+      "id": "ice-column-moderate-r55",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 60,
+      "massExtinctionRgbM2PerKg": [
+        31.462674729850303,
+        31.525726182214733,
+        31.620303360761373
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8341274608241531,
+        0.8351759638263831,
+        0.8362242769804322
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.87797731454976,
+        "draineG": 0.62916350210048,
+        "draineAlpha": 6.514409601990102,
+        "draineWeight": 0.32506666549248003,
+        "backwardG": -0.32822535897088,
+        "backwardWeight": 0.005434266914389105,
+        "loss": 0.00890922052807756,
+        "rmsLog2": 0.09438866737102267
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.313191305410204
+      },
+      "validation": {
+        "normalizationRgb": [
+          1,
+          1.0000000000000013,
+          1.0000000000000016
+        ],
+        "minimumPhaseRgb": [
+          0.006262564331776009,
+          0.006212191983123892,
+          0.006161779142198994
+        ]
+      }
+    },
+    {
+      "id": "ice-column-moderate-r90",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "moderate",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 61,
+      "massExtinctionRgbM2PerKg": [
+        19.2271901126863,
+        19.265721555797896,
+        19.323518720465287
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8448643789180134,
+        0.8459128468817058,
+        0.8469611233062412
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.87930802866176,
+        "draineG": 0.65793406210048,
+        "draineAlpha": 8.484029747310462,
+        "draineWeight": 0.29256005429248005,
+        "backwardG": -0.40151078617088004,
+        "backwardWeight": 0.006341578225319607,
+        "loss": 0.008368808436406742,
+        "rmsLog2": 0.09148119170849679
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.33518072510234276
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000009,
+          0.9999999999999982,
+          1.0000000000000016
+        ],
+        "minimumPhaseRgb": [
+          0.005797591252463437,
+          0.005748366443623593,
+          0.005699013111230095
+        ]
+      }
+    },
+    {
+      "id": "ice-column-severe-r10",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 10,
+      "phaseRow": 62,
+      "massExtinctionRgbM2PerKg": [
+        173.0447110141767,
+        173.39149400218105,
+        173.91166848418757
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7652337591874868,
+        0.7663022496371111,
+        0.7673707041400556
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.78950303105024,
+        "draineG": 0.47122944,
+        "draineAlpha": 231.87624421819174,
+        "draineWeight": 0.14048805429247999,
+        "backwardG": -0.27874828402688,
+        "backwardWeight": 0.006495077935031685,
+        "loss": 0.000339202057858279,
+        "rmsLog2": 0.018417438960351654
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.20697029748557327
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999993,
+          0.9999999999999976,
+          0.9999999999999994
+        ],
+        "minimumPhaseRgb": [
+          0.00968360067100807,
+          0.009635384958573402,
+          0.009587116419224896
+        ]
+      }
+    },
+    {
+      "id": "ice-column-severe-r20",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 20,
+      "phaseRow": 63,
+      "massExtinctionRgbM2PerKg": [
+        86.52235550708835,
+        86.69574700109052,
+        86.95583424209379
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.7906905932473588,
+        0.7917590781686317,
+        0.7928275268335299
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84,
+        "draineG": 0.62650207387648,
+        "draineAlpha": 3.4720120233517466,
+        "draineWeight": 0.42884005119999996,
+        "backwardG": -0.32335321382912,
+        "backwardWeight": 0.005328310255988605,
+        "loss": 0.00023457327916398535,
+        "rmsLog2": 0.0153157852937414
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.22853698500658615
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999988,
+          1.0000000000000002,
+          0.9999999999999993
+        ],
+        "minimumPhaseRgb": [
+          0.008174243963957531,
+          0.008122697043730327,
+          0.008071115643547646
+        ]
+      }
+    },
+    {
+      "id": "ice-column-severe-r35",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 35,
+      "phaseRow": 64,
+      "massExtinctionRgbM2PerKg": [
+        49.44134600405048,
+        49.540426857766015,
+        49.68904813833931
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8062003270008651,
+        0.8072688019478602,
+        0.80833724022
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.83930802866176,
+        "draineG": 0.62404537090048,
+        "draineAlpha": 6.068846749703252,
+        "draineWeight": 0.34270831255552,
+        "backwardG": -0.36191158157312003,
+        "backwardWeight": 0.0037792156211948805,
+        "loss": 0.0002515863654234839,
+        "rmsLog2": 0.01586147425126315
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.24687205011907642
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000004,
+          0.9999999999999983,
+          1.0000000000000009
+        ],
+        "minimumPhaseRgb": [
+          0.007368809339476184,
+          0.007317949628444554,
+          0.007267107499655901
+        ]
+      }
+    },
+    {
+      "id": "ice-column-severe-r55",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 55,
+      "phaseRow": 65,
+      "massExtinctionRgbM2PerKg": [
+        31.462674729850303,
+        31.525726182214733,
+        31.620303360761373
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.817554736111941,
+        0.8186232009336788,
+        0.8196916286547332
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.84,
+        "draineG": 0.62404537090048,
+        "draineAlpha": 13.912940969703966,
+        "draineWeight": 0.27386826135552,
+        "backwardG": -0.3915773717708801,
+        "backwardWeight": 0.003321193187604275,
+        "loss": 0.0003501400483542288,
+        "rmsLog2": 0.018712029509228248
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2629224589268325
+      },
+      "validation": {
+        "normalizationRgb": [
+          0.9999999999999998,
+          1.0000000000000013,
+          1
+        ],
+        "minimumPhaseRgb": [
+          0.006826799173547362,
+          0.0067772096382607075,
+          0.006727535525571102
+        ]
+      }
+    },
+    {
+      "id": "ice-column-severe-r90",
+      "phase": "ice",
+      "habit": "column",
+      "roughness": "severe",
+      "effectiveRadiusMicrons": 90,
+      "phaseRow": 66,
+      "massExtinctionRgbM2PerKg": [
+        19.2271901126863,
+        19.265721555797896,
+        19.323518720465287
+      ],
+      "singleScatteringAlbedoRgb": [
+        0.999985,
+        0.999992,
+        0.999996
+      ],
+      "asymmetryRgb": [
+        0.8292310822740925,
+        0.8302995341391411,
+        0.8313679483407377
+      ],
+      "analyticApproximation": {
+        "forwardG": 0.8445817510502399,
+        "draineG": 0.62916350210048,
+        "draineAlpha": 296.7447064088406,
+        "draineWeight": 0.22957861120000003,
+        "backwardG": -0.32887257382912005,
+        "backwardWeight": 0.0032581820743680006,
+        "loss": 0.0005267417413130674,
+        "rmsLog2": 0.022950854914644627
+      },
+      "angularFeatures": {
+        "rainbow": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "glory": {
+          "centerRadians": 0,
+          "widthRadians": 0,
+          "contrast": 1,
+          "energy": 0
+        },
+        "forwardTenDegreeEnergy": 0.2819966000244252
+      },
+      "validation": {
+        "normalizationRgb": [
+          1.0000000000000002,
+          0.9999999999999997,
+          0.9999999999999992
+        ],
+        "minimumPhaseRgb": [
+          0.006297993737443979,
+          0.006249973930170969,
+          0.006201945875701824
+        ]
+      }
+    }
+  ],
+  "checksums": {
+    "algorithm": "SHA-256",
+    "phaseTexture": "287e9039b5917575ce29340698a41be2244f5b6a70115765ab684bdad724bb9f",
+    "parameterBuffer": "570fd7a72bfc64b94b94d6b5ec0b36d4076ee5b1383936907153f846e2e90fd4"
+  },
+  "provenance": {
+    "license": "Original generated numerical asset; repository license applies.",
+    "liquid": "Polydisperse Lorenz-Mie calculation implemented by this generator; Hansen modified-gamma size distribution with effective variance 0.10.",
+    "ice": "Original normalized multi-lobe approximation informed by Yang et al. (2013) habit/roughness behavior; not a substitute for the Yang/Baum numerical database.",
+    "analyticFit": "Energy-normalized HG + Draine + weak backward-HG closure with deterministic continuous parameter refinement and first-moment penalty.",
+    "references": [
+      "https://doi.org/10.1175/JAS-D-12-039.1",
+      "https://doi.org/10.1145/3587421.3595409",
+      "https://www.libradtran.org/",
+      "https://www.ea.com/news/physically-based-sky-atmosphere-and-cloud-rendering"
+    ]
+  },
+  "limitations": [
+    "Ice phase functions are physically constrained analytic approximations, not full electromagnetic solutions.",
+    "Random particle orientation is assumed; oriented plate/column halo arcs require a separate orientation model.",
+    "The positive RGB band responses are display-oriented approximations rather than a full CIE spectral transform.",
+    "Polarization and thermal-infrared absorption are outside this visible-light asset.",
+    "Sub-degree diffraction structure is represented mainly by the analytic forward lobe because the LUT has finite angular resolution."
+  ]
+}

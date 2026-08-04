@@ -1,0 +1,437 @@
+{
+  "schemaVersion": 1,
+  "taxonomy": {
+    "provider": "WMO International Cloud Atlas",
+    "classificationUrl": "https://cloudatlas.wmo.int/cloud-classification-summary.html",
+    "associatedFormsUrl": "https://cloudatlas.wmo.int/en/Associated-cloud-forms-table.html"
+  },
+  "strictReadiness": {
+    "minimumTransportUpdates": 64,
+    "minimumHistoryAcceptanceFraction": 0.9,
+    "minimumStableHistoryAge": 0.75,
+    "minimumPersistentHistoryConfidence": 0.85,
+    "minimumProjectedOpacity": 0.00001,
+    "requireWebGpu": true,
+    "requireCurrentCaseEvidence": true,
+    "requireCompleteLightVolume": true,
+    "requireFiniteTransport": true,
+    "requireHistoryValid": true,
+    "requireReconstructionMaturity": true,
+    "allowEmptyFrame": false
+  },
+  "invariants": [
+    {
+      "id": "finite-world-support",
+      "domain": "formation",
+      "observable": "Cloud systems have physically generated, irregular world-space termini and do not continue as a canvas-wide band unless the meteorological state is a true immediate overcast.",
+      "rejects": ["screen-space-mask", "uniform-alpha-fade", "rectangular-support", "camera-locked-clouds"]
+    },
+    {
+      "id": "aperiodic-organization",
+      "domain": "formation",
+      "observable": "Repeated elements share meteorological organization while varying spacing, scale, phase, merger, erosion, and orientation across several nested scales.",
+      "rejects": ["fake-grid", "repeated-stamp", "equal-lobe-spacing", "periodic-domain"]
+    },
+    {
+      "id": "genus-angular-scale",
+      "domain": "morphology",
+      "observable": "Element angular size, vertical extent, base altitude, and horizon foreshortening identify the WMO genus at every qualified camera perspective.",
+      "rejects": ["wrong-scale-hierarchy", "camera-independent-scale", "miniature-storm", "oversized-high-cloud"]
+    },
+    {
+      "id": "connected-parent-topology",
+      "domain": "morphology",
+      "observable": "Turrets, anvils, accessories, and supplementary features remain causally and spatially attached to their owning cloud where WMO morphology requires attachment.",
+      "rejects": ["detached-owner-feature", "floating-anvil", "pasted-accessory", "broken-updraft-core"]
+    },
+    {
+      "id": "coherent-condensation-base",
+      "domain": "morphology",
+      "observable": "Liquid convective elements share a meteorologically credible condensation level while entrained fragments and precipitation-driven scud may occupy distinct lower levels.",
+      "rejects": ["random-puff-altitudes", "spherical-blob-field", "unmotivated-low-density", "flat-bottom-stamp"]
+    },
+    {
+      "id": "phase-appropriate-boundary",
+      "domain": "morphology",
+      "observable": "Liquid edges show nested cauliflower, erosion, and entrainment; ice edges show fibres, shear, and sedimentation; stratiform edges show correlated sheets, holes, and ragged humid-air fragments.",
+      "rejects": ["smooth-oval", "cotton-cirrus", "hard-rim", "uniform-noise-edge"]
+    },
+    {
+      "id": "volumetric-negative-space",
+      "domain": "morphology",
+      "observable": "Gaps, cavum, lacunae, and clear-air channels remove condensate through physical depth and exhibit parallax, occlusion, and irregular condensate rims.",
+      "rejects": ["alpha-hole", "painted-gap", "identical-perforations", "boundary-clipping"]
+    },
+    {
+      "id": "neutral-passive-extinction",
+      "domain": "transport",
+      "observable": "Passive cloud extinction is spectrally neutral; chromatic appearance comes from incident sky, solar or lunar radiance, phase, and atmospheric path rather than RGB transmittance tint.",
+      "rejects": ["colored-transmittance", "channel-dependent-extinction", "cyan-shadow-filter"],
+      "metric": {
+        "name": "maximumTransmittanceChroma",
+        "operator": "less-than-or-equal",
+        "value": 0.025
+      }
+    },
+    {
+      "id": "atmosphere-coupled-radiance",
+      "domain": "lighting",
+      "observable": "Cloud highlights, shadows, transmitted sky, haze, and distant extinction inhabit the same solar, lunar, aerosol, humidity, ozone, and exposure state as the surrounding sky.",
+      "rejects": ["atmosphere-color-mismatch", "white-overlay", "luminous-night-cloud", "isolated-color-grade"]
+    },
+    {
+      "id": "bounded-source-scattering",
+      "domain": "lighting",
+      "observable": "Silver lining and forward scattering follow source angle, droplet or ice phase, and finite optical path without a fixed screen-space rim or blown circular bloom.",
+      "rejects": ["fixed-edge-glow", "uniform-silver-lining", "solar-stamp", "unbounded-forward-lobe"]
+    },
+    {
+      "id": "aerial-perspective-continuity",
+      "domain": "lighting",
+      "observable": "Distance changes contrast, hue, extinction, and apparent scale continuously through the atmosphere while nearby clouds retain greater local relief.",
+      "rejects": ["uniform-distance-whitening", "layer-seam", "depth-invariant-contrast", "flat-composite"]
+    },
+    {
+      "id": "multiple-scattering-shadow-depth",
+      "domain": "lighting",
+      "observable": "Dense cloud interiors and undersides remain structured by source visibility, sky irradiance, ground bounce, and multiple scattering without black crushing or ambient-white fill.",
+      "rejects": ["black-interior", "flat-grey-deck", "ambient-white-cloud", "single-scatter-cardboard"]
+    },
+    {
+      "id": "lifecycle-structure",
+      "domain": "evolution",
+      "observable": "Incipient, growing, mature, precipitating, and decaying states differ in connected core, turret age, glaciation, precipitation, detrainment, and erosion rather than opacity alone.",
+      "rejects": ["opacity-only-lifecycle", "simultaneous-incompatible-stages", "detached-detrainment", "frozen-repeated-form"]
+    },
+    {
+      "id": "hydrometeor-parent-depth-order",
+      "domain": "weather",
+      "observable": "Virga, rain, snow, hail, and pannus originate in an admissible parent layer and remain depth ordered through cloud, precipitation shaft, wet haze, and foreground atmosphere.",
+      "rejects": ["detached-precipitation", "frontmost-rain-overlay", "uniform-rain-curtain", "dry-air-pannus"]
+    },
+    {
+      "id": "multilayer-parallax-ordering",
+      "domain": "weather",
+      "observable": "Independent layers retain altitude-dependent element scale, parallax, wind, phase, occlusion, and extinction; mother-cloud lineages preserve causal attachment.",
+      "rejects": ["duplicated-layer-texture", "impossible-layer-order", "shared-rigid-motion", "missing-cross-layer-extinction"]
+    },
+    {
+      "id": "surface-obscuration-continuity",
+      "domain": "weather",
+      "observable": "Fog, mist, ice fog, and diamond dust arise in a finite boundary-layer depth with correct visibility, surface contact, phase, and smooth transition into clear air and sky radiance.",
+      "rejects": ["full-screen-white-filter", "floating-fog-plane", "hard-visibility-boundary", "wrong-phase-sparkle"]
+    },
+    {
+      "id": "upper-atmosphere-altitude-lighting",
+      "domain": "weather",
+      "observable": "Polar stratospheric and noctilucent clouds occupy their physical altitude and season, receiving grazing sunlight above a darker lower atmosphere with restrained view-dependent color.",
+      "rejects": ["tropospheric-placement", "baked-iridescence", "luminous-overlay", "wrong-solar-depression"]
+    }
+  ],
+  "coreCases": [
+    {
+      "id": "core-cu-humilis-humid-wide",
+      "qualificationSet": "base",
+      "caseId": "cu-humilis--humid-wide-nearby",
+      "genus": "cumulus",
+      "species": "humilis",
+      "perspective": "near-uplook",
+      "coverage": "sparse",
+      "lighting": "side",
+      "lifecycle": "incipient",
+      "expectedOccupiedSkyFraction": [0.03, 0.48],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "coherent-condensation-base", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "aerial-perspective-continuity", "lifecycle-structure"]
+    },
+    {
+      "id": "core-cu-congestus-day",
+      "qualificationSet": "base",
+      "caseId": "cu-congestus--day-oblique-natural",
+      "genus": "cumulus",
+      "species": "congestus",
+      "perspective": "oblique-natural",
+      "coverage": "sparse",
+      "lighting": "front",
+      "lifecycle": "growing",
+      "expectedOccupiedSkyFraction": [0.04, 0.58],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "connected-parent-topology", "coherent-condensation-base", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "multiple-scattering-shadow-depth", "lifecycle-structure"]
+    },
+    {
+      "id": "core-cb-calvus-near",
+      "qualificationSet": "base",
+      "caseId": "cb-calvus--humid-wide-nearby",
+      "genus": "cumulonimbus",
+      "species": "calvus",
+      "perspective": "near-uplook",
+      "coverage": "broken",
+      "lighting": "side",
+      "lifecycle": "growing",
+      "expectedOccupiedSkyFraction": [0.16, 0.82],
+      "invariantIds": ["finite-world-support", "genus-angular-scale", "connected-parent-topology", "coherent-condensation-base", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "multiple-scattering-shadow-depth", "lifecycle-structure"]
+    },
+    {
+      "id": "core-cb-incus-backlit",
+      "qualificationSet": "base",
+      "caseId": "cb-capillatus-incus--golden-backlit-telephoto",
+      "genus": "cumulonimbus",
+      "species": "capillatus-incus",
+      "perspective": "distant-telephoto",
+      "coverage": "broken",
+      "lighting": "back",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.12, 0.78],
+      "invariantIds": ["finite-world-support", "genus-angular-scale", "connected-parent-topology", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "bounded-source-scattering", "aerial-perspective-continuity", "multiple-scattering-shadow-depth", "lifecycle-structure", "hydrometeor-parent-depth-order"]
+    },
+    {
+      "id": "core-ns-moon",
+      "qualificationSet": "base",
+      "caseId": "ns-precipitating--moonlight-natural",
+      "genus": "nimbostratus",
+      "species": "praecipitatio",
+      "perspective": "oblique-natural",
+      "coverage": "overcast",
+      "lighting": "moon",
+      "lifecycle": "precipitating",
+      "expectedOccupiedSkyFraction": [0.76, 1],
+      "invariantIds": ["finite-world-support", "genus-angular-scale", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "multiple-scattering-shadow-depth", "lifecycle-structure", "hydrometeor-parent-depth-order"]
+    },
+    {
+      "id": "core-st-fractus-humid",
+      "qualificationSet": "base",
+      "caseId": "st-fractus--humid-wide-nearby",
+      "genus": "stratus",
+      "species": "fractus",
+      "perspective": "near-uplook",
+      "coverage": "extensive",
+      "lighting": "diffuse",
+      "lifecycle": "decaying",
+      "expectedOccupiedSkyFraction": [0.42, 0.95],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "aerial-perspective-continuity", "lifecycle-structure", "surface-obscuration-continuity"]
+    },
+    {
+      "id": "core-st-nebulosus-moon",
+      "qualificationSet": "base",
+      "caseId": "st-nebulosus--moonlight-natural",
+      "genus": "stratus",
+      "species": "nebulosus",
+      "perspective": "oblique-natural",
+      "coverage": "overcast",
+      "lighting": "moon",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.74, 1],
+      "invariantIds": ["finite-world-support", "genus-angular-scale", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "multiple-scattering-shadow-depth", "surface-obscuration-continuity"]
+    },
+    {
+      "id": "core-sc-stratiformis-humid",
+      "qualificationSet": "base",
+      "caseId": "sc-stratiformis--humid-wide-nearby",
+      "genus": "stratocumulus",
+      "species": "stratiformis",
+      "perspective": "near-uplook",
+      "coverage": "extensive",
+      "lighting": "diffuse",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.46, 0.96],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "coherent-condensation-base", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "aerial-perspective-continuity", "multiple-scattering-shadow-depth"]
+    },
+    {
+      "id": "core-sc-volutus-backlit",
+      "qualificationSet": "base",
+      "caseId": "sc-volutus--golden-backlit-telephoto",
+      "genus": "stratocumulus",
+      "species": "volutus",
+      "perspective": "distant-telephoto",
+      "coverage": "sparse",
+      "lighting": "back",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.03, 0.42],
+      "invariantIds": ["finite-world-support", "genus-angular-scale", "connected-parent-topology", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "bounded-source-scattering", "aerial-perspective-continuity"]
+    },
+    {
+      "id": "core-ac-castellanus-day",
+      "qualificationSet": "base",
+      "caseId": "ac-castellanus--day-oblique-natural",
+      "genus": "altocumulus",
+      "species": "castellanus",
+      "perspective": "oblique-natural",
+      "coverage": "broken",
+      "lighting": "side",
+      "lifecycle": "growing",
+      "expectedOccupiedSkyFraction": [0.18, 0.78],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "connected-parent-topology", "coherent-condensation-base", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "lifecycle-structure"]
+    },
+    {
+      "id": "core-ac-lenticularis-backlit",
+      "qualificationSet": "base",
+      "caseId": "ac-lenticularis--golden-backlit-telephoto",
+      "genus": "altocumulus",
+      "species": "lenticularis",
+      "perspective": "distant-telephoto",
+      "coverage": "sparse",
+      "lighting": "back",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.03, 0.48],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "bounded-source-scattering", "aerial-perspective-continuity"]
+    },
+    {
+      "id": "core-as-opacus-twilight",
+      "qualificationSet": "base",
+      "caseId": "as-opacus--twilight-overhead",
+      "genus": "altostratus",
+      "species": "opacus",
+      "perspective": "zenith-wide",
+      "coverage": "overcast",
+      "lighting": "twilight",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.72, 1],
+      "invariantIds": ["finite-world-support", "genus-angular-scale", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "aerial-perspective-continuity", "multiple-scattering-shadow-depth"]
+    },
+    {
+      "id": "core-cs-nebulosus-backlit",
+      "qualificationSet": "base",
+      "caseId": "cs-nebulosus--golden-backlit-telephoto",
+      "genus": "cirrostratus",
+      "species": "nebulosus",
+      "perspective": "distant-telephoto",
+      "coverage": "extensive",
+      "lighting": "back",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.48, 1],
+      "invariantIds": ["finite-world-support", "genus-angular-scale", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "bounded-source-scattering", "aerial-perspective-continuity"]
+    },
+    {
+      "id": "core-cc-stratiformis-overhead",
+      "qualificationSet": "base",
+      "caseId": "cc-stratiformis--twilight-overhead",
+      "genus": "cirrocumulus",
+      "species": "stratiformis",
+      "perspective": "zenith-wide",
+      "coverage": "broken",
+      "lighting": "twilight",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.16, 0.82],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "phase-appropriate-boundary", "volumetric-negative-space", "neutral-passive-extinction", "atmosphere-coupled-radiance"]
+    },
+    {
+      "id": "core-ci-uncinus-twilight",
+      "qualificationSet": "base",
+      "caseId": "ci-uncinus--twilight-overhead",
+      "genus": "cirrus",
+      "species": "uncinus",
+      "perspective": "zenith-wide",
+      "coverage": "sparse",
+      "lighting": "twilight",
+      "lifecycle": "decaying",
+      "expectedOccupiedSkyFraction": [0.02, 0.56],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "connected-parent-topology", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "aerial-perspective-continuity", "lifecycle-structure"]
+    },
+    {
+      "id": "core-ci-spissatus-moon",
+      "qualificationSet": "base",
+      "caseId": "ci-spissatus--moonlight-natural",
+      "genus": "cirrus",
+      "species": "spissatus",
+      "perspective": "oblique-natural",
+      "coverage": "broken",
+      "lighting": "moon",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.12, 0.78],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "multiple-scattering-shadow-depth"]
+    },
+    {
+      "id": "core-feature-incus-backlit",
+      "qualificationSet": "orthogonal",
+      "caseId": "feature-incus--tropical-storm-backlight--distant-telephoto--sparse",
+      "genus": "cumulonimbus",
+      "species": "capillatus",
+      "perspective": "distant-telephoto",
+      "coverage": "sparse",
+      "lighting": "back",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.04, 0.48],
+      "invariantIds": ["finite-world-support", "genus-angular-scale", "connected-parent-topology", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "bounded-source-scattering", "aerial-perspective-continuity", "lifecycle-structure"]
+    },
+    {
+      "id": "core-liquid-exterior-day",
+      "qualificationSet": "orthogonal",
+      "caseId": "exterior-liquid-convection--clean-side-day--near-uplook--sparse",
+      "genus": "cumulus",
+      "species": "congestus",
+      "perspective": "near-uplook",
+      "coverage": "sparse",
+      "lighting": "side",
+      "lifecycle": "growing",
+      "expectedOccupiedSkyFraction": [0.04, 0.48],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "connected-parent-topology", "coherent-condensation-base", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "multiple-scattering-shadow-depth", "lifecycle-structure"]
+    },
+    {
+      "id": "core-pannus-overcast",
+      "qualificationSet": "orthogonal",
+      "caseId": "accessory-pannus--diffuse-humid--horizon-wide--overcast",
+      "genus": "altostratus",
+      "species": "opacus",
+      "perspective": "horizon-wide",
+      "coverage": "overcast",
+      "lighting": "diffuse",
+      "lifecycle": "precipitating",
+      "expectedOccupiedSkyFraction": [0.82, 1],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "connected-parent-topology", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "aerial-perspective-continuity", "multiple-scattering-shadow-depth", "hydrometeor-parent-depth-order"]
+    },
+    {
+      "id": "core-noctilucent-horizon",
+      "qualificationSet": "orthogonal",
+      "caseId": "upper-noctilucent--polar-summer-nautical--horizon-wide--sparse",
+      "genus": "cirrus",
+      "species": "fibratus",
+      "perspective": "horizon-wide",
+      "coverage": "sparse",
+      "lighting": "twilight",
+      "lifecycle": "mature",
+      "expectedOccupiedSkyFraction": [0.04, 0.32],
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance", "aerial-perspective-continuity", "upper-atmosphere-altitude-lighting"]
+    }
+  ],
+  "nextReviewQueue": [
+    {
+      "stage": 0,
+      "caseId": "cu-congestus--day-oblique-natural",
+      "debugView": "transmittance",
+      "purpose": "Correctness gate: prove finite, occupied, spectrally neutral transport before judging beauty.",
+      "invariantIds": ["finite-world-support", "neutral-passive-extinction"]
+    },
+    {
+      "stage": 1,
+      "caseId": "cu-congestus--day-oblique-natural",
+      "debugView": "final",
+      "purpose": "Canonical Cu gate: connected buoyant core, nested cauliflower hierarchy, erosion, and sky-colored relief.",
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "coherent-condensation-base", "phase-appropriate-boundary", "atmosphere-coupled-radiance", "multiple-scattering-shadow-depth"]
+    },
+    {
+      "stage": 2,
+      "caseId": "cu-congestus--golden-backlit-telephoto",
+      "debugView": "final",
+      "purpose": "Adversarial Cu lighting: finite-path silver lining, silhouette depth, and haze coupling.",
+      "invariantIds": ["phase-appropriate-boundary", "bounded-source-scattering", "aerial-perspective-continuity", "multiple-scattering-shadow-depth"]
+    },
+    {
+      "stage": 3,
+      "caseId": "sc-stratiformis--humid-wide-nearby",
+      "debugView": "final",
+      "purpose": "Dense low-cloud gate: aperiodic cellular deck, real negative space, wet-air depth, and no world-domain seam.",
+      "invariantIds": ["finite-world-support", "aperiodic-organization", "genus-angular-scale", "atmosphere-coupled-radiance", "aerial-perspective-continuity"]
+    },
+    {
+      "stage": 4,
+      "caseId": "ci-uncinus--twilight-overhead",
+      "debugView": "final",
+      "purpose": "Thin-ice gate: hooks and attached fallstreaks with physical twilight extinction instead of cotton or white overlay.",
+      "invariantIds": ["aperiodic-organization", "connected-parent-topology", "phase-appropriate-boundary", "neutral-passive-extinction", "atmosphere-coupled-radiance"]
+    },
+    {
+      "stage": 5,
+      "caseId": "ns-precipitating--moonlight-natural",
+      "debugView": "final",
+      "purpose": "Low-light dense-weather gate: readable deep deck and parent-owned precipitation without luminous cloud or black clipping.",
+      "invariantIds": ["neutral-passive-extinction", "atmosphere-coupled-radiance", "multiple-scattering-shadow-depth", "hydrometeor-parent-depth-order"]
+    }
+  ]
+}

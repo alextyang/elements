@@ -23,6 +23,15 @@ export type SkyRegion =
     | "tropical"
     | "polar";
 
+export type SkySurfaceType =
+    | "ocean"
+    | "vegetation"
+    | "desert"
+    | "snow"
+    | "urban"
+    | "rock"
+    | "wet";
+
 export type SkyNightCharacter =
     | "pristine"
     | "marine"
@@ -487,3 +496,131 @@ export const SKY_FAMILIES: SkyFamily[] = [
         regionWeights: { tropical: 1.85, humid: 1.55, marine: 1.2 },
     },
 ];
+
+export interface SkyFamilyEnvironment {
+    /** Regions in which the family may be selected automatically. Lab overrides remain unrestricted. */
+    autoRegions: readonly SkyRegion[];
+    /** Optional local meteorological seasons for automatic selection. */
+    autoSeasons?: readonly SkySeason[];
+    /** Production density envelope before genus-specific cloud authoring. */
+    cloudDensityRange: readonly [number, number];
+    /** Spectral surface class used by the atmosphere's Lambertian boundary. */
+    surface: SkySurfaceType;
+}
+
+/**
+ * Meteorological validity constraints for the authored color families.
+ *
+ * The palettes remain art direction; this table defines the physical air mass,
+ * surface, and synoptic envelope in which that art direction is allowed to
+ * occur automatically. Explicit Sky Lab selection intentionally bypasses the
+ * regional gate, but never the atmosphere's aerosol validity constraints.
+ */
+export const SKY_FAMILY_ENVIRONMENTS: Record<string, SkyFamilyEnvironment> = {
+    "crystal-azure": {
+        autoRegions: ["continental", "dry", "polar", "marine", "humid"],
+        cloudDensityRange: [0.02, 0.82],
+        surface: "vegetation",
+    },
+    "marine-pearl": {
+        autoRegions: ["marine", "humid", "tropical"],
+        cloudDensityRange: [0.28, 1.42],
+        surface: "ocean",
+    },
+    "lavender-alpenglow": {
+        autoRegions: ["continental", "polar", "dry"],
+        cloudDensityRange: [0.03, 0.94],
+        surface: "rock",
+    },
+    "desert-apricot": {
+        autoRegions: ["dry", "continental", "tropical"],
+        cloudDensityRange: [0.01, 0.64],
+        surface: "desert",
+    },
+    "storm-slate": {
+        autoRegions: ["marine", "continental", "humid", "tropical", "polar"],
+        cloudDensityRange: [0.92, 1.92],
+        surface: "wet",
+    },
+    "smoky-copper": {
+        autoRegions: ["dry", "continental", "humid", "marine"],
+        cloudDensityRange: [0.02, 0.66],
+        surface: "vegetation",
+    },
+    "humid-aqua": {
+        autoRegions: ["tropical", "humid", "marine"],
+        cloudDensityRange: [0.38, 1.62],
+        surface: "vegetation",
+    },
+    "winter-ice": {
+        autoRegions: ["polar", "continental", "marine"],
+        autoSeasons: ["autumn", "winter", "spring"],
+        cloudDensityRange: [0.03, 1.12],
+        surface: "snow",
+    },
+    "rose-afterglow": {
+        autoRegions: ["marine", "continental", "dry", "humid", "tropical", "polar"],
+        cloudDensityRange: [0.03, 0.86],
+        surface: "vegetation",
+    },
+    "violet-nocturne": {
+        autoRegions: ["continental", "dry", "polar", "marine"],
+        cloudDensityRange: [0.01, 0.58],
+        surface: "rock",
+    },
+    "sage-haze": {
+        autoRegions: ["marine", "humid", "tropical", "continental"],
+        cloudDensityRange: [0.34, 1.28],
+        surface: "vegetation",
+    },
+    "cobalt-gold": {
+        autoRegions: ["dry", "continental", "tropical"],
+        cloudDensityRange: [0.01, 0.56],
+        surface: "desert",
+    },
+    "post-storm-cerulean": {
+        autoRegions: ["continental", "humid", "marine", "tropical"],
+        cloudDensityRange: [0.02, 0.72],
+        surface: "wet",
+    },
+    "coastal-silver": {
+        autoRegions: ["marine", "humid", "tropical"],
+        cloudDensityRange: [0.56, 1.58],
+        surface: "ocean",
+    },
+    "saharan-veil": {
+        autoRegions: ["dry", "tropical", "continental", "marine"],
+        cloudDensityRange: [0.01, 0.48],
+        surface: "desert",
+    },
+    "volcanic-amethyst": {
+        autoRegions: ["marine", "continental", "dry", "humid", "tropical", "polar"],
+        cloudDensityRange: [0.01, 0.64],
+        surface: "rock",
+    },
+    "urban-amber-inversion": {
+        autoRegions: ["continental", "humid", "marine", "dry", "tropical"],
+        cloudDensityRange: [0.03, 0.86],
+        surface: "urban",
+    },
+    "monsoon-pewter": {
+        autoRegions: ["tropical", "humid", "marine"],
+        cloudDensityRange: [1.02, 2],
+        surface: "wet",
+    },
+};
+
+export const skyFamilySelectionWeight = (
+    family: SkyFamily,
+    season: SkySeason,
+    region: SkyRegion,
+) => {
+    const environment = SKY_FAMILY_ENVIRONMENTS[family.id];
+    if (environment && !environment.autoRegions.includes(region)) return 0;
+    if (environment?.autoSeasons && !environment.autoSeasons.includes(season)) {
+        return 0;
+    }
+    // Unlisted regional weights are possible but uncommon, rather than as
+    // likely as the family's named climatological regions.
+    return family.seasonWeights[season] * (family.regionWeights[region] ?? 0.18);
+};
