@@ -1,0 +1,67 @@
+name: Repair cloud optics SHA build typing
+
+on:
+  pull_request:
+    types: [synchronize]
+    branches:
+      - clouds/volumetric
+    paths:
+      - ".github/workflows/repair-cloud-optics-sha.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/cloud-support-maturity-manifest'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Make the Web Crypto input explicitly ArrayBuffer-backed
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("components/backgrounds/sky/cloud-optics.ts")
+          text = path.read_text(encoding="utf-8")
+          old = '''const sha256 = async (bytes: Uint8Array) => {
+              const digest = await crypto.subtle.digest("SHA-256", bytes);
+              return [...new Uint8Array(digest)]
+                  .map((value) => value.toString(16).padStart(2, "0"))
+                  .join("");
+          };'''
+          new = '''const sha256 = async (bytes: Uint8Array) => {
+              const digestInput = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+              digestInput.set(bytes);
+              const digest = await crypto.subtle.digest(
+                  "SHA-256",
+                  digestInput.buffer,
+              );
+              return [...new Uint8Array(digest)]
+                  .map((value) => value.toString(16).padStart(2, "0"))
+                  .join("");
+          };'''
+          if text.count(old) != 1:
+              raise RuntimeError("expected exactly one cloud optics SHA helper")
+          path.write_text(text.replace(old, new), encoding="utf-8")
+          PY
+          git diff --check
+
+      - name: Commit the repair and remove this one-shot workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/repair-cloud-optics-sha.yml
+          git add components/backgrounds/sky/cloud-optics.ts
+          git commit -m "Use an ArrayBuffer-backed Web Crypto input"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
