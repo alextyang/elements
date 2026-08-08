@@ -134,8 +134,11 @@ test("the shipping boundary instantiates V2 frames without overstating operator 
 test("the actual camera-world runtime now carries the cached shipping V2 frame", () => {
     assert.match(worldSource, /CloudSystemRuntimeWithProductionV1/);
     assert.match(worldSource, /readonly productionV2:/);
-    assert.match(worldSource, /compileCloudShippingProductionRuntimeV1\(runtime\)/);
     assert.match(worldSource,
-        /productionV2: compileCloudShippingProductionRuntimeV1\(embeddedBase\)/);
+        /compileCloudShippingProductionRuntimeV1\(\s*namespacedRuntime,?\s*\)/);
+    assert.match(worldSource,
+        /compileCloudShippingProductionRuntimeV1\(embeddedBase\)/);
+    assert.match(worldSource, /const attached:[\s\S]*productionV2,/);
+    assert.match(worldSource, /const embedded:[\s\S]*productionV2,/);
     assert.match(worldSource, /zeroYawRuntimeCache/);
 });
