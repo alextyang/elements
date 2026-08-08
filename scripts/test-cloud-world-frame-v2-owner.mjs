@@ -135,12 +135,14 @@ test("yaw embedding pairs the transformed owner and keeps the result cached", ()
     assert.equal(world.embedCloudRuntimeInCameraWorld(runtime, yaw), embedded);
 });
 
-test("radiative setup consumes the paired owner rather than a global registry", () => {
+test("radiative setup remains runtime-local rather than consulting a global registry", () => {
     const radiativeSource = readFileSync(
         new URL("cloud-radiative-domain.ts", sourceRoot),
         "utf8",
     );
-    assert.match(radiativeSource, /\.productionV2Owner \?\? null/);
-    assert.match(radiativeSource, /source: v2Owner \? "v2-owner" : "legacy-runtime"/);
-    assert.doesNotMatch(radiativeSource, /latestRuntime|cloudShippingV2SystemForOwner/);
+    assert.match(radiativeSource, /cloudRadiativeOwnerInputFromRuntime/);
+    assert.match(radiativeSource, /system\.state\.extent\.centerEastKm/);
+    assert.match(radiativeSource, /system\.compiled\.geometry\.baseAltitudeKm/);
+    assert.doesNotMatch(radiativeSource,
+        /latestRuntime|cloudShippingV2SystemForOwner|cloud-shipping-gpu-registry/);
 });
