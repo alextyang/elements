@@ -198,14 +198,14 @@ const expectedSemanticIds = (
     request: CloudMorphologyCompileRequest,
 ): readonly string[] => {
     const classification = request.classification;
-    const values: string[] = (classification ? [
+    const specialOrigin = classification?.origin.kind === "special"
+        ? classification.origin.designation : undefined;
+    const values: string[] = classification ? [
         ...classification.varieties,
         ...classification.supplementaryFeatures,
         ...classification.accessoryClouds,
-        ...(classification.origin.kind === "special"
-            ? [classification.origin.designation] : []),
-    ] : []).filter((value): value is string =>
-        typeof value === "string" && value.length > 0);
+        ...(specialOrigin ? [specialOrigin] : []),
+    ] : [];
     if (request.upperAtmosphericCloud) {
         values.push(request.upperAtmosphericCloud);
     }
@@ -249,7 +249,7 @@ const featureFor = (
     semanticId: string,
     request: CloudMorphologyCompileRequest,
     system: RuntimeCloudSystem,
-    generation: number;
+    generation: number,
 ): Omit<CloudFeatureRecordV2, "featureId" | "parentOwnerNumericId"> | null => {
     const value = FEATURE_PROFILES[semanticId];
     if (!value) return null;
