@@ -22,25 +22,9 @@ const output = ts.transpileModule(radiativeSource, {
 }).outputText.replace(/from "(\.\/[^".]+)"/g, 'from "$1.mjs"');
 writeFileSync(join(temporaryRoot, "cloud-radiative-domain.mjs"), output);
 writeFileSync(join(temporaryRoot, "cloud-morphology-modifiers.mjs"), "");
+writeFileSync(join(temporaryRoot, "cloud-system-abi-v2.mjs"), "");
 writeFileSync(join(temporaryRoot, "cloud-system-runtime.mjs"), "");
-writeFileSync(join(temporaryRoot, "cloud-shipping-gpu-registry.mjs"), `
-const owners = new Map();
-export const setOwner = (signature, index, system) =>
-    owners.set(signature + ":" + index, system);
-export const cloudShippingV2SystemForOwnerIndex = (
-    signature, index, expectedOwnerId,
-) => {
-    const system = owners.get(signature + ":" + index) ?? null;
-    if (system && system.owner.sourceId !== expectedOwnerId) {
-        throw new Error("Shipping V2 owner order mismatch");
-    }
-    return system;
-};
-`);
 
-const registry = await import(new URL(
-    `file://${join(temporaryRoot, "cloud-shipping-gpu-registry.mjs")}`,
-));
 const radiative = await import(new URL(
     `file://${join(temporaryRoot, "cloud-radiative-domain.mjs")}`,
 ));
@@ -65,23 +49,20 @@ const legacySystem = {
         },
     },
 };
-const v2System = {
-    owner: {
-        sourceId: "owner-a",
-        centerKm: [11, 22, 33],
-        horizontalRadiusKm: [7, 8, 9],
-        orientationRadians: 0.7,
-        boundaryTransitionKm: 0.8,
-        baseAltitudeKm: 10,
-        geometricDepthKm: 12,
-    },
+const v2Owner = {
+    sourceId: "owner-a",
+    centerKm: [11, 22, 33],
+    horizontalRadiusKm: [7, 8, 9],
+    orientationRadians: 0.7,
+    boundaryTransitionKm: 0.8,
+    baseAltitudeKm: 10,
+    geometricDepthKm: 12,
 };
 
-test("shipping radiative domains use the scoped V2 owner geometry", () => {
-    registry.setOwner("runtime-a", 0, v2System);
+test("shipping radiative domains use the directly attached V2 owner geometry", () => {
     const input = radiative.cloudRadiativeOwnerInputFromRuntime({
         ...legacySystem,
-        productionRuntimeSignature: "runtime-a",
+        productionV2Owner: v2Owner,
     }, 0);
     assert.equal(input.source, "v2-owner");
     assert.equal(input.centerEastKm, 11);
@@ -106,22 +87,18 @@ test("laboratory radiative callers retain an explicit legacy fallback", () => {
     assert.equal(input.baseAltitudeKm, 5);
 });
 
-test("scoped owner order divergence fails closed", () => {
-    registry.setOwner("runtime-b", 0, {
-        owner: { ...v2System.owner, sourceId: "wrong-owner" },
-    });
+test("attached owner divergence fails closed", () => {
     assert.throws(() => radiative.cloudRadiativeOwnerInputFromRuntime({
         ...legacySystem,
-        productionRuntimeSignature: "runtime-b",
-    }, 0), /Shipping V2 owner order mismatch/);
+        productionV2Owner: { ...v2Owner, sourceId: "wrong-owner" },
+    }, 0), /V2 radiative owner mismatch/);
 });
 
-test("world-frame owners carry the immutable registry namespace", () => {
+test("world-frame owners carry both registry namespace and matched V2 record", () => {
     assert.match(worldSource, /productionRuntimeSignature: string/);
-    assert.match(worldSource,
-        /productionRuntimeSignature:\s*runtime\.signature/);
-    assert.match(worldSource,
-        /embedSystem\([\s\S]*signature/);
+    assert.match(worldSource, /productionV2Owner: CloudOwnerRecordV2 \| null/);
+    assert.match(worldSource, /attachOwnerRecords/);
+    assert.match(worldSource, /V2 world owner order mismatch/);
     assert.doesNotMatch(radiativeSource,
-        /latestRuntimeSignature|cameraRangeKm|horizontalFieldOfView/);
+        /cloudShippingV2SystemFor|latestRuntimeSignature|cameraRangeKm|horizontalFieldOfView/);
 });
