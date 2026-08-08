@@ -169,7 +169,12 @@ test("attachments can explicitly retarget without reallocating their session", (
     assert.equal(attachment.bindGroupEntries().length, 0);
 });
 
-test("shipping optical-owner upload owns the V2 device attachment lifetime", () => {
+test("shipping optical-owner upload owns the exact V2 runtime namespace and lifetime", () => {
+    assert.match(opticsSource, /const latestRuntime\s*=/);
+    assert.match(opticsSource,
+        /productionRuntimeSignature:\s*latestRuntime\?\.runtimeSignature \?\? null/);
+    assert.match(opticsSource,
+        /runtimeSignature:\s*runtime\.productionRuntimeSignature/);
     assert.match(opticsSource, /attachCloudShippingGpuDeviceV1/);
     assert.match(opticsSource, /productionV2:/);
     assert.match(opticsSource,
