@@ -4,6 +4,9 @@ import {
     type CloudMorphologyV2Migration,
 } from "./cloud-morphology-v2-feature-adapter";
 import {
+    registerCloudShippingProductionRuntimeV1,
+} from "./cloud-shipping-gpu-registry";
+import {
     compileCloudSystemRuntimeProductionV1,
     type CloudRuntimeProductionBridgeResult,
 } from "./cloud-production-runtime-bridge";
@@ -50,7 +53,10 @@ export const compileCloudShippingProductionRuntimeV1 = (
     if (!input.previous && input.frameIndex === undefined &&
         input.simulationTimeSeconds === undefined) {
         const cached = cache.get(runtime);
-        if (cached) return cached;
+        if (cached) {
+            registerCloudShippingProductionRuntimeV1(cached);
+            return cached;
+        }
     }
     const simulationTimeSeconds = Math.max(
         0,
@@ -94,5 +100,6 @@ export const compileCloudShippingProductionRuntimeV1 = (
         input.simulationTimeSeconds === undefined) {
         cache.set(runtime, result);
     }
+    registerCloudShippingProductionRuntimeV1(result);
     return result;
 };
