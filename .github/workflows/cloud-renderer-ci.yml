@@ -6,6 +6,7 @@ on:
       - clouds/volumetric
     paths:
       - ".github/workflows/cloud-renderer-ci.yml"
+      - ".playwright/**"
       - "app/**"
       - "components/backgrounds/sky/**"
       - "data/**"
@@ -47,6 +48,11 @@ jobs:
 
       - name: Run test suite
         run: npm test
+
+      - name: Install pinned browser validation runtime
+        run: |
+          npm install --no-save --package-lock=false @playwright/cli@0.1.17
+          npx playwright install chromium --with-deps
 
       - name: Validate generated WebGPU shaders
         run: npm run sky:validate-webgpu
