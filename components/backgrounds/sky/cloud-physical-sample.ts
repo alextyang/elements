@@ -142,8 +142,10 @@ export const resolveCloudPhysicalSample = ({
     }
 
     const support = clamp(finite(geometry.support));
-    const density = clamp(finite(geometry.density)) * support *
-        Math.max(0, finite(feature?.densityMultiplier ?? 1, 1));
+    const density = clamp(
+        clamp(finite(geometry.density)) * support *
+            Math.max(0, finite(feature?.densityMultiplier ?? 1, 1)),
+    );
     const condensate = owner.physical.condensate;
     const liquidBase = waterConcentration(
         condensate.liquidWaterPath,
@@ -285,8 +287,12 @@ export const validateCloudPhysicalSample = (
         issue("ownerless-precipitation", "precipitationSource",
             "Precipitation requires condensate in the same physical sample.");
     }
-    if (sample.ownerId === 0) {
-        issue("missing-owner", "ownerId", "Owner ID zero is reserved.");
+    const unownedEmptySample = sample.support === 0 && sample.density === 0 &&
+        sample.liquidWaterContent === 0 && sample.iceWaterContent === 0 &&
+        sample.precipitationSource === 0 && sample.featureId === 0;
+    if (sample.ownerId === 0 && !unownedEmptySample) {
+        issue("missing-owner", "ownerId",
+            "Owner ID zero is reserved for the canonical empty sample.");
     }
     return issues;
 };
@@ -356,10 +362,10 @@ export const combineCloudPhysicalSamples = (
             precipitationSource: 0,
             turbulence: 0,
             temperatureKelvin: 273.15,
-            ownerId: 1,
+            ownerId: 0,
             featureId: 0,
             materialClass: CLOUD_MATERIAL_CLASS_CODES["liquid-cloud"],
-            signedDistanceKm: Number.POSITIVE_INFINITY,
+            signedDistanceKm: 1e20,
             closestSurfaceKm: [0, 0, 0],
             inverseCurvatureKm: 0,
             seam01: 0,
