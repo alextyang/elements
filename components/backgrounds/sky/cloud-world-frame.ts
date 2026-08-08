@@ -193,6 +193,112 @@ const zeroYawRuntimeCache = new WeakMap<
     CloudSystemRuntimeWithProductionV1
 >();
 
+/**
+ * Re-materialize the compatibility state from the exact index-paired V2 owner.
+ * Existing camera/light/hydrometeor setup can therefore keep its public input
+ * shape during migration without recomputing mass, phase, temperature, motion,
+ * precipitation, or lifecycle from a second source of truth.
+ */
+const synchronizeProductionOwnerState = (
+    system: RuntimeCloudSystemWithProductionNamespace,
+    owner: CloudOwnerRecordV2,
+): RuntimeCloudSystemWithProductionOwner => {
+    const totalWaterPath =
+        owner.liquidWaterPathGramsPerSquareMetre +
+        owner.iceWaterPathGramsPerSquareMetre;
+    const liquidFraction = totalWaterPath > 1e-8
+        ? owner.liquidWaterPathGramsPerSquareMetre / totalWaterPath
+        : system.state.physical.condensate.liquidFraction;
+    const windSpeed = Math.hypot(
+        owner.velocityKmPerSecond[0],
+        owner.velocityKmPerSecond[2],
+    ) * 1_000;
+    const windDirection = windSpeed > 1e-8
+        ? Math.atan2(
+            owner.velocityKmPerSecond[0],
+            owner.velocityKmPerSecond[2],
+        )
+        : system.state.physical.kinematics.windDirection;
+    const extent = {
+        ...system.state.extent,
+        centerEastKm: owner.centerKm[0],
+        centerNorthKm: owner.centerKm[2],
+        majorRadiusKm: owner.horizontalRadiusKm[0],
+        minorRadiusKm: owner.horizontalRadiusKm[2],
+        orientation: owner.orientationRadians,
+        boundaryTransitionKm: owner.boundaryTransitionKm,
+    };
+    const thermodynamics = {
+        ...system.state.physical.thermodynamics,
+        baseTemperatureKelvin: owner.baseTemperatureKelvin,
+        topTemperatureKelvin: owner.topTemperatureKelvin,
+        relativeHumidity: owner.relativeHumidity01,
+        verticalVelocity: owner.velocityKmPerSecond[1] * 1_000,
+    };
+    const kinematics = {
+        ...system.state.physical.kinematics,
+        windSpeed,
+        windDirection,
+        turbulenceDissipation: owner.turbulenceDissipation,
+    };
+    const condensate = {
+        ...system.state.physical.condensate,
+        liquidWaterPath: owner.liquidWaterPathGramsPerSquareMetre,
+        iceWaterPath: owner.iceWaterPathGramsPerSquareMetre,
+        liquidFraction,
+        dropletEffectiveRadius: owner.liquidEffectiveRadiusMicrons,
+        iceEffectiveRadius: owner.iceEffectiveRadiusMicrons,
+    };
+    const precipitation = {
+        ...system.state.physical.precipitation,
+        rate: owner.precipitationRate,
+    };
+    const lifecycle = {
+        ...system.state.lifecycle,
+        ageSeconds: owner.lifecycleAgeSeconds,
+        stageProgress: owner.lifecycleProgress01,
+    };
+    return {
+        ...system,
+        productionV2Owner: owner,
+        state: {
+            ...system.state,
+            extent,
+            lifecycle,
+            physical: {
+                ...system.state.physical,
+                baseAltitudeKm: owner.baseAltitudeKm,
+                geometricDepthKm: owner.geometricDepthKm,
+                thermodynamics,
+                kinematics,
+                condensate,
+                precipitation,
+            },
+        },
+        compiled: {
+            ...system.compiled,
+            geometry: {
+                ...system.compiled.geometry,
+                extent,
+            },
+            material: {
+                ...system.compiled.material,
+                liquidWaterPathKgM2:
+                    owner.liquidWaterPathGramsPerSquareMetre,
+                iceWaterPathKgM2: owner.iceWaterPathGramsPerSquareMetre,
+                liquidFraction01: liquidFraction,
+                liquidEffectiveRadiusMicrons:
+                    owner.liquidEffectiveRadiusMicrons,
+                iceEffectiveRadiusMicrons: owner.iceEffectiveRadiusMicrons,
+            },
+            thermodynamics,
+            kinematics,
+            lifecycle,
+            precipitation,
+        },
+    };
+};
+
 const pairProductionOwners = (
     systems: readonly RuntimeCloudSystemWithProductionNamespace[],
     productionV2: CloudShippingProductionRuntimeV1,
@@ -205,7 +311,7 @@ const pairProductionOwners = (
                 `${owner?.sourceId ?? "missing"} != ${system.state.id}.`,
             );
         }
-        return { ...system, productionV2Owner: owner };
+        return synchronizeProductionOwnerState(system, owner);
     },
 );
 
