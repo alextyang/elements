@@ -142,5 +142,5 @@ test("diagnostic runner is private, serial, revision-bound, and process-group bo
     assert.match(diagnosticSource, /rendererContentHash/);
     assert.doesNotMatch(diagnosticSource, /public\/generated\/cloud-previews\/manifest\.json/);
     assert.doesNotMatch(diagnosticSource, /generate-cloud-previews/);
-    assert.ok(root.endsWith("/work/elements"));
+    assert.equal(join(root, "scripts"), import.meta.dirname);
 });
