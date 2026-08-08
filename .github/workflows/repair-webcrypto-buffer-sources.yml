@@ -1,0 +1,74 @@
+name: Repair Web Crypto BufferSource typing
+
+on:
+  pull_request:
+    types: [synchronize]
+    branches:
+      - clouds/volumetric
+    paths:
+      - ".github/workflows/repair-webcrypto-buffer-sources.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/cloud-support-maturity-manifest'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Repair every remaining typed-array SHA input
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          needle = '    const digest = await crypto.subtle.digest("SHA-256", bytes);'
+          replacement = '''    const digestInput = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+              digestInput.set(bytes);
+              const digest = await crypto.subtle.digest(
+                  "SHA-256",
+                  digestInput.buffer,
+              );'''
+          changed = []
+          for path in sorted(Path(".").rglob("*.ts")):
+              if any(part in {"node_modules", ".next"} for part in path.parts):
+                  continue
+              text = path.read_text(encoding="utf-8")
+              count = text.count(needle)
+              if count:
+                  path.write_text(text.replace(needle, replacement), encoding="utf-8")
+                  changed.append((str(path), count))
+          for path in sorted(Path(".").rglob("*.tsx")):
+              if any(part in {"node_modules", ".next"} for part in path.parts):
+                  continue
+              text = path.read_text(encoding="utf-8")
+              count = text.count(needle)
+              if count:
+                  path.write_text(text.replace(needle, replacement), encoding="utf-8")
+                  changed.append((str(path), count))
+          if not changed:
+              raise RuntimeError("no remaining typed-array SHA inputs were found")
+          print("Repaired Web Crypto inputs:")
+          for path, count in changed:
+              print(f"- {path}: {count}")
+          PY
+          git diff --check
+
+      - name: Commit repairs and remove this one-shot workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/repair-webcrypto-buffer-sources.yml
+          git add app components scripts
+          git commit -m "Use ArrayBuffer-backed Web Crypto inputs"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
