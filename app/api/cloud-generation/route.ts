@@ -5,6 +5,10 @@ import {
     createFreeRunningCloudRuntime,
 } from "@/components/backgrounds/sky/cloud-generative-runtime";
 import {
+    cloudGateAQualificationSummary,
+    qualifyCloudGateA,
+} from "@/components/backgrounds/sky/cloud-gate-a-qualification";
+import {
     compileCloudProductionFrameV1,
     serializeCloudProductionFrameV1,
 } from "@/components/backgrounds/sky/cloud-production-frame";
@@ -90,6 +94,8 @@ export function GET() {
         diagnostics: {
             includeProductionBuffers:
                 "Opt-in fixed-capacity GPU records; omitted by default.",
+            gateA:
+                "Contract and live-integration blockers are reported separately.",
         },
     });
 }
@@ -144,6 +150,16 @@ export async function POST(request: NextRequest) {
                 eventReferences: MAXIMUM_EVENT_REFERENCES,
             },
         });
+        const gateA = qualifyCloudGateA({
+            runtime: generated,
+            productionCapacities: {
+                owners: MAXIMUM_OWNERS,
+                features: MAXIMUM_FEATURES,
+                events: MAXIMUM_EVENTS,
+                eventReferences: MAXIMUM_EVENT_REFERENCES,
+            },
+            maximumSamplePositions: 48,
+        });
         const response = {
             schemaVersion: 1,
             mode,
@@ -170,6 +186,9 @@ export async function POST(request: NextRequest) {
                     productionFrame.buffers.fingerprint,
                 productionHistoryToken:
                     productionFrame.temporal.historyToken,
+                gateAContractReady: gateA.contractReady,
+                gateAReady: gateA.gateAReady,
+                gateABlockers: gateA.blockers.length,
             },
             validationIssues,
             scene: generated.scene,
@@ -179,6 +198,7 @@ export async function POST(request: NextRequest) {
                 productionFrame,
                 body.includeProductionBuffers === true,
             ),
+            gateA: cloudGateAQualificationSummary(gateA),
             ...(body.includeSimulationState ? {
                 simulation: generated.simulation,
             } : {}),
