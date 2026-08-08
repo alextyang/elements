@@ -82,36 +82,91 @@ const runtime = (signature, fingerprint, frameIndex) => ({
     },
 });
 
-test("the shipping registry uploads the latest frame when a renderer device attaches", () => {
+test("renderer attachments remain isolated to their captured runtime namespace", () => {
     registry.registerCloudShippingProductionRuntimeV1(
-        runtime("runtime-a", "frame-a", 1),
+        runtime("runtime-a", "frame-a-1", 1),
     );
-    const attachment = registry.attachCloudShippingGpuDeviceV1({});
-    const initial = attachment.snapshot();
-    assert.equal(initial.runtimeSignature, "runtime-a");
-    assert.equal(initial.frameFingerprint, "frame-a");
-    assert.equal(initial.uploaded, true);
-    assert.equal(initial.session.frameCount, 1);
-    assert.equal(attachment.bindGroupEntries().length, 1);
+    const attachmentA = registry.attachCloudShippingGpuDeviceV1({});
+    assert.equal(attachmentA.snapshot().selectedRuntimeSignature, "runtime-a");
+    assert.equal(attachmentA.snapshot().frameFingerprint, "frame-a-1");
 
     registry.registerCloudShippingProductionRuntimeV1(
-        runtime("runtime-a", "frame-a", 1),
+        runtime("runtime-b", "frame-b-1", 2),
     );
-    assert.equal(attachment.snapshot().session.frameCount, 1,
-        "identical production frames must not upload again");
+    assert.equal(attachmentA.snapshot().runtimeSignature, "runtime-a",
+        "another canvas must not overwrite this device's V2 buffers");
+    assert.equal(attachmentA.snapshot().session.frameCount, 1);
+
+    const attachmentB = registry.attachCloudShippingGpuDeviceV1({});
+    assert.equal(attachmentB.snapshot().selectedRuntimeSignature, "runtime-b");
+    assert.equal(attachmentB.snapshot().frameFingerprint, "frame-b-1");
 
     registry.registerCloudShippingProductionRuntimeV1(
-        runtime("runtime-b", "frame-b", 2),
+        runtime("runtime-a", "frame-a-2", 3),
     );
-    const updated = attachment.snapshot();
-    assert.equal(updated.runtimeSignature, "runtime-b");
-    assert.equal(updated.frameFingerprint, "frame-b");
-    assert.equal(updated.session.frameCount, 2);
+    assert.equal(attachmentA.snapshot().frameFingerprint, "frame-a-2");
+    assert.equal(attachmentA.snapshot().session.frameCount, 2);
+    assert.equal(attachmentB.snapshot().frameFingerprint, "frame-b-1");
+    assert.equal(attachmentB.snapshot().session.frameCount, 1);
+
+    const snapshot = registry.cloudShippingGpuRegistrySnapshotV1();
+    assert.equal(snapshot.attachmentCount, 2);
+    assert.ok(snapshot.registeredRuntimeSignatures.includes("runtime-a"));
+    assert.ok(snapshot.registeredRuntimeSignatures.includes("runtime-b"));
+
+    attachmentA.destroy();
+    attachmentB.destroy();
+    assert.equal(registry.cloudShippingGpuRegistrySnapshotV1().attachmentCount, 0);
+});
+
+test("a device attached before runtime compilation captures only the first namespace", () => {
+    const attachment = registry.attachCloudShippingGpuDeviceV1(
+        {}, { runtimeSignature: null },
+    );
+    assert.equal(attachment.snapshot().selectedRuntimeSignature, null);
+    registry.registerCloudShippingProductionRuntimeV1(
+        runtime("runtime-c", "frame-c-1", 4),
+    );
+    assert.equal(attachment.snapshot().runtimeSignature, null,
+        "an explicit null selection must remain disconnected");
+
+    const awaiting = registry.attachCloudShippingGpuDeviceV1({});
+    // A latest runtime exists, so the default captures it immediately.
+    assert.equal(awaiting.snapshot().runtimeSignature, "runtime-c");
+    registry.registerCloudShippingProductionRuntimeV1(
+        runtime("runtime-d", "frame-d-1", 5),
+    );
+    assert.equal(awaiting.snapshot().runtimeSignature, "runtime-c");
 
     attachment.destroy();
-    assert.equal(attachment.snapshot().session.destroyed, true);
+    awaiting.destroy();
+});
+
+test("attachments can explicitly retarget without reallocating their session", () => {
+    registry.registerCloudShippingProductionRuntimeV1(
+        runtime("runtime-e", "frame-e-1", 6),
+    );
+    registry.registerCloudShippingProductionRuntimeV1(
+        runtime("runtime-f", "frame-f-1", 7),
+    );
+    const attachment = registry.attachCloudShippingGpuDeviceV1(
+        {}, { runtimeSignature: "runtime-e" },
+    );
+    assert.equal(attachment.snapshot().runtimeSignature, "runtime-e");
+    assert.equal(attachment.snapshot().session.frameCount, 1);
+
+    attachment.selectRuntime("runtime-f");
+    assert.equal(attachment.snapshot().selectedRuntimeSignature, "runtime-f");
+    assert.equal(attachment.snapshot().runtimeSignature, "runtime-f");
+    assert.equal(attachment.snapshot().session.frameCount, 2);
+
+    attachment.selectRuntime(null);
+    assert.equal(attachment.snapshot().selectedRuntimeSignature, null);
+    assert.equal(attachment.snapshot().runtimeSignature, null);
+    assert.equal(attachment.bindGroupEntries().length, 1,
+        "disconnecting preserves renderer-owned allocations for later reuse");
+    attachment.destroy();
     assert.equal(attachment.bindGroupEntries().length, 0);
-    assert.equal(registry.cloudShippingGpuRegistrySnapshotV1().attachmentCount, 0);
 });
 
 test("shipping optical-owner upload owns the V2 device attachment lifetime", () => {
@@ -122,10 +177,13 @@ test("shipping optical-owner upload owns the V2 device attachment lifetime", () 
     assert.doesNotMatch(opticsSource, /requestAdapter|requestDevice/);
 });
 
-test("every cached or fresh shipping frame is published to attached devices", () => {
+test("every cached or fresh shipping frame is published by exact namespace", () => {
     assert.match(shippingSource,
         /if \(cached\) \{[\s\S]*registerCloudShippingProductionRuntimeV1\(cached\)/);
     assert.match(shippingSource,
         /registerCloudShippingProductionRuntimeV1\(result\);[\s\S]*return result/);
+    assert.match(registrySource, /selectedRuntimeSignature/);
+    assert.match(registrySource,
+        /attachment\.selectedRuntimeSignature !== runtime\.runtimeSignature/);
     assert.doesNotMatch(shippingSource, /navigator\.gpu|requestAdapter|requestDevice/);
 });
