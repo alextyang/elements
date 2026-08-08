@@ -1,9 +1,9 @@
 import type {
     CloudMacroTopology,
     CloudMaterialModel,
-    CloudSpecies,
     CloudSystemState,
 } from "./cloud-state-map";
+import type { CloudSpecies } from "./cloud-scene";
 import {
     CLOUD_PHYSICAL_SAMPLE_SCHEMA_VERSION,
     cloudStableNumericId,
