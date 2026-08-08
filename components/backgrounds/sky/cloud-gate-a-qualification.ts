@@ -25,6 +25,7 @@ import type { CloudWeatherSimulation } from "./cloud-weather-engine";
 export type CloudGateAComponent =
     | "geometry-material-sampling"
     | "owner-feature-event-buffers"
+    | "optical-owner-state"
     | "camera-transport"
     | "light-volume"
     | "atmosphere-shadow"
@@ -53,12 +54,17 @@ readonly CloudGateAMigrationRecord[] = Object.freeze([
     {
         component: "geometry-material-sampling",
         state: "contract-ready",
-        evidence: "Generated owners and packed V2 records resolve CloudPhysicalSampleV1; remaining production morphology still needs migration.",
+        evidence: "Generated owners and packed V2 records resolve CloudPhysicalSampleV1; remaining production morphology operators still need GPU parity migration.",
     },
     {
         component: "owner-feature-event-buffers",
-        state: "contract-ready",
-        evidence: "Fixed V2 production buffers, upload plans, and resource sessions exist but are not bound by the shipping renderer.",
+        state: "live-integrated",
+        evidence: "The shipping world-runtime boundary publishes fixed V2 frames and the renderer-owned GPU device maintains their persistent fail-closed upload session.",
+    },
+    {
+        component: "optical-owner-state",
+        state: "live-integrated",
+        evidence: "Shipping optical binding 24 derives effective radii, phase fraction, and temperature from the corresponding V2 owner record with fail-closed owner-order validation.",
     },
     {
         component: "camera-transport",
@@ -205,6 +211,7 @@ const migrationBlockers = (
     for (const component of [
         "geometry-material-sampling",
         "owner-feature-event-buffers",
+        "optical-owner-state",
         "camera-transport",
         "light-volume",
         "atmosphere-shadow",
