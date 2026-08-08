@@ -6,9 +6,7 @@
  */
 
 import type { CloudMorphologyBounds } from "./cloud-morphology-modifiers";
-import {
-    cloudShippingV2SystemForOwnerIndex,
-} from "./cloud-shipping-gpu-registry";
+import type { CloudOwnerRecordV2 } from "./cloud-system-abi-v2";
 import type { RuntimeCloudSystem } from "./cloud-system-runtime";
 
 export type CloudRadiativeVec2 = readonly [number, number];
@@ -70,8 +68,8 @@ export interface CloudRadiativeOwnerProjection {
     depthMaximumKm: number;
 }
 
-interface RuntimeCloudSystemWithProductionSignature extends RuntimeCloudSystem {
-    readonly productionRuntimeSignature?: string;
+interface RuntimeCloudSystemWithProductionOwner extends RuntimeCloudSystem {
+    readonly productionV2Owner?: CloudOwnerRecordV2 | null;
 }
 
 const finite = (value: number) => Number.isFinite(value);
@@ -200,25 +198,24 @@ export const validateCloudRadiativeOwnerInput = (
 };
 
 /**
- * Resolve the radiative-domain owner from the same scoped V2 frame uploaded to
- * the renderer device. Laboratory callers without a world-runtime namespace
- * retain the legacy compatibility fields; shipping callers fail closed on an
- * owner-order mismatch in the registry lookup.
+ * Resolve the radiative-domain owner from the V2 record directly attached at
+ * the world-runtime boundary. This avoids global lookup and guarantees that
+ * independent canvases cannot cross-wire owner geometry. Laboratory callers
+ * retain the explicit legacy compatibility fields.
  */
 export const cloudRadiativeOwnerInputFromRuntime = (
     system: RuntimeCloudSystem,
     ownerIndex: number,
     morphologyBounds?: CloudMorphologyBounds,
 ): CloudRadiativeOwnerInput => {
-    const runtimeSignature = (system as RuntimeCloudSystemWithProductionSignature)
-        .productionRuntimeSignature;
-    const v2Owner = runtimeSignature
-        ? cloudShippingV2SystemForOwnerIndex(
-            runtimeSignature,
-            ownerIndex,
-            system.state.id,
-        )?.owner ?? null
-        : null;
+    const v2Owner = (system as RuntimeCloudSystemWithProductionOwner)
+        .productionV2Owner ?? null;
+    if (v2Owner && v2Owner.sourceId !== system.state.id) {
+        throw new Error(
+            `V2 radiative owner mismatch at ${ownerIndex}: ` +
+            `${v2Owner.sourceId} != ${system.state.id}.`,
+        );
+    }
     return {
         ownerIndex,
         layerIndex: system.layerIndex,
