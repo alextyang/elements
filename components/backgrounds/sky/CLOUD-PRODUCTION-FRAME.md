@@ -129,6 +129,18 @@ checks a validation error scope. The page remains a diagnostic module probe: a
 pass does not qualify the composed shipping pipelines and does not promote a
 cloud route's support maturity.
 
+With an Elements server running, execute the bounded browser qualification:
+
+```sh
+npm run cloud:production:probe
+```
+
+The command uses the repository's `playwright-cli` harness, waits only for an
+explicit `passed`, `failed`, or `unavailable` state, fails closed for every state
+except `passed`, and preserves the complete transcript under
+`output/cloud-production-probe/`. A source build is not substituted for this
+real-adapter result.
+
 ## Integration boundary still open
 
 The live WebGPU graph still needs to:
@@ -153,6 +165,7 @@ node --test \
   scripts/test-cloud-gate-a-qualification.mjs \
   scripts/test-cloud-runtime-v2-adapter.mjs \
   scripts/test-cloud-production-shader-probe.mjs \
+  scripts/test-cloud-production-shader-qualification.mjs \
   scripts/test-cloud-indexed-physical-sampler.mjs
 ```
 
@@ -161,4 +174,5 @@ event deduplication, spatial DDA traversal, ordered ray intervals, temporal
 reuse/invalidation/retirement, allocation reuse and destruction, fail-closed
 uploads, CPU/WGSL record agreement, Gate A truthfulness, live-pass parity
 requirements, shipping-runtime V2 shadow frames, real-browser probe contracts,
-and owner-indexed parity with measured evaluation reduction.
+the bounded browser qualification runner, and owner-indexed parity with measured
+evaluation reduction.
