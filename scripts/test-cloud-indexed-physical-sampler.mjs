@@ -46,7 +46,9 @@ const sample = (owner, position) => ({
  ownerId:owner.numericId,featureId:0,materialClass:2,signedDistanceKm:-.1,
  closestSurfaceKm:position,inverseCurvatureKm:.5,seam01:0,
 });
-export const sampleGeneratedCloudOwnerPhysical = (owner, _features, position) => {
+export const sampleGeneratedCloudOwnerPhysical = (
+ owner, _domain, _features, position,
+) => {
  calls.push(owner.numericId); return sample(owner, position);
 };
 export const sampleCloudWeatherSimulationPhysical = (simulation, position) =>
@@ -62,6 +64,7 @@ const indexed = await import(
 
 const simulation = {
     timeSeconds: 60,
+    domain: { id: "test-domain" },
     owners: [
         { active:true,numericId:101 },
         { active:true,numericId:202 },
