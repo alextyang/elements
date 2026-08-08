@@ -71,6 +71,8 @@ export interface CloudOpticsOwnerSelection {
 
 export interface CloudOpticsOwnerRuntime {
     signature: string;
+    /** Exact immutable world-runtime namespace for this optical owner set. */
+    productionRuntimeSignature: string | null;
     activeCount: number;
     capacity: typeof CLOUD_OPTICS_OWNER_COUNT;
     data: Float32Array;
@@ -104,6 +106,7 @@ export interface UploadedCloudOpticsOwners {
 
 interface CloudSystemRuntimeWithV2Optics extends CloudSystemRuntime {
     readonly productionV2?: {
+        readonly runtimeSignature: string;
         readonly bridge: {
             readonly systemsV2: readonly {
                 readonly owner: CloudOwnerRecordV2;
@@ -306,6 +309,8 @@ export const createCloudOpticsOwnerRuntime = (
     optics: CloudOpticsManifest | LoadedCloudOptics,
 ): CloudOpticsOwnerRuntime => {
     const manifest = manifestOf(optics);
+    const latestRuntime =
+        (runtime as CloudSystemRuntimeWithV2Optics).productionV2;
     const activeCount = Math.min(runtime.systems.length, CLOUD_OPTICS_OWNER_COUNT);
     const data = new Float32Array(CLOUD_OPTICS_OWNER_BUFFER_FLOATS);
     const ownerIds: (string | null)[] = Array(CLOUD_OPTICS_OWNER_COUNT).fill(null);
@@ -355,10 +360,10 @@ export const createCloudOpticsOwnerRuntime = (
             selection.unresolvedIcePorosity,
         ]);
     }
-    const production = (runtime as CloudSystemRuntimeWithV2Optics).productionV2;
     return {
         signature: `${runtime.signature}:${manifest.checksums.phaseTexture}:` +
-            `${production?.bridge.frame.fingerprint ?? "legacy"}`,
+            `${latestRuntime?.bridge.frame.fingerprint ?? "legacy"}`,
+        productionRuntimeSignature: latestRuntime?.runtimeSignature ?? null,
         activeCount,
         capacity: CLOUD_OPTICS_OWNER_COUNT,
         data,
@@ -390,6 +395,7 @@ export const uploadCloudOpticsOwnerRuntime = (
         device as unknown as Parameters<
             typeof attachCloudShippingGpuDeviceV1
         >[0],
+        { runtimeSignature: runtime.productionRuntimeSignature },
     );
     return {
         buffer,
