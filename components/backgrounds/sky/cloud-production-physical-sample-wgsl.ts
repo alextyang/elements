@@ -207,7 +207,9 @@ export const resolvePackedCloudPhysicalSampleV1 = (
     }
 
     const support = clamp(geometry.support);
-    const density = clamp(geometry.density) * support * densityMultiplier;
+    const density = clamp(
+        clamp(geometry.density) * support * densityMultiplier,
+    );
     const depthMetres = Math.max(1, ownerFloat(
         CLOUD_PRODUCTION_OWNER_FLOAT_LAYOUT_V2.geometricDepthKm,
     ) * 1_000);
@@ -448,8 +450,11 @@ fn cloud_production_physical_sample_v1(
     }
 
     let support = clamp(geometry.support, 0.0, 1.0);
-    let density = clamp(geometry.density, 0.0, 1.0) * support *
-        density_multiplier;
+    let density = clamp(
+        clamp(geometry.density, 0.0, 1.0) * support * density_multiplier,
+        0.0,
+        1.0,
+    );
     let depth_metres = max(1.0, owner_f[1].w * 1000.0);
     let liquid_water = density * owner_f[3].y / depth_metres *
         liquid_multiplier;
