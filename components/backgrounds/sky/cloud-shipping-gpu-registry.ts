@@ -104,20 +104,26 @@ export const cloudShippingV2SystemForOwnerIndex = (
 /**
  * Attach the production V2 session to a GPU device already owned by one sky
  * renderer and subscribe it to that renderer's immutable runtime signature.
- * No adapter/device is requested here and no secondary renderer is created.
+ *
+ * `runtimeSignature` is optional only for the current binding-24 migration:
+ * JavaScript setup publishes the relevant runtime immediately before the
+ * optical-owner upload, so the latest signature is captured once here. The
+ * attachment remains permanently scoped after creation and cannot be updated
+ * by another canvas. New consumers must pass their signature explicitly.
  */
 export const attachCloudShippingGpuDeviceV1 = (
     device: CloudGpuDeviceLike,
-    runtimeSignature: string,
+    runtimeSignature?: string,
 ): CloudShippingGpuAttachmentV1 => {
-    if (!runtimeSignature) {
-        throw new Error("Cloud shipping GPU attachment requires a runtime signature.");
+    const resolvedRuntimeSignature = runtimeSignature ?? latestRuntimeSignature;
+    if (!resolvedRuntimeSignature) {
+        throw new Error("Cloud shipping GPU attachment requires a registered runtime.");
     }
     const id = nextAttachmentId;
     nextAttachmentId += 1;
     const state: AttachmentState = {
         id,
-        runtimeSignature,
+        runtimeSignature: resolvedRuntimeSignature,
         session: new CloudProductionGpuSessionV1(device, {
             productionCapacities: {
                 owners: 36,
@@ -132,7 +138,7 @@ export const attachCloudShippingGpuDeviceV1 = (
         destroyed: false,
     };
     attachments.set(id, state);
-    const runtime = runtimes.get(runtimeSignature);
+    const runtime = runtimes.get(resolvedRuntimeSignature);
     if (runtime) updateAttachment(state, runtime);
     return {
         schemaVersion: 1,
