@@ -91,6 +91,7 @@ export const sampleIndexedCloudWeatherPhysicalV1 = (
     const samples = boundedOwners.map((owner) =>
         sampleGeneratedCloudOwnerPhysical(
             owner,
+            simulation.domain,
             featuresByOwner.get(owner.numericId) ?? [],
             positionKm,
         ));
