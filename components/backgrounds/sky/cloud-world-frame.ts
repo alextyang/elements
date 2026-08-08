@@ -28,7 +28,16 @@ import {
  * density, topology, optical state, relative spacing, or camera composition.
  */
 
-export type CloudSystemRuntimeWithProductionV1 = CloudSystemRuntime & {
+export type RuntimeCloudSystemWithProductionSignature = RuntimeCloudSystem & {
+    /** Exact V2 registry namespace for this camera-independent world runtime. */
+    readonly productionRuntimeSignature: string;
+};
+
+export type CloudSystemRuntimeWithProductionV1 = Omit<
+    CloudSystemRuntime,
+    "systems"
+> & {
+    readonly systems: readonly RuntimeCloudSystemWithProductionSignature[];
     /**
      * V2 owner/feature/event frame instantiated on the shipping runtime path.
      * Existing shaders remain on the legacy ABI until their bind groups migrate.
@@ -82,7 +91,8 @@ const embedOrganization = (
 const embedSystem = (
     system: RuntimeCloudSystem,
     cameraYawRadians: number,
-): RuntimeCloudSystem => {
+    productionRuntimeSignature: string,
+): RuntimeCloudSystemWithProductionSignature => {
     const center = rotateWorldPoint([
         system.state.extent.centerEastKm,
         0,
@@ -113,6 +123,7 @@ const embedSystem = (
     };
     return {
         ...system,
+        productionRuntimeSignature,
         state: {
             ...system.state,
             extent,
@@ -177,9 +188,17 @@ const attachProductionRuntime = (
 ): CloudSystemRuntimeWithProductionV1 => {
     const cached = zeroYawRuntimeCache.get(runtime);
     if (cached) return cached;
-    const productionV2 = compileCloudShippingProductionRuntimeV1(runtime);
+    const systems = runtime.systems.map((system) => ({
+        ...system,
+        productionRuntimeSignature: runtime.signature,
+    }));
+    const namespacedRuntime: CloudSystemRuntime = { ...runtime, systems };
+    const productionV2 = compileCloudShippingProductionRuntimeV1(
+        namespacedRuntime,
+    );
     const attached: CloudSystemRuntimeWithProductionV1 = {
-        ...runtime,
+        ...namespacedRuntime,
+        systems,
         productionV2,
     };
     zeroYawRuntimeCache.set(runtime, attached);
@@ -211,10 +230,15 @@ export const embedCloudRuntimeInCameraWorld = (
     const cached = perRuntime.get(key);
     if (cached) return cached;
 
-    const systems = runtime.systems.map((system) => embedSystem(system, yaw));
+    const signature = `${runtime.signature}:earth-frame-yaw=${key}`;
+    const systems = runtime.systems.map((system) => embedSystem(
+        system,
+        yaw,
+        signature,
+    ));
     const embeddedBase: CloudSystemRuntime = {
         ...runtime,
-        signature: `${runtime.signature}:earth-frame-yaw=${key}`,
+        signature,
         systems,
         packedSystemData: packCloudSystems(
             systems,
@@ -229,6 +253,7 @@ export const embedCloudRuntimeInCameraWorld = (
     };
     const embedded: CloudSystemRuntimeWithProductionV1 = {
         ...embeddedBase,
+        systems,
         productionV2: compileCloudShippingProductionRuntimeV1(embeddedBase),
     };
     perRuntime.set(key, embedded);
