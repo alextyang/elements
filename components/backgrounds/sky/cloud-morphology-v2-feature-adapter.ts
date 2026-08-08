@@ -198,18 +198,18 @@ const expectedSemanticIds = (
     request: CloudMorphologyCompileRequest,
 ): readonly string[] => {
     const classification = request.classification;
-    const values = classification ? [
+    const values: string[] = (classification ? [
         ...classification.varieties,
         ...classification.supplementaryFeatures,
         ...classification.accessoryClouds,
         ...(classification.origin.kind === "special"
             ? [classification.origin.designation] : []),
-    ] : [];
+    ] : []).filter((value): value is string =>
+        typeof value === "string" && value.length > 0);
     if (request.upperAtmosphericCloud) {
         values.push(request.upperAtmosphericCloud);
     }
-    return [...new Set(values.filter((value): value is string =>
-        typeof value === "string" && value.length > 0))];
+    return [...new Set(values)];
 };
 
 const attachmentFor = (
@@ -249,7 +249,7 @@ const featureFor = (
     semanticId: string,
     request: CloudMorphologyCompileRequest,
     system: RuntimeCloudSystem,
-    generation: number,
+    generation: number;
 ): Omit<CloudFeatureRecordV2, "featureId" | "parentOwnerNumericId"> | null => {
     const value = FEATURE_PROFILES[semanticId];
     if (!value) return null;
@@ -282,15 +282,16 @@ export const adaptCloudMorphologyRequestToV2Features = (
     request: CloudMorphologyCompileRequest,
     system: RuntimeCloudSystem,
     generation = 0,
+    expectedOwnerIndex = request.parent.ownerIndex,
 ): CloudMorphologyV2OwnerFeatures => {
     const expected = expectedSemanticIds(request);
     const issues: CloudMorphologyV2FeatureIssue[] = [];
-    if (request.parent.ownerIndex !== system.systemIndex) {
+    if (request.parent.ownerIndex !== expectedOwnerIndex) {
         issues.push({
             code: "owner-index-mismatch",
             severity: "error",
             subject: system.state.id,
-            message: `Morphology owner ${request.parent.ownerIndex} does not match runtime system index ${system.systemIndex}.`,
+            message: `Morphology owner ${request.parent.ownerIndex} does not match runtime owner index ${expectedOwnerIndex}.`,
         });
     }
     const features = expected.flatMap((semanticId) => {
@@ -355,6 +356,8 @@ export const adaptCloudRuntimeMorphologyV2 = (
         const owner = adaptCloudMorphologyRequestToV2Features(
             request,
             system,
+            0,
+            ownerIndex,
         );
         owners.push(owner);
         issues.push(...owner.issues);
