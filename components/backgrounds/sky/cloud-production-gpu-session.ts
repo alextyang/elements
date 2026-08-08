@@ -8,6 +8,7 @@ import {
     createCloudProductionGpuUploadPlanV1,
     destroyCloudProductionGpuResourcesV1,
     uploadCloudProductionGpuFrameV1,
+    type CloudGpuBufferLike,
     type CloudGpuDeviceLike,
     type CloudProductionGpuAuxiliaryCapacities,
     type CloudProductionGpuBufferName,
@@ -48,10 +49,7 @@ export interface CloudProductionGpuSessionResultV1 {
 
 export interface CloudProductionBindGroupEntryLike {
     binding: number;
-    resource: {
-        buffer: CloudProductionGpuResourcesV1["buffers"]
-            [CloudProductionGpuBufferName];
-    };
+    resource: { buffer: CloudGpuBufferLike };
 }
 
 export interface CloudProductionGpuSessionSnapshotV1 {
@@ -63,6 +61,21 @@ export interface CloudProductionGpuSessionSnapshotV1 {
     resourceCount: number;
 }
 
+const copyOptions = (
+    options: CloudProductionGpuSessionOptionsV1,
+): CloudProductionGpuSessionOptionsV1 => ({
+    allowTruncatedFrames: options.allowTruncatedFrames,
+    ...(options.productionCapacities ? {
+        productionCapacities: { ...options.productionCapacities },
+    } : {}),
+    ...(options.auxiliaryCapacities ? {
+        auxiliaryCapacities: { ...options.auxiliaryCapacities },
+    } : {}),
+    ...(options.spatialIndex ? {
+        spatialIndex: { ...options.spatialIndex },
+    } : {}),
+});
+
 /**
  * Persistent bridge for the live renderer. It keeps one fixed set of GPU
  * allocations, advances owner-aware temporal identity from the previous
@@ -70,30 +83,25 @@ export interface CloudProductionGpuSessionSnapshotV1 {
  */
 export class CloudProductionGpuSessionV1 {
     readonly schemaVersion = 1 as const;
-    readonly #device: CloudGpuDeviceLike;
-    readonly #options: CloudProductionGpuSessionOptionsV1;
-    #previousFrame: CloudProductionFrameV1 | null = null;
-    #resources: CloudProductionGpuResourcesV1 | null = null;
-    #destroyed = false;
-    #frameCount = 0;
+    private readonly device: CloudGpuDeviceLike;
+    private readonly options: CloudProductionGpuSessionOptionsV1;
+    private previousFrame: CloudProductionFrameV1 | null = null;
+    private resources: CloudProductionGpuResourcesV1 | null = null;
+    private destroyed = false;
+    private frameCount = 0;
 
     constructor(
         device: CloudGpuDeviceLike,
         options: CloudProductionGpuSessionOptionsV1 = {},
     ) {
-        this.#device = device;
-        this.#options = {
-            ...options,
-            productionCapacities: { ...options.productionCapacities },
-            auxiliaryCapacities: { ...options.auxiliaryCapacities },
-            spatialIndex: { ...options.spatialIndex },
-        };
+        this.device = device;
+        this.options = copyOptions(options);
     }
 
     update(
         value: CloudProductionGpuSessionUpdateV1,
     ): CloudProductionGpuSessionResultV1 {
-        if (this.#destroyed) {
+        if (this.destroyed) {
             throw new Error(
                 "Destroyed cloud production GPU session cannot update.",
             );
@@ -102,28 +110,28 @@ export class CloudProductionGpuSessionV1 {
             systems: value.systems,
             frameIndex: value.frameIndex,
             simulationTimeSeconds: value.simulationTimeSeconds,
-            previousFrame: this.#previousFrame,
-            capacities: this.#options.productionCapacities,
-            spatialIndex: this.#options.spatialIndex,
+            previousFrame: this.previousFrame,
+            capacities: this.options.productionCapacities,
+            spatialIndex: this.options.spatialIndex,
         });
         const uploadPlan = createCloudProductionGpuUploadPlanV1(
             frame,
-            this.#options.auxiliaryCapacities,
+            this.options.auxiliaryCapacities,
         );
         let resourcesCreated = false;
-        if (!this.#resources) {
-            this.#resources = createCloudProductionGpuResourcesV1(
-                this.#device,
+        if (!this.resources) {
+            this.resources = createCloudProductionGpuResourcesV1(
+                this.device,
                 uploadPlan,
             );
             resourcesCreated = true;
         }
         const permitUpload = uploadPlan.complete ||
-            this.#options.allowTruncatedFrames === true;
+            this.options.allowTruncatedFrames === true;
         const uploadIssues: readonly CloudProductionGpuIssue[] = permitUpload
             ? uploadCloudProductionGpuFrameV1(
-                this.#device,
-                this.#resources,
+                this.device,
+                this.resources,
                 uploadPlan,
             )
             : [...uploadPlan.issues, {
@@ -133,8 +141,8 @@ export class CloudProductionGpuSessionV1 {
             }];
         const uploaded = permitUpload && uploadIssues.length === 0;
         if (uploaded) {
-            this.#previousFrame = frame;
-            this.#frameCount += 1;
+            this.previousFrame = frame;
+            this.frameCount += 1;
         }
         return {
             frame,
@@ -143,17 +151,18 @@ export class CloudProductionGpuSessionV1 {
             uploaded,
             resourcesCreated,
             uploadedFrameFingerprint:
-                this.#resources.uploadedFrameFingerprint,
+                this.resources.uploadedFrameFingerprint,
         };
     }
 
     bindGroupEntries(): readonly CloudProductionBindGroupEntryLike[] {
-        if (this.#destroyed || !this.#resources) return [];
+        if (this.destroyed || !this.resources) return [];
+        const resources = this.resources;
         return (Object.keys(CLOUD_PRODUCTION_GPU_BINDINGS) as
             CloudProductionGpuBufferName[])
             .map((name) => ({
                 binding: CLOUD_PRODUCTION_GPU_BINDINGS[name],
-                resource: { buffer: this.#resources!.buffers[name] },
+                resource: { buffer: resources.buffers[name] },
             }))
             .sort((left, right) => left.binding - right.binding);
     }
@@ -161,23 +170,23 @@ export class CloudProductionGpuSessionV1 {
     snapshot(): CloudProductionGpuSessionSnapshotV1 {
         return {
             schemaVersion: 1,
-            destroyed: this.#destroyed,
-            frameCount: this.#frameCount,
-            previousFrameFingerprint: this.#previousFrame?.fingerprint ?? null,
+            destroyed: this.destroyed,
+            frameCount: this.frameCount,
+            previousFrameFingerprint: this.previousFrame?.fingerprint ?? null,
             uploadedFrameFingerprint:
-                this.#resources?.uploadedFrameFingerprint ?? null,
-            resourceCount: this.#resources
-                ? Object.keys(this.#resources.buffers).length : 0,
+                this.resources?.uploadedFrameFingerprint ?? null,
+            resourceCount: this.resources
+                ? Object.keys(this.resources.buffers).length : 0,
         };
     }
 
     destroy() {
-        if (this.#destroyed) return;
-        if (this.#resources) {
-            destroyCloudProductionGpuResourcesV1(this.#resources);
+        if (this.destroyed) return;
+        if (this.resources) {
+            destroyCloudProductionGpuResourcesV1(this.resources);
         }
-        this.#resources = null;
-        this.#previousFrame = null;
-        this.#destroyed = true;
+        this.resources = null;
+        this.previousFrame = null;
+        this.destroyed = true;
     }
 }
