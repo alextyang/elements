@@ -6,8 +6,12 @@ import {
 } from "@/components/backgrounds/sky/cloud-generative-runtime";
 import {
     cloudGateAQualificationSummary,
+    createCloudGateASamplePositions,
     qualifyCloudGateA,
 } from "@/components/backgrounds/sky/cloud-gate-a-qualification";
+import {
+    qualifyIndexedCloudWeatherSamplerV1,
+} from "@/components/backgrounds/sky/cloud-indexed-physical-sampler";
 import {
     compileCloudProductionFrameV1,
     serializeCloudProductionFrameV1,
@@ -29,6 +33,7 @@ const MAXIMUM_OWNERS = 48;
 const MAXIMUM_FEATURES = 192;
 const MAXIMUM_EVENTS = 1_024;
 const MAXIMUM_EVENT_REFERENCES = 8_192;
+const MAXIMUM_GATE_A_SAMPLE_POSITIONS = 48;
 const GENERA = new Set([
     "cirrus", "cirrocumulus", "cirrostratus", "altocumulus",
     "altostratus", "nimbostratus", "stratocumulus", "stratus",
@@ -88,6 +93,7 @@ export function GET() {
             maximumFeatures: MAXIMUM_FEATURES,
             maximumEvents: MAXIMUM_EVENTS,
             maximumEventReferences: MAXIMUM_EVENT_REFERENCES,
+            maximumGateASamplePositions: MAXIMUM_GATE_A_SAMPLE_POSITIONS,
         },
         conditionedRequiredFields: ["mode", "seed", "target.genus"],
         freeRunningRequiredFields: ["mode", "seed"],
@@ -96,6 +102,8 @@ export function GET() {
                 "Opt-in fixed-capacity GPU records; omitted by default.",
             gateA:
                 "Contract and live-integration blockers are reported separately.",
+            indexedSampling:
+                "Reports full/indexed physical-sample parity and owner-evaluation reduction over the Gate A lattice.",
         },
     });
 }
@@ -150,16 +158,25 @@ export async function POST(request: NextRequest) {
                 eventReferences: MAXIMUM_EVENT_REFERENCES,
             },
         });
+        const samplePositionsKm = createCloudGateASamplePositions(
+            generated.simulation,
+            MAXIMUM_GATE_A_SAMPLE_POSITIONS,
+        );
         const gateA = qualifyCloudGateA({
             runtime: generated,
+            samplePositionsKm,
             productionCapacities: {
                 owners: MAXIMUM_OWNERS,
                 features: MAXIMUM_FEATURES,
                 events: MAXIMUM_EVENTS,
                 eventReferences: MAXIMUM_EVENT_REFERENCES,
             },
-            maximumSamplePositions: 48,
         });
+        const indexedSampling = qualifyIndexedCloudWeatherSamplerV1(
+            generated.simulation,
+            productionFrame,
+            samplePositionsKm,
+        );
         const response = {
             schemaVersion: 1,
             mode,
@@ -189,6 +206,9 @@ export async function POST(request: NextRequest) {
                 gateAContractReady: gateA.contractReady,
                 gateAReady: gateA.gateAReady,
                 gateABlockers: gateA.blockers.length,
+                indexedSamplingParity: indexedSampling.parity.valid,
+                indexedOwnerEvaluationReduction:
+                    indexedSampling.reductionFraction,
             },
             validationIssues,
             scene: generated.scene,
@@ -199,6 +219,17 @@ export async function POST(request: NextRequest) {
                 body.includeProductionBuffers === true,
             ),
             gateA: cloudGateAQualificationSummary(gateA),
+            indexedSampling: {
+                schemaVersion: indexedSampling.schemaVersion,
+                parityValid: indexedSampling.parity.valid,
+                parityIssues: indexedSampling.parity.issues,
+                positions: indexedSampling.positions,
+                fullOwnerEvaluations:
+                    indexedSampling.fullOwnerEvaluations,
+                indexedOwnerEvaluations:
+                    indexedSampling.indexedOwnerEvaluations,
+                reductionFraction: indexedSampling.reductionFraction,
+            },
             ...(body.includeSimulationState ? {
                 simulation: generated.simulation,
             } : {}),
