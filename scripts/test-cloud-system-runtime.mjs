@@ -71,9 +71,34 @@ for (const name of [
         .replaceAll('"./cloud-photograph-benchmark"',
             '"./cloud-photograph-benchmark.mjs"')
         .replaceAll('"./cloud-morphology-photograph-qualification"',
-            '"./cloud-morphology-photograph-qualification.mjs"');
+            '"./cloud-morphology-photograph-qualification.mjs"')
+        .replaceAll('"./cloud-shipping-production-runtime"',
+            '"./cloud-shipping-production-runtime.mjs"');
     writeFileSync(join(temporaryRoot, `${name}.mjs`), output);
 }
+writeFileSync(join(temporaryRoot, "cloud-shipping-production-runtime.mjs"), `
+export const compileCloudShippingProductionRuntimeV1 = runtime => ({
+    schemaVersion: 1,
+    runtimeSignature: runtime.signature,
+    frameIndex: 0,
+    simulationTimeSeconds: 0,
+    bridge: {
+        systemsV2: runtime.systems.map(system => ({
+            owner: {
+                sourceId: system.state.id,
+                centerKm: [
+                    system.state.extent.centerEastKm,
+                    system.state.physical.baseAltitudeKm +
+                        system.state.physical.geometricDepthKm * 0.5,
+                    system.state.extent.centerNorthKm,
+                ],
+                orientationRadians: system.state.extent.orientation,
+            },
+        })),
+        frame: { fingerprint: runtime.signature },
+    },
+});
+`);
 
 const runtimeModule = await import(
     new URL(`file://${join(temporaryRoot, "cloud-system-runtime.mjs")}`)
@@ -363,11 +388,22 @@ test("camera world embedding rigidly co-rotates owners, morphology, and producti
         embedded,
         "one immutable base runtime/yaw pair should reuse one derived runtime",
     );
+    const zeroYaw = cloudWorldFrameModule.embedCloudRuntimeInCameraWorld(
+        base, 0,
+    );
+    assert.notEqual(zeroYaw, base,
+        "zero yaw must attach the cached shipping V2 frame");
     assert.equal(
         cloudWorldFrameModule.embedCloudRuntimeInCameraWorld(base, 0),
-        base,
-        "the explicit 180-degree reference view must remain allocation-free",
+        zeroYaw,
+        "zero yaw must reuse one attached shipping runtime",
     );
+    assert.equal(zeroYaw.signature, base.signature);
+    assert.equal(zeroYaw.systems.length, base.systems.length);
+    zeroYaw.systems.forEach((system, index) => {
+        assert.equal(system.productionV2Owner.sourceId,
+            base.systems[index].state.id);
+    });
     assert.notEqual(embedded, base);
     assert.match(embedded.signature, /earth-frame-yaw=/);
     assert.deepEqual([

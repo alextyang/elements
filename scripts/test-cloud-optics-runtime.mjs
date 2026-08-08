@@ -57,9 +57,21 @@ for (const name of [
         .replaceAll('"./cloud-atlas-material-profile"',
             '"./cloud-atlas-material-profile.mjs"')
         .replaceAll('"./cloud-system-runtime"', '"./cloud-system-runtime.mjs"')
-        .replaceAll('"./cloud-optics"', '"./cloud-optics.mjs"');
+        .replaceAll('"./cloud-optics"', '"./cloud-optics.mjs"')
+        .replaceAll('"./cloud-shipping-gpu-registry"',
+            '"./cloud-shipping-gpu-registry.mjs"');
     writeFileSync(join(temporaryRoot, `${name}.mjs`), output);
 }
+writeFileSync(join(temporaryRoot, "cloud-shipping-gpu-registry.mjs"), `
+export const attachCloudShippingGpuDeviceV1 = () => ({
+    schemaVersion: 1,
+    attachmentId: 1,
+    selectRuntime() {},
+    bindGroupEntries: () => [],
+    snapshot: () => ({ uploaded: false }),
+    destroy() {},
+});
+`);
 
 const opticsRuntime = await import(
     new URL(`file://${join(temporaryRoot, "cloud-optics-runtime.mjs")}`),
