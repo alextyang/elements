@@ -28,6 +28,8 @@ test("cloud CI installs a pinned real-browser validator before shader execution"
 test("CI Chromium explicitly enables the bounded software WebGPU adapter", () => {
     assert.equal(configuration.browser.browserName, "chromium");
     assert.equal(configuration.browser.launchOptions.headless, true);
+    assert.equal(configuration.browser.launchOptions.chromiumSandbox, false,
+        "GitHub-hosted Ubuntu cannot create Chromium user namespaces");
     for (const argument of [
         "--enable-unsafe-webgpu",
         "--enable-features=Vulkan",
