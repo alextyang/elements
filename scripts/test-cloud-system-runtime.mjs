@@ -77,6 +77,55 @@ for (const name of [
     writeFileSync(join(temporaryRoot, `${name}.mjs`), output);
 }
 writeFileSync(join(temporaryRoot, "cloud-shipping-production-runtime.mjs"), `
+const ownerFromSystem = system => {
+    const state = system.state;
+    const physical = state.physical;
+    const windSpeedKmPerSecond =
+        physical.kinematics.windSpeed / 1_000;
+    return {
+        sourceId: state.id,
+        centerKm: [
+            state.extent.centerEastKm,
+            physical.baseAltitudeKm + physical.geometricDepthKm * 0.5,
+            state.extent.centerNorthKm,
+        ],
+        horizontalRadiusKm: [
+            state.extent.majorRadiusKm,
+            physical.geometricDepthKm * 0.5,
+            state.extent.minorRadiusKm,
+        ],
+        orientationRadians: state.extent.orientation,
+        boundaryTransitionKm: state.extent.boundaryTransitionKm,
+        baseAltitudeKm: physical.baseAltitudeKm,
+        geometricDepthKm: physical.geometricDepthKm,
+        liquidWaterPathGramsPerSquareMetre:
+            physical.condensate.liquidWaterPath,
+        iceWaterPathGramsPerSquareMetre:
+            physical.condensate.iceWaterPath,
+        liquidEffectiveRadiusMicrons:
+            physical.condensate.dropletEffectiveRadius,
+        iceEffectiveRadiusMicrons:
+            physical.condensate.iceEffectiveRadius,
+        baseTemperatureKelvin:
+            physical.thermodynamics.baseTemperatureKelvin,
+        topTemperatureKelvin:
+            physical.thermodynamics.topTemperatureKelvin,
+        relativeHumidity01:
+            physical.thermodynamics.relativeHumidity,
+        velocityKmPerSecond: [
+            Math.sin(physical.kinematics.windDirection) *
+                windSpeedKmPerSecond,
+            physical.thermodynamics.verticalVelocity / 1_000,
+            Math.cos(physical.kinematics.windDirection) *
+                windSpeedKmPerSecond,
+        ],
+        turbulenceDissipation:
+            physical.kinematics.turbulenceDissipation,
+        precipitationRate: physical.precipitation.rate,
+        lifecycleAgeSeconds: state.lifecycle.ageSeconds,
+        lifecycleProgress01: state.lifecycle.stageProgress,
+    };
+};
 export const compileCloudShippingProductionRuntimeV1 = runtime => ({
     schemaVersion: 1,
     runtimeSignature: runtime.signature,
@@ -84,16 +133,7 @@ export const compileCloudShippingProductionRuntimeV1 = runtime => ({
     simulationTimeSeconds: 0,
     bridge: {
         systemsV2: runtime.systems.map(system => ({
-            owner: {
-                sourceId: system.state.id,
-                centerKm: [
-                    system.state.extent.centerEastKm,
-                    system.state.physical.baseAltitudeKm +
-                        system.state.physical.geometricDepthKm * 0.5,
-                    system.state.extent.centerNorthKm,
-                ],
-                orientationRadians: system.state.extent.orientation,
-            },
+            owner: ownerFromSystem(system),
         })),
         frame: { fingerprint: runtime.signature },
     },
