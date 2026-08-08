@@ -70,8 +70,10 @@ const formatMessage = (message: WebGpuCompilationMessageLike) => {
 
 export function CloudProductionShaderProbe({
     shaderSource,
+    shaderSha256,
 }: {
     shaderSource: string;
+    shaderSha256: string;
 }) {
     const [status, setStatus] = useState<ProbeStatus>("idle");
     const [diagnostics, setDiagnostics] = useState<readonly string[]>([]);
@@ -186,12 +188,16 @@ export function CloudProductionShaderProbe({
                 light-volume, shadow, hydrometeor, or temporal pipelines.
             </p>
 
-            <div data-cloud-production-shader-probe={status} style={{
-                padding: 20,
-                border: `1px solid ${border}`,
-                borderRadius: 14,
-                background,
-            }}>
+            <div
+                data-cloud-production-shader-probe={status}
+                data-cloud-production-shader-sha256={shaderSha256}
+                style={{
+                    padding: 20,
+                    border: `1px solid ${border}`,
+                    borderRadius: 14,
+                    background,
+                }}
+            >
                 <div style={{
                     display: "flex",
                     alignItems: "center",
@@ -239,6 +245,12 @@ export function CloudProductionShaderProbe({
             }}>
                 <dt>Shader bytes</dt>
                 <dd style={{ margin: 0 }}>{shaderSource.length.toLocaleString()}</dd>
+                <dt>Shader SHA-256</dt>
+                <dd style={{
+                    margin: 0,
+                    overflowWrap: "anywhere",
+                    fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                }}>{shaderSha256}</dd>
                 <dt>Validation</dt>
                 <dd style={{ margin: 0 }}>
                     GPUShaderModule compilation info plus validation error scope
