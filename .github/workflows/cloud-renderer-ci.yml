@@ -1,0 +1,55 @@
+name: Cloud renderer CI
+
+on:
+  pull_request:
+    branches:
+      - clouds/volumetric
+    paths:
+      - ".github/workflows/cloud-renderer-ci.yml"
+      - "app/**"
+      - "components/backgrounds/sky/**"
+      - "data/**"
+      - "public/assets/sky/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-renderer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Typecheck, tests, shaders, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Validate generated WebGPU shaders
+        run: npm run sky:validate-webgpu
+
+      - name: Build production application
+        run: npm run build
