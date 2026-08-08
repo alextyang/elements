@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
     createCloudProductionPhysicalSampleWgsl,
 } from "@/components/backgrounds/sky/cloud-production-physical-sample-wgsl";
@@ -11,5 +13,11 @@ export default function CloudProductionProbePage() {
     const shaderSource = createCloudProductionPhysicalSampleWgsl({
         group: 0,
     });
-    return <CloudProductionShaderProbe shaderSource={shaderSource} />;
+    const shaderSha256 = createHash("sha256")
+        .update(shaderSource)
+        .digest("hex");
+    return <CloudProductionShaderProbe
+        shaderSource={shaderSource}
+        shaderSha256={shaderSha256}
+    />;
 }
