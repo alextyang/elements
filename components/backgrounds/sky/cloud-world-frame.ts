@@ -11,6 +11,7 @@ import {
     type CloudShippingProductionRuntimeV1,
 } from "./cloud-shipping-production-runtime";
 import type { CloudOrganizationState } from "./cloud-state-map";
+import type { CloudOwnerRecordV2 } from "./cloud-system-abi-v2";
 import {
     packCloudSystems,
     packLegacyCloudFeatures,
@@ -31,6 +32,8 @@ import {
 export type RuntimeCloudSystemWithProductionSignature = RuntimeCloudSystem & {
     /** Exact V2 registry namespace for this camera-independent world runtime. */
     readonly productionRuntimeSignature: string;
+    /** Index-matched V2 owner consumed by shipping CPU pass setup. */
+    readonly productionV2Owner: CloudOwnerRecordV2 | null;
 };
 
 export type CloudSystemRuntimeWithProductionV1 = Omit<
@@ -88,11 +91,15 @@ const embedOrganization = (
     }
 };
 
+type NamespacedRuntimeCloudSystem = RuntimeCloudSystem & {
+    readonly productionRuntimeSignature: string;
+};
+
 const embedSystem = (
     system: RuntimeCloudSystem,
     cameraYawRadians: number,
     productionRuntimeSignature: string,
-): RuntimeCloudSystemWithProductionSignature => {
+): NamespacedRuntimeCloudSystem => {
     const center = rotateWorldPoint([
         system.state.extent.centerEastKm,
         0,
@@ -183,19 +190,39 @@ const zeroYawRuntimeCache = new WeakMap<
     CloudSystemRuntimeWithProductionV1
 >();
 
+const attachOwnerRecords = (
+    systems: readonly NamespacedRuntimeCloudSystem[],
+    productionV2: CloudShippingProductionRuntimeV1,
+): readonly RuntimeCloudSystemWithProductionSignature[] =>
+    systems.map((system, ownerIndex) => {
+        const owner = productionV2.bridge.systemsV2[ownerIndex]?.owner ?? null;
+        if (owner && owner.sourceId !== system.state.id) {
+            throw new Error(
+                `V2 world owner order mismatch at ${ownerIndex}: ` +
+                `${owner.sourceId} != ${system.state.id}.`,
+            );
+        }
+        return { ...system, productionV2Owner: owner };
+    });
+
 const attachProductionRuntime = (
     runtime: CloudSystemRuntime,
 ): CloudSystemRuntimeWithProductionV1 => {
     const cached = zeroYawRuntimeCache.get(runtime);
     if (cached) return cached;
-    const systems = runtime.systems.map((system) => ({
-        ...system,
-        productionRuntimeSignature: runtime.signature,
-    }));
-    const namespacedRuntime: CloudSystemRuntime = { ...runtime, systems };
+    const namespacedSystems: NamespacedRuntimeCloudSystem[] =
+        runtime.systems.map((system) => ({
+            ...system,
+            productionRuntimeSignature: runtime.signature,
+        }));
+    const namespacedRuntime: CloudSystemRuntime = {
+        ...runtime,
+        systems: namespacedSystems,
+    };
     const productionV2 = compileCloudShippingProductionRuntimeV1(
         namespacedRuntime,
     );
+    const systems = attachOwnerRecords(namespacedSystems, productionV2);
     const attached: CloudSystemRuntimeWithProductionV1 = {
         ...namespacedRuntime,
         systems,
@@ -231,7 +258,7 @@ export const embedCloudRuntimeInCameraWorld = (
     if (cached) return cached;
 
     const signature = `${runtime.signature}:earth-frame-yaw=${key}`;
-    const systems = runtime.systems.map((system) => embedSystem(
+    const namespacedSystems = runtime.systems.map((system) => embedSystem(
         system,
         yaw,
         signature,
@@ -239,22 +266,24 @@ export const embedCloudRuntimeInCameraWorld = (
     const embeddedBase: CloudSystemRuntime = {
         ...runtime,
         signature,
-        systems,
+        systems: namespacedSystems,
         packedSystemData: packCloudSystems(
-            systems,
+            namespacedSystems,
             runtime.packedSystemData.capacity,
         ),
-        legacyFeatureData: packLegacyCloudFeatures(systems),
+        legacyFeatureData: packLegacyCloudFeatures(namespacedSystems),
         morphologyRequests: runtime.morphologyRequests.map((request) =>
             embedMorphologyRequest(request, yaw)),
         // Composition qualifications are invariant under this matching rigid
         // camera/owner rotation, so retain the already qualified values.
         compositionQualifications: runtime.compositionQualifications,
     };
+    const productionV2 = compileCloudShippingProductionRuntimeV1(embeddedBase);
+    const systems = attachOwnerRecords(namespacedSystems, productionV2);
     const embedded: CloudSystemRuntimeWithProductionV1 = {
         ...embeddedBase,
         systems,
-        productionV2: compileCloudShippingProductionRuntimeV1(embeddedBase),
+        productionV2,
     };
     perRuntime.set(key, embedded);
     if (perRuntime.size > 8) {
