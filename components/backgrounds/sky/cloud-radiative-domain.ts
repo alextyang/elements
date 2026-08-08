@@ -6,7 +6,6 @@
  */
 
 import type { CloudMorphologyBounds } from "./cloud-morphology-modifiers";
-import type { CloudOwnerRecordV2 } from "./cloud-system-abi-v2";
 import type { RuntimeCloudSystem } from "./cloud-system-runtime";
 
 export type CloudRadiativeVec2 = readonly [number, number];
@@ -31,8 +30,6 @@ export interface CloudRadiativeOwnerInput {
     boundaryTransitionKm: number;
     baseAltitudeKm: number;
     geometricDepthKm: number;
-    /** Explicit provenance retained for migration qualification. */
-    source?: "v2-owner" | "legacy-runtime";
     morphologyBounds?: CloudMorphologyBounds;
 }
 
@@ -66,10 +63,6 @@ export interface CloudRadiativeOwnerProjection {
     planeMaximumKm: CloudRadiativeVec2;
     depthMinimumKm: number;
     depthMaximumKm: number;
-}
-
-interface RuntimeCloudSystemWithProductionOwner extends RuntimeCloudSystem {
-    readonly productionV2Owner?: CloudOwnerRecordV2 | null;
 }
 
 const finite = (value: number) => Number.isFinite(value);
@@ -197,49 +190,24 @@ export const validateCloudRadiativeOwnerInput = (
     return { valid: reasons.length === 0, reasons };
 };
 
-/**
- * Resolve the radiative-domain owner from the V2 record directly attached at
- * the world-runtime boundary. This avoids global lookup and guarantees that
- * independent canvases cannot cross-wire owner geometry. Laboratory callers
- * retain the explicit legacy compatibility fields.
- */
 export const cloudRadiativeOwnerInputFromRuntime = (
     system: RuntimeCloudSystem,
     ownerIndex: number,
     morphologyBounds?: CloudMorphologyBounds,
-): CloudRadiativeOwnerInput => {
-    const v2Owner = (system as RuntimeCloudSystemWithProductionOwner)
-        .productionV2Owner ?? null;
-    if (v2Owner && v2Owner.sourceId !== system.state.id) {
-        throw new Error(
-            `V2 radiative owner mismatch at ${ownerIndex}: ` +
-            `${v2Owner.sourceId} != ${system.state.id}.`,
-        );
-    }
-    return {
-        ownerIndex,
-        layerIndex: system.layerIndex,
-        id: system.state.id,
-        centerEastKm: v2Owner?.centerKm[0] ??
-            system.state.extent.centerEastKm,
-        centerNorthKm: v2Owner?.centerKm[2] ??
-            system.state.extent.centerNorthKm,
-        majorRadiusKm: v2Owner?.horizontalRadiusKm[0] ??
-            system.state.extent.majorRadiusKm,
-        minorRadiusKm: v2Owner?.horizontalRadiusKm[2] ??
-            system.state.extent.minorRadiusKm,
-        orientationRadians: v2Owner?.orientationRadians ??
-            system.state.extent.orientation,
-        boundaryTransitionKm: v2Owner?.boundaryTransitionKm ??
-            system.state.extent.boundaryTransitionKm,
-        baseAltitudeKm: v2Owner?.baseAltitudeKm ??
-            system.compiled.geometry.baseAltitudeKm,
-        geometricDepthKm: v2Owner?.geometricDepthKm ??
-            system.compiled.geometry.geometricDepthKm,
-        source: v2Owner ? "v2-owner" : "legacy-runtime",
-        morphologyBounds,
-    };
-};
+): CloudRadiativeOwnerInput => ({
+    ownerIndex,
+    layerIndex: system.layerIndex,
+    id: system.state.id,
+    centerEastKm: system.state.extent.centerEastKm,
+    centerNorthKm: system.state.extent.centerNorthKm,
+    majorRadiusKm: system.state.extent.majorRadiusKm,
+    minorRadiusKm: system.state.extent.minorRadiusKm,
+    orientationRadians: system.state.extent.orientation,
+    boundaryTransitionKm: system.state.extent.boundaryTransitionKm,
+    baseAltitudeKm: system.compiled.geometry.baseAltitudeKm,
+    geometricDepthKm: system.compiled.geometry.geometricDepthKm,
+    morphologyBounds,
+});
 
 export const createCloudRadiativeOwnerDomain = (
     input: CloudRadiativeOwnerInput,

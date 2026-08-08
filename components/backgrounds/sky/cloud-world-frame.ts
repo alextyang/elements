@@ -11,7 +11,6 @@ import {
     type CloudShippingProductionRuntimeV1,
 } from "./cloud-shipping-production-runtime";
 import type { CloudOrganizationState } from "./cloud-state-map";
-import type { CloudOwnerRecordV2 } from "./cloud-system-abi-v2";
 import {
     packCloudSystems,
     packLegacyCloudFeatures,
@@ -29,18 +28,7 @@ import {
  * density, topology, optical state, relative spacing, or camera composition.
  */
 
-export type RuntimeCloudSystemWithProductionSignature = RuntimeCloudSystem & {
-    /** Exact V2 registry namespace for this camera-independent world runtime. */
-    readonly productionRuntimeSignature: string;
-    /** Index-matched V2 owner consumed by shipping CPU pass setup. */
-    readonly productionV2Owner: CloudOwnerRecordV2 | null;
-};
-
-export type CloudSystemRuntimeWithProductionV1 = Omit<
-    CloudSystemRuntime,
-    "systems"
-> & {
-    readonly systems: readonly RuntimeCloudSystemWithProductionSignature[];
+export type CloudSystemRuntimeWithProductionV1 = CloudSystemRuntime & {
     /**
      * V2 owner/feature/event frame instantiated on the shipping runtime path.
      * Existing shaders remain on the legacy ABI until their bind groups migrate.
@@ -91,15 +79,10 @@ const embedOrganization = (
     }
 };
 
-type NamespacedRuntimeCloudSystem = RuntimeCloudSystem & {
-    readonly productionRuntimeSignature: string;
-};
-
 const embedSystem = (
     system: RuntimeCloudSystem,
     cameraYawRadians: number,
-    productionRuntimeSignature: string,
-): NamespacedRuntimeCloudSystem => {
+): RuntimeCloudSystem => {
     const center = rotateWorldPoint([
         system.state.extent.centerEastKm,
         0,
@@ -130,7 +113,6 @@ const embedSystem = (
     };
     return {
         ...system,
-        productionRuntimeSignature,
         state: {
             ...system.state,
             extent,
@@ -190,42 +172,14 @@ const zeroYawRuntimeCache = new WeakMap<
     CloudSystemRuntimeWithProductionV1
 >();
 
-const attachOwnerRecords = (
-    systems: readonly NamespacedRuntimeCloudSystem[],
-    productionV2: CloudShippingProductionRuntimeV1,
-): readonly RuntimeCloudSystemWithProductionSignature[] =>
-    systems.map((system, ownerIndex) => {
-        const owner = productionV2.bridge.systemsV2[ownerIndex]?.owner ?? null;
-        if (owner && owner.sourceId !== system.state.id) {
-            throw new Error(
-                `V2 world owner order mismatch at ${ownerIndex}: ` +
-                `${owner.sourceId} != ${system.state.id}.`,
-            );
-        }
-        return { ...system, productionV2Owner: owner };
-    });
-
 const attachProductionRuntime = (
     runtime: CloudSystemRuntime,
 ): CloudSystemRuntimeWithProductionV1 => {
     const cached = zeroYawRuntimeCache.get(runtime);
     if (cached) return cached;
-    const namespacedSystems: NamespacedRuntimeCloudSystem[] =
-        runtime.systems.map((system) => ({
-            ...system,
-            productionRuntimeSignature: runtime.signature,
-        }));
-    const namespacedRuntime: CloudSystemRuntime = {
-        ...runtime,
-        systems: namespacedSystems,
-    };
-    const productionV2 = compileCloudShippingProductionRuntimeV1(
-        namespacedRuntime,
-    );
-    const systems = attachOwnerRecords(namespacedSystems, productionV2);
+    const productionV2 = compileCloudShippingProductionRuntimeV1(runtime);
     const attached: CloudSystemRuntimeWithProductionV1 = {
-        ...namespacedRuntime,
-        systems,
+        ...runtime,
         productionV2,
     };
     zeroYawRuntimeCache.set(runtime, attached);
@@ -257,33 +211,25 @@ export const embedCloudRuntimeInCameraWorld = (
     const cached = perRuntime.get(key);
     if (cached) return cached;
 
-    const signature = `${runtime.signature}:earth-frame-yaw=${key}`;
-    const namespacedSystems = runtime.systems.map((system) => embedSystem(
-        system,
-        yaw,
-        signature,
-    ));
+    const systems = runtime.systems.map((system) => embedSystem(system, yaw));
     const embeddedBase: CloudSystemRuntime = {
         ...runtime,
-        signature,
-        systems: namespacedSystems,
+        signature: `${runtime.signature}:earth-frame-yaw=${key}`,
+        systems,
         packedSystemData: packCloudSystems(
-            namespacedSystems,
+            systems,
             runtime.packedSystemData.capacity,
         ),
-        legacyFeatureData: packLegacyCloudFeatures(namespacedSystems),
+        legacyFeatureData: packLegacyCloudFeatures(systems),
         morphologyRequests: runtime.morphologyRequests.map((request) =>
             embedMorphologyRequest(request, yaw)),
         // Composition qualifications are invariant under this matching rigid
         // camera/owner rotation, so retain the already qualified values.
         compositionQualifications: runtime.compositionQualifications,
     };
-    const productionV2 = compileCloudShippingProductionRuntimeV1(embeddedBase);
-    const systems = attachOwnerRecords(namespacedSystems, productionV2);
     const embedded: CloudSystemRuntimeWithProductionV1 = {
         ...embeddedBase,
-        systems,
-        productionV2,
+        productionV2: compileCloudShippingProductionRuntimeV1(embeddedBase),
     };
     perRuntime.set(key, embedded);
     if (perRuntime.size > 8) {

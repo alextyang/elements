@@ -11,7 +11,7 @@ import type { CloudShippingProductionRuntimeV1 } from
 export interface CloudShippingGpuAttachmentSnapshotV1 {
     schemaVersion: 1;
     attachmentId: number;
-    runtimeSignature: string;
+    runtimeSignature: string | null;
     frameFingerprint: string | null;
     uploaded: boolean;
     uploadIssueCount: number;
@@ -28,16 +28,15 @@ export interface CloudShippingGpuAttachmentV1 {
 
 interface AttachmentState {
     id: number;
-    runtimeSignature: string;
     session: CloudProductionGpuSessionV1;
+    runtimeSignature: string | null;
     frameFingerprint: string | null;
     result: CloudProductionGpuSessionResultV1 | null;
     destroyed: boolean;
 }
 
-let latestRuntimeSignature: string | null = null;
+let latestRuntime: CloudShippingProductionRuntimeV1 | null = null;
 let nextAttachmentId = 1;
-const runtimes = new Map<string, CloudShippingProductionRuntimeV1>();
 const attachments = new Map<number, AttachmentState>();
 
 const updateAttachment = (
@@ -45,7 +44,6 @@ const updateAttachment = (
     runtime: CloudShippingProductionRuntimeV1,
 ) => {
     if (attachment.destroyed ||
-        attachment.runtimeSignature !== runtime.runtimeSignature ||
         attachment.frameFingerprint === runtime.bridge.frame.fingerprint) {
         return;
     }
@@ -54,123 +52,36 @@ const updateAttachment = (
         frameIndex: runtime.frameIndex,
         simulationTimeSeconds: runtime.simulationTimeSeconds,
     });
+    attachment.runtimeSignature = runtime.runtimeSignature;
     attachment.frameFingerprint = runtime.bridge.frame.fingerprint;
     attachment.result = result;
 };
 
 /**
- * Publish one camera-independent V2 frame only to GPU devices subscribed to
- * that exact runtime signature. Independent canvases can therefore render
- * different skies without overwriting each other's owner buffers.
+ * Publish the camera-independent V2 frame to every live shipping GPU device.
+ * This is called before camera/light/hydrometeor consumers inspect the runtime.
  */
 export const registerCloudShippingProductionRuntimeV1 = (
     runtime: CloudShippingProductionRuntimeV1,
 ) => {
-    latestRuntimeSignature = runtime.runtimeSignature;
-    runtimes.set(runtime.runtimeSignature, runtime);
+    latestRuntime = runtime;
     for (const attachment of attachments.values()) {
         updateAttachment(attachment, runtime);
     }
 };
 
-const resolveRuntime = (runtimeSignature?: string) => {
-    const resolved = runtimeSignature ?? latestRuntimeSignature;
-    return resolved ? runtimes.get(resolved) ?? null : null;
-};
-
 /**
- * Exact shipping owner lookup for CPU-side pass setup.
- *
- * The one-argument form is a compatibility bridge for consumers not yet
- * carrying the immutable world-runtime signature. New production consumers
- * must use the two-argument form so independent canvases cannot cross-wire.
- */
-export function cloudShippingV2SystemForOwnerId(
-    ownerId: string,
-): CloudShippingProductionRuntimeV1["bridge"]["systemsV2"][number] | null;
-export function cloudShippingV2SystemForOwnerId(
-    runtimeSignature: string,
-    ownerId: string,
-): CloudShippingProductionRuntimeV1["bridge"]["systemsV2"][number] | null;
-export function cloudShippingV2SystemForOwnerId(
-    runtimeSignatureOrOwnerId: string,
-    maybeOwnerId?: string,
-) {
-    const runtimeSignature = maybeOwnerId === undefined
-        ? undefined : runtimeSignatureOrOwnerId;
-    const ownerId = maybeOwnerId ?? runtimeSignatureOrOwnerId;
-    return resolveRuntime(runtimeSignature)?.bridge.systemsV2.find(({ owner }) =>
-        owner.sourceId === ownerId) ?? null;
-}
-
-/**
- * Index-preserving lookup used by passes whose storage ABI shares the runtime
- * owner order. A mismatch fails closed instead of cross-wiring two clouds.
- *
- * The numeric-first overload is retained only while legacy pass setup is
- * migrated. Signature-aware callers should use the string-first overload.
- */
-export function cloudShippingV2SystemForOwnerIndex(
-    ownerIndex: number,
-    expectedOwnerId?: string,
-): CloudShippingProductionRuntimeV1["bridge"]["systemsV2"][number] | null;
-export function cloudShippingV2SystemForOwnerIndex(
-    runtimeSignature: string,
-    ownerIndex: number,
-    expectedOwnerId?: string,
-): CloudShippingProductionRuntimeV1["bridge"]["systemsV2"][number] | null;
-export function cloudShippingV2SystemForOwnerIndex(
-    runtimeSignatureOrOwnerIndex: string | number,
-    ownerIndexOrExpectedOwnerId?: number | string,
-    maybeExpectedOwnerId?: string,
-) {
-    const signatureAware = typeof runtimeSignatureOrOwnerIndex === "string";
-    const runtimeSignature = signatureAware
-        ? runtimeSignatureOrOwnerIndex : undefined;
-    const ownerIndex = signatureAware
-        ? Number(ownerIndexOrExpectedOwnerId)
-        : runtimeSignatureOrOwnerIndex;
-    const expectedOwnerId = signatureAware
-        ? maybeExpectedOwnerId
-        : typeof ownerIndexOrExpectedOwnerId === "string"
-            ? ownerIndexOrExpectedOwnerId : undefined;
-    if (!Number.isInteger(ownerIndex) || ownerIndex < 0) return null;
-    const system = resolveRuntime(runtimeSignature)?.bridge.systemsV2[
-        ownerIndex
-    ] ?? null;
-    if (system && expectedOwnerId !== undefined &&
-        system.owner.sourceId !== expectedOwnerId) {
-        throw new Error(
-            `Shipping V2 owner order mismatch at ${ownerIndex}: ` +
-            `${system.owner.sourceId} != ${expectedOwnerId}.`,
-        );
-    }
-    return system;
-}
-
-/**
- * Attach the production V2 session to a GPU device already owned by one sky
- * renderer and subscribe it to that renderer's immutable runtime signature.
- *
- * `runtimeSignature` is optional only for the current binding-24 migration:
- * JavaScript setup publishes the relevant runtime immediately before the
- * optical-owner upload, so the latest signature is captured once here. The
- * attachment remains permanently scoped after creation and cannot be updated
- * by another canvas. New consumers must pass their signature explicitly.
+ * Attach the production V2 session to a GPU device already owned by the sky
+ * renderer. No adapter/device is requested here and no secondary renderer is
+ * created. The caller owns the returned lifetime token.
  */
 export const attachCloudShippingGpuDeviceV1 = (
     device: CloudGpuDeviceLike,
-    runtimeSignature?: string,
 ): CloudShippingGpuAttachmentV1 => {
-    const resolvedRuntimeSignature = runtimeSignature ?? latestRuntimeSignature;
-    if (!resolvedRuntimeSignature) {
-        throw new Error("Cloud shipping GPU attachment requires a registered runtime.");
-    }
     const id = nextAttachmentId;
     nextAttachmentId += 1;
     const state: AttachmentState = {
         id,
-        runtimeSignature: resolvedRuntimeSignature,
         session: new CloudProductionGpuSessionV1(device, {
             productionCapacities: {
                 owners: 36,
@@ -180,13 +91,13 @@ export const attachCloudShippingGpuDeviceV1 = (
             },
             allowTruncatedFrames: false,
         }),
+        runtimeSignature: null,
         frameFingerprint: null,
         result: null,
         destroyed: false,
     };
     attachments.set(id, state);
-    const runtime = runtimes.get(resolvedRuntimeSignature);
-    if (runtime) updateAttachment(state, runtime);
+    if (latestRuntime) updateAttachment(state, latestRuntime);
     return {
         schemaVersion: 1,
         attachmentId: id,
@@ -212,14 +123,9 @@ export const attachCloudShippingGpuDeviceV1 = (
 
 export const cloudShippingGpuRegistrySnapshotV1 = () => ({
     schemaVersion: 1 as const,
-    latestRuntimeSignature,
-    runtimeCount: runtimes.size,
+    latestRuntimeSignature: latestRuntime?.runtimeSignature ?? null,
+    latestFrameFingerprint: latestRuntime?.bridge.frame.fingerprint ?? null,
     attachmentCount: attachments.size,
-    runtimes: [...runtimes.values()].map((runtime) => ({
-        runtimeSignature: runtime.runtimeSignature,
-        frameFingerprint: runtime.bridge.frame.fingerprint,
-        ownerCount: runtime.bridge.systemsV2.length,
-    })),
     attachments: [...attachments.values()].map((state) => ({
         attachmentId: state.id,
         runtimeSignature: state.runtimeSignature,
