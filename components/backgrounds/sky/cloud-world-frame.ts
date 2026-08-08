@@ -279,6 +279,8 @@ const synchronizeProductionOwnerState = (
             ...system.compiled,
             geometry: {
                 ...system.compiled.geometry,
+                baseAltitudeKm: owner.baseAltitudeKm,
+                geometricDepthKm: owner.geometricDepthKm,
                 extent,
             },
             material: {
@@ -315,6 +317,17 @@ const pairProductionOwners = (
     },
 );
 
+const repackProductionSystems = (
+    runtime: CloudSystemRuntime,
+    systems: readonly RuntimeCloudSystemWithProductionOwner[],
+) => ({
+    packedSystemData: packCloudSystems(
+        systems,
+        runtime.packedSystemData.capacity,
+    ),
+    legacyFeatureData: packLegacyCloudFeatures(systems),
+});
+
 const attachProductionRuntime = (
     runtime: CloudSystemRuntime,
 ): CloudSystemRuntimeWithProductionV1 => {
@@ -334,6 +347,7 @@ const attachProductionRuntime = (
     const systems = pairProductionOwners(namespacedSystems, productionV2);
     const attached: CloudSystemRuntimeWithProductionV1 = {
         ...namespacedRuntime,
+        ...repackProductionSystems(namespacedRuntime, systems),
         systems,
         productionV2,
     };
@@ -391,6 +405,7 @@ export const embedCloudRuntimeInCameraWorld = (
     const systems = pairProductionOwners(namespacedSystems, productionV2);
     const embedded: CloudSystemRuntimeWithProductionV1 = {
         ...embeddedBase,
+        ...repackProductionSystems(embeddedBase, systems),
         systems,
         productionV2,
     };
