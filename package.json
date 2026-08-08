@@ -35,6 +35,7 @@
     "cloud:previews:watch:stop": "node scripts/manage-cloud-preview-watch.mjs stop",
     "cloud:previews:watch:restart": "node scripts/manage-cloud-preview-watch.mjs restart",
     "cloud:diagnostics": "node scripts/capture-cloud-diagnostics.mjs",
+    "cloud:production:probe": "bash scripts/qualify-cloud-production-shader.sh",
     "sky:qualify": "bash scripts/qualify-cloud-renderer.sh"
   },
   "dependencies": {
