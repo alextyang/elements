@@ -5,6 +5,10 @@ import {
     createFreeRunningCloudRuntime,
 } from "@/components/backgrounds/sky/cloud-generative-runtime";
 import {
+    compileCloudProductionFrameV1,
+    serializeCloudProductionFrameV1,
+} from "@/components/backgrounds/sky/cloud-production-frame";
+import {
     DEFAULT_CLOUD_WEATHER_DOMAIN,
     cloudWeatherSimulationFingerprint,
     validateCloudWeatherSimulation,
@@ -19,6 +23,8 @@ export const runtime = "nodejs";
 const MAXIMUM_STEPS = 600;
 const MAXIMUM_OWNERS = 48;
 const MAXIMUM_FEATURES = 192;
+const MAXIMUM_EVENTS = 1_024;
+const MAXIMUM_EVENT_REFERENCES = 8_192;
 const GENERA = new Set([
     "cirrus", "cirrocumulus", "cirrostratus", "altocumulus",
     "altostratus", "nimbostratus", "stratocumulus", "stratus",
@@ -34,6 +40,8 @@ interface CloudGenerationRequest {
     forcing?: Record<string, number>;
     target?: ConditionedCloudTarget;
     includeSimulationState?: boolean;
+    /** Diagnostic only: serializes fixed-capacity typed arrays into JSON. */
+    includeProductionBuffers?: boolean;
 }
 
 const integer = (
@@ -65,15 +73,24 @@ export function GET() {
         sharedRepresentation: {
             physicalSampleSchemaVersion: 1,
             cloudSystemAbiVersion: 2,
+            productionBufferSchemaVersion: 1,
+            spatialIndexSchemaVersion: 1,
+            temporalIdentitySchemaVersion: 1,
             cameraIndependent: true,
         },
         limits: {
             maximumSteps: MAXIMUM_STEPS,
             maximumOwners: MAXIMUM_OWNERS,
             maximumFeatures: MAXIMUM_FEATURES,
+            maximumEvents: MAXIMUM_EVENTS,
+            maximumEventReferences: MAXIMUM_EVENT_REFERENCES,
         },
         conditionedRequiredFields: ["mode", "seed", "target.genus"],
         freeRunningRequiredFields: ["mode", "seed"],
+        diagnostics: {
+            includeProductionBuffers:
+                "Opt-in fixed-capacity GPU records; omitted by default.",
+        },
     });
 }
 
@@ -116,6 +133,17 @@ export async function POST(request: NextRequest) {
         const validationIssues = validateCloudWeatherSimulation(
             generated.simulation,
         );
+        const productionFrame = compileCloudProductionFrameV1({
+            systems: generated.systemsV2,
+            frameIndex: steps,
+            simulationTimeSeconds: generated.simulation.timeSeconds,
+            capacities: {
+                owners: MAXIMUM_OWNERS,
+                features: MAXIMUM_FEATURES,
+                events: MAXIMUM_EVENTS,
+                eventReferences: MAXIMUM_EVENT_REFERENCES,
+            },
+        });
         const response = {
             schemaVersion: 1,
             mode,
@@ -137,11 +165,20 @@ export async function POST(request: NextRequest) {
                 events: generated.simulation.events.length,
                 interactions: generated.interactions.interactions.length,
                 validationIssues: validationIssues.length,
+                productionFrameIssues: productionFrame.issues.length,
+                productionBufferFingerprint:
+                    productionFrame.buffers.fingerprint,
+                productionHistoryToken:
+                    productionFrame.temporal.historyToken,
             },
             validationIssues,
             scene: generated.scene,
             systemsV2: generated.systemsV2,
             interactions: generated.interactions,
+            productionFrame: serializeCloudProductionFrameV1(
+                productionFrame,
+                body.includeProductionBuffers === true,
+            ),
             ...(body.includeSimulationState ? {
                 simulation: generated.simulation,
             } : {}),
