@@ -70,6 +70,30 @@ export const registerCloudShippingProductionRuntimeV1 = (
     }
 };
 
+/** Exact shipping owner lookup for CPU-side pass setup. */
+export const cloudShippingV2SystemForOwnerId = (ownerId: string) =>
+    latestRuntime?.bridge.systemsV2.find(({ owner }) =>
+        owner.sourceId === ownerId) ?? null;
+
+/**
+ * Index-preserving lookup used by passes whose storage ABI shares the runtime
+ * owner order. A mismatch fails closed instead of cross-wiring two clouds.
+ */
+export const cloudShippingV2SystemForOwnerIndex = (
+    ownerIndex: number,
+    expectedOwnerId?: string,
+) => {
+    const system = latestRuntime?.bridge.systemsV2[ownerIndex] ?? null;
+    if (system && expectedOwnerId !== undefined &&
+        system.owner.sourceId !== expectedOwnerId) {
+        throw new Error(
+            `Shipping V2 owner order mismatch at ${ownerIndex}: ` +
+            `${system.owner.sourceId} != ${expectedOwnerId}.`,
+        );
+    }
+    return system;
+};
+
 /**
  * Attach the production V2 session to a GPU device already owned by the sky
  * renderer. No adapter/device is requested here and no secondary renderer is
@@ -125,6 +149,7 @@ export const cloudShippingGpuRegistrySnapshotV1 = () => ({
     schemaVersion: 1 as const,
     latestRuntimeSignature: latestRuntime?.runtimeSignature ?? null,
     latestFrameFingerprint: latestRuntime?.bridge.frame.fingerprint ?? null,
+    ownerCount: latestRuntime?.bridge.systemsV2.length ?? 0,
     attachmentCount: attachments.size,
     attachments: [...attachments.values()].map((state) => ({
         attachmentId: state.id,
