@@ -11,7 +11,7 @@ import type { CloudShippingProductionRuntimeV1 } from
 export interface CloudShippingGpuAttachmentSnapshotV1 {
     schemaVersion: 1;
     attachmentId: number;
-    runtimeSignature: string | null;
+    runtimeSignature: string;
     frameFingerprint: string | null;
     uploaded: boolean;
     uploadIssueCount: number;
@@ -28,15 +28,16 @@ export interface CloudShippingGpuAttachmentV1 {
 
 interface AttachmentState {
     id: number;
+    runtimeSignature: string;
     session: CloudProductionGpuSessionV1;
-    runtimeSignature: string | null;
     frameFingerprint: string | null;
     result: CloudProductionGpuSessionResultV1 | null;
     destroyed: boolean;
 }
 
-let latestRuntime: CloudShippingProductionRuntimeV1 | null = null;
+let latestRuntimeSignature: string | null = null;
 let nextAttachmentId = 1;
+const runtimes = new Map<string, CloudShippingProductionRuntimeV1>();
 const attachments = new Map<number, AttachmentState>();
 
 const updateAttachment = (
@@ -44,6 +45,7 @@ const updateAttachment = (
     runtime: CloudShippingProductionRuntimeV1,
 ) => {
     if (attachment.destroyed ||
+        attachment.runtimeSignature !== runtime.runtimeSignature ||
         attachment.frameFingerprint === runtime.bridge.frame.fingerprint) {
         return;
     }
@@ -52,38 +54,43 @@ const updateAttachment = (
         frameIndex: runtime.frameIndex,
         simulationTimeSeconds: runtime.simulationTimeSeconds,
     });
-    attachment.runtimeSignature = runtime.runtimeSignature;
     attachment.frameFingerprint = runtime.bridge.frame.fingerprint;
     attachment.result = result;
 };
 
 /**
- * Publish the camera-independent V2 frame to every live shipping GPU device.
- * This is called before camera/light/hydrometeor consumers inspect the runtime.
+ * Publish one camera-independent V2 frame only to GPU devices subscribed to
+ * that exact runtime signature. Independent canvases can therefore render
+ * different skies without overwriting each other's owner buffers.
  */
 export const registerCloudShippingProductionRuntimeV1 = (
     runtime: CloudShippingProductionRuntimeV1,
 ) => {
-    latestRuntime = runtime;
+    latestRuntimeSignature = runtime.runtimeSignature;
+    runtimes.set(runtime.runtimeSignature, runtime);
     for (const attachment of attachments.values()) {
         updateAttachment(attachment, runtime);
     }
 };
 
 /** Exact shipping owner lookup for CPU-side pass setup. */
-export const cloudShippingV2SystemForOwnerId = (ownerId: string) =>
-    latestRuntime?.bridge.systemsV2.find(({ owner }) =>
-        owner.sourceId === ownerId) ?? null;
+export const cloudShippingV2SystemForOwnerId = (
+    runtimeSignature: string,
+    ownerId: string,
+) => runtimes.get(runtimeSignature)?.bridge.systemsV2.find(({ owner }) =>
+    owner.sourceId === ownerId) ?? null;
 
 /**
  * Index-preserving lookup used by passes whose storage ABI shares the runtime
  * owner order. A mismatch fails closed instead of cross-wiring two clouds.
  */
 export const cloudShippingV2SystemForOwnerIndex = (
+    runtimeSignature: string,
     ownerIndex: number,
     expectedOwnerId?: string,
 ) => {
-    const system = latestRuntime?.bridge.systemsV2[ownerIndex] ?? null;
+    const system = runtimes.get(runtimeSignature)?
+        .bridge.systemsV2[ownerIndex] ?? null;
     if (system && expectedOwnerId !== undefined &&
         system.owner.sourceId !== expectedOwnerId) {
         throw new Error(
@@ -95,17 +102,22 @@ export const cloudShippingV2SystemForOwnerIndex = (
 };
 
 /**
- * Attach the production V2 session to a GPU device already owned by the sky
- * renderer. No adapter/device is requested here and no secondary renderer is
- * created. The caller owns the returned lifetime token.
+ * Attach the production V2 session to a GPU device already owned by one sky
+ * renderer and subscribe it to that renderer's immutable runtime signature.
+ * No adapter/device is requested here and no secondary renderer is created.
  */
 export const attachCloudShippingGpuDeviceV1 = (
     device: CloudGpuDeviceLike,
+    runtimeSignature: string,
 ): CloudShippingGpuAttachmentV1 => {
+    if (!runtimeSignature) {
+        throw new Error("Cloud shipping GPU attachment requires a runtime signature.");
+    }
     const id = nextAttachmentId;
     nextAttachmentId += 1;
     const state: AttachmentState = {
         id,
+        runtimeSignature,
         session: new CloudProductionGpuSessionV1(device, {
             productionCapacities: {
                 owners: 36,
@@ -115,13 +127,13 @@ export const attachCloudShippingGpuDeviceV1 = (
             },
             allowTruncatedFrames: false,
         }),
-        runtimeSignature: null,
         frameFingerprint: null,
         result: null,
         destroyed: false,
     };
     attachments.set(id, state);
-    if (latestRuntime) updateAttachment(state, latestRuntime);
+    const runtime = runtimes.get(runtimeSignature);
+    if (runtime) updateAttachment(state, runtime);
     return {
         schemaVersion: 1,
         attachmentId: id,
@@ -147,10 +159,14 @@ export const attachCloudShippingGpuDeviceV1 = (
 
 export const cloudShippingGpuRegistrySnapshotV1 = () => ({
     schemaVersion: 1 as const,
-    latestRuntimeSignature: latestRuntime?.runtimeSignature ?? null,
-    latestFrameFingerprint: latestRuntime?.bridge.frame.fingerprint ?? null,
-    ownerCount: latestRuntime?.bridge.systemsV2.length ?? 0,
+    latestRuntimeSignature,
+    runtimeCount: runtimes.size,
     attachmentCount: attachments.size,
+    runtimes: [...runtimes.values()].map((runtime) => ({
+        runtimeSignature: runtime.runtimeSignature,
+        frameFingerprint: runtime.bridge.frame.fingerprint,
+        ownerCount: runtime.bridge.systemsV2.length,
+    })),
     attachments: [...attachments.values()].map((state) => ({
         attachmentId: state.id,
         runtimeSignature: state.runtimeSignature,
