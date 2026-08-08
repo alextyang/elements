@@ -16,6 +16,7 @@ for (const name of [
     "cloud-owner-spatial-index",
     "cloud-temporal-reconstruction",
     "cloud-production-frame",
+    "cloud-production-gpu-runtime",
     "cloud-physical-pass-parity",
 ]) {
     const source = readFileSync(new URL(`${name}.ts`, sourceRoot), "utf8");
@@ -39,6 +40,9 @@ const temporal = await import(
 );
 const production = await import(
     new URL(`file://${join(temporaryRoot, "cloud-production-frame.mjs")}`)
+);
+const gpu = await import(
+    new URL(`file://${join(temporaryRoot, "cloud-production-gpu-runtime.mjs")}`)
 );
 const parity = await import(
     new URL(`file://${join(temporaryRoot, "cloud-physical-pass-parity.mjs")}`)
@@ -250,6 +254,63 @@ test("the generation API exposes bounded production records without making them 
     assert.match(apiSource, /MAXIMUM_EVENT_REFERENCES = 8_192/);
     assert.match(apiSource, /includeProductionBuffers === true/);
     assert.doesNotMatch(apiSource, /writeFile|unlink|rmSync|exec\(/);
+});
+
+test("GPU runtime allocates, uploads, fingerprints, and destroys every production binding", () => {
+    const frame = production.compileCloudProductionFrameV1({
+        systems: [first, second],
+        frameIndex: 4,
+        simulationTimeSeconds: 60,
+        capacities: {
+            owners: 4,
+            features: 8,
+            events: 8,
+            eventReferences: 64,
+        },
+        spatialIndex: { cellSizeKm: 4 },
+    });
+    const plan = gpu.createCloudProductionGpuUploadPlanV1(frame, {
+        spatialCells: 128,
+        spatialOwnerReferences: 512,
+        temporalDecisions: 8,
+    });
+    assert.equal(plan.complete, true);
+    assert.deepEqual(plan.issues, []);
+
+    const created = [];
+    const writes = [];
+    const device = {
+        queue: {
+            writeBuffer(buffer, offset, data) {
+                writes.push({ buffer, offset, byteLength: data.byteLength });
+            },
+        },
+        createBuffer(descriptor) {
+            const buffer = {
+                ...descriptor,
+                destroyed: false,
+                destroy() { this.destroyed = true; },
+            };
+            created.push(buffer);
+            return buffer;
+        },
+    };
+    const resources = gpu.createCloudProductionGpuResourcesV1(device, plan);
+    assert.equal(created.length, 15);
+    assert.ok(created.every(({ usage }) =>
+        usage === gpu.CLOUD_PRODUCTION_STORAGE_BUFFER_USAGE));
+    assert.deepEqual(
+        gpu.uploadCloudProductionGpuFrameV1(device, resources, plan),
+        [],
+    );
+    assert.equal(writes.length, 15);
+    assert.ok(writes.every(({ offset, byteLength }) =>
+        offset === 0 && byteLength > 0));
+    assert.equal(resources.uploadedFrameFingerprint, frame.fingerprint);
+    gpu.destroyCloudProductionGpuResourcesV1(resources);
+    assert.equal(resources.destroyed, true);
+    assert.ok(created.every(({ destroyed }) => destroyed));
+    assert.ok(gpu.CLOUD_PRODUCTION_GPU_WGSL.includes("CloudSpatialCellV1"));
 });
 
 test("camera, light, shadow, and hydrometeor passes must preserve one physical sample", () => {
