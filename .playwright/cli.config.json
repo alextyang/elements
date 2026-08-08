@@ -4,6 +4,7 @@
     "isolated": true,
     "launchOptions": {
       "headless": true,
+      "chromiumSandbox": false,
       "args": [
         "--enable-unsafe-webgpu",
         "--enable-features=Vulkan",
