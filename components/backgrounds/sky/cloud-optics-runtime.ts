@@ -8,6 +8,9 @@ import {
     type LoadedCloudOptics,
 } from "./cloud-optics";
 import {
+    attachCloudShippingGpuDeviceV1,
+} from "./cloud-shipping-gpu-registry";
+import {
     CLOUD_SYSTEM_MAX_COUNT,
     type CloudSystemRuntime,
     type RuntimeCloudSystem,
@@ -91,6 +94,8 @@ interface CloudOpticsOwnerGpuDevice {
 export interface UploadedCloudOpticsOwners {
     buffer: BufferLike;
     runtime: CloudOpticsOwnerRuntime;
+    /** V2 production owner/feature/event session sharing this renderer device. */
+    productionV2: ReturnType<typeof attachCloudShippingGpuDeviceV1>;
     destroy: () => void;
 }
 
@@ -302,7 +307,12 @@ export const createCloudOpticsOwnerRuntime = (
     };
 };
 
-/** Creates binding 24's fixed-size read-only storage buffer. */
+/**
+ * Creates binding 24's fixed-size read-only storage buffer and, on the exact
+ * GPU device already owned by the shipping sky renderer, instantiates the
+ * persistent V2 owner/feature/event session. The V2 buffers are uploaded now
+ * but remain excluded from legacy shader bind groups until pass migration.
+ */
 export const uploadCloudOpticsOwnerRuntime = (
     device: CloudOpticsOwnerGpuDevice,
     runtime: CloudOpticsOwnerRuntime,
@@ -314,10 +324,19 @@ export const uploadCloudOpticsOwnerRuntime = (
         usage,
     });
     device.queue.writeBuffer(buffer, 0, runtime.data);
+    const productionV2 = attachCloudShippingGpuDeviceV1(
+        device as unknown as Parameters<
+            typeof attachCloudShippingGpuDeviceV1
+        >[0],
+    );
     return {
         buffer,
         runtime,
-        destroy: () => buffer.destroy?.(),
+        productionV2,
+        destroy: () => {
+            productionV2.destroy();
+            buffer.destroy?.();
+        },
     };
 };
 
