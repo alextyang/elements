@@ -73,24 +73,71 @@ export const registerCloudShippingProductionRuntimeV1 = (
     }
 };
 
-/** Exact shipping owner lookup for CPU-side pass setup. */
-export const cloudShippingV2SystemForOwnerId = (
+const resolveRuntime = (runtimeSignature?: string) => {
+    const resolved = runtimeSignature ?? latestRuntimeSignature;
+    return resolved ? runtimes.get(resolved) ?? null : null;
+};
+
+/**
+ * Exact shipping owner lookup for CPU-side pass setup.
+ *
+ * The one-argument form is a compatibility bridge for consumers not yet
+ * carrying the immutable world-runtime signature. New production consumers
+ * must use the two-argument form so independent canvases cannot cross-wire.
+ */
+export function cloudShippingV2SystemForOwnerId(
+    ownerId: string,
+): CloudShippingProductionRuntimeV1["bridge"]["systemsV2"][number] | null;
+export function cloudShippingV2SystemForOwnerId(
     runtimeSignature: string,
     ownerId: string,
-) => runtimes.get(runtimeSignature)?.bridge.systemsV2.find(({ owner }) =>
-    owner.sourceId === ownerId) ?? null;
+): CloudShippingProductionRuntimeV1["bridge"]["systemsV2"][number] | null;
+export function cloudShippingV2SystemForOwnerId(
+    runtimeSignatureOrOwnerId: string,
+    maybeOwnerId?: string,
+) {
+    const runtimeSignature = maybeOwnerId === undefined
+        ? undefined : runtimeSignatureOrOwnerId;
+    const ownerId = maybeOwnerId ?? runtimeSignatureOrOwnerId;
+    return resolveRuntime(runtimeSignature)?.bridge.systemsV2.find(({ owner }) =>
+        owner.sourceId === ownerId) ?? null;
+}
 
 /**
  * Index-preserving lookup used by passes whose storage ABI shares the runtime
  * owner order. A mismatch fails closed instead of cross-wiring two clouds.
+ *
+ * The numeric-first overload is retained only while legacy pass setup is
+ * migrated. Signature-aware callers should use the string-first overload.
  */
-export const cloudShippingV2SystemForOwnerIndex = (
+export function cloudShippingV2SystemForOwnerIndex(
+    ownerIndex: number,
+    expectedOwnerId?: string,
+): CloudShippingProductionRuntimeV1["bridge"]["systemsV2"][number] | null;
+export function cloudShippingV2SystemForOwnerIndex(
     runtimeSignature: string,
     ownerIndex: number,
     expectedOwnerId?: string,
-) => {
-    const system = runtimes.get(runtimeSignature)?
-        .bridge.systemsV2[ownerIndex] ?? null;
+): CloudShippingProductionRuntimeV1["bridge"]["systemsV2"][number] | null;
+export function cloudShippingV2SystemForOwnerIndex(
+    runtimeSignatureOrOwnerIndex: string | number,
+    ownerIndexOrExpectedOwnerId?: number | string,
+    maybeExpectedOwnerId?: string,
+) {
+    const signatureAware = typeof runtimeSignatureOrOwnerIndex === "string";
+    const runtimeSignature = signatureAware
+        ? runtimeSignatureOrOwnerIndex : undefined;
+    const ownerIndex = signatureAware
+        ? Number(ownerIndexOrExpectedOwnerId)
+        : runtimeSignatureOrOwnerIndex;
+    const expectedOwnerId = signatureAware
+        ? maybeExpectedOwnerId
+        : typeof ownerIndexOrExpectedOwnerId === "string"
+            ? ownerIndexOrExpectedOwnerId : undefined;
+    if (!Number.isInteger(ownerIndex) || ownerIndex < 0) return null;
+    const system = resolveRuntime(runtimeSignature)?.bridge.systemsV2[
+        ownerIndex
+    ] ?? null;
     if (system && expectedOwnerId !== undefined &&
         system.owner.sourceId !== expectedOwnerId) {
         throw new Error(
@@ -99,7 +146,7 @@ export const cloudShippingV2SystemForOwnerIndex = (
         );
     }
     return system;
-};
+}
 
 /**
  * Attach the production V2 session to a GPU device already owned by one sky
