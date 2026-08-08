@@ -6,6 +6,10 @@ import type {
     CloudMorphologyCompileRequest,
     CloudMorphologyOwnerGeometry,
 } from "./cloud-morphology-modifiers";
+import {
+    compileCloudShippingProductionRuntimeV1,
+    type CloudShippingProductionRuntimeV1,
+} from "./cloud-shipping-production-runtime";
 import type { CloudOrganizationState } from "./cloud-state-map";
 import {
     packCloudSystems,
@@ -23,6 +27,14 @@ import {
  * This adapter changes only the world frame. It never changes owner scale,
  * density, topology, optical state, relative spacing, or camera composition.
  */
+
+export type CloudSystemRuntimeWithProductionV1 = CloudSystemRuntime & {
+    /**
+     * V2 owner/feature/event frame instantiated on the shipping runtime path.
+     * Existing shaders remain on the legacy ABI until their bind groups migrate.
+     */
+    readonly productionV2: CloudShippingProductionRuntimeV1;
+};
 
 const rotateWorldPoint = (
     point: readonly [number, number, number],
@@ -153,20 +165,43 @@ const embedMorphologyRequest = (
 
 const embeddedRuntimeCache = new WeakMap<
     CloudSystemRuntime,
-    Map<string, CloudSystemRuntime>
+    Map<string, CloudSystemRuntimeWithProductionV1>
 >();
+const zeroYawRuntimeCache = new WeakMap<
+    CloudSystemRuntime,
+    CloudSystemRuntimeWithProductionV1
+>();
+
+const attachProductionRuntime = (
+    runtime: CloudSystemRuntime,
+): CloudSystemRuntimeWithProductionV1 => {
+    const cached = zeroYawRuntimeCache.get(runtime);
+    if (cached) return cached;
+    const productionV2 = compileCloudShippingProductionRuntimeV1(runtime);
+    const attached: CloudSystemRuntimeWithProductionV1 = {
+        ...runtime,
+        productionV2,
+    };
+    zeroYawRuntimeCache.set(runtime, attached);
+    return attached;
+};
 
 /**
  * Rigidly embed a camera-reference cloud runtime in the Earth-local frame.
  * The base runtime remains immutable and cacheable; all CPU and GPU consumers
  * receive one coherent derived runtime with yaw included in its signature.
+ *
+ * The V2 production frame is compiled here because this function is the single
+ * shipping boundary shared by camera, light-volume, atmosphere-shadow and
+ * hydrometeor setup. It is present before those consumers inspect the runtime,
+ * while shader bind groups remain explicitly gated by Gate A migration state.
  */
 export const embedCloudRuntimeInCameraWorld = (
     runtime: CloudSystemRuntime,
     cameraYawRadians: number,
-): CloudSystemRuntime => {
+): CloudSystemRuntimeWithProductionV1 => {
     const yaw = normalizeCameraAngleRadians(cameraYawRadians);
-    if (Math.abs(yaw) < 1e-12) return runtime;
+    if (Math.abs(yaw) < 1e-12) return attachProductionRuntime(runtime);
     const key = yaw.toPrecision(15);
     let perRuntime = embeddedRuntimeCache.get(runtime);
     if (!perRuntime) {
@@ -177,7 +212,7 @@ export const embedCloudRuntimeInCameraWorld = (
     if (cached) return cached;
 
     const systems = runtime.systems.map((system) => embedSystem(system, yaw));
-    const embedded = {
+    const embeddedBase: CloudSystemRuntime = {
         ...runtime,
         signature: `${runtime.signature}:earth-frame-yaw=${key}`,
         systems,
@@ -191,7 +226,11 @@ export const embedCloudRuntimeInCameraWorld = (
         // Composition qualifications are invariant under this matching rigid
         // camera/owner rotation, so retain the already qualified values.
         compositionQualifications: runtime.compositionQualifications,
-    } satisfies CloudSystemRuntime;
+    };
+    const embedded: CloudSystemRuntimeWithProductionV1 = {
+        ...embeddedBase,
+        productionV2: compileCloudShippingProductionRuntimeV1(embeddedBase),
+    };
     perRuntime.set(key, embedded);
     if (perRuntime.size > 8) {
         perRuntime.delete(perRuntime.keys().next().value as string);
