@@ -294,6 +294,27 @@ export const generatedOwnerToCloudSystemState = (
     };
 };
 
+/**
+ * Resolve a feature's parent-local attachment into the shared Earth-local
+ * cloud frame. Translation and owner orientation must be applied before the
+ * record reaches camera, light, shadow, or hydrometeor consumers.
+ */
+export const cloudWeatherFeatureAttachmentWorldKm = (
+    feature: CloudWeatherFeature,
+    owner: CloudWeatherOwner,
+): readonly [number, number, number] => {
+    const localEast = feature.attachmentFraction[0] * owner.radiusEastKm;
+    const localNorth = feature.attachmentFraction[2] * owner.radiusNorthKm;
+    const cosine = Math.cos(owner.orientationRadians);
+    const sine = Math.sin(owner.orientationRadians);
+    return [
+        owner.centerEastKm + localEast * cosine - localNorth * sine,
+        owner.baseAltitudeKm +
+            (feature.attachmentFraction[1] + 0.5) * owner.geometricDepthKm,
+        owner.centerNorthKm + localEast * sine + localNorth * cosine,
+    ];
+};
+
 const featureToV2 = (
     feature: CloudWeatherFeature,
     owner: CloudWeatherOwner,
@@ -301,12 +322,7 @@ const featureToV2 = (
     id: feature.id,
     parentOwnerId: owner.id,
     kind: feature.kind,
-    attachmentKm: [
-        feature.attachmentFraction[0] * owner.radiusEastKm,
-        owner.baseAltitudeKm +
-            (feature.attachmentFraction[1] + 0.5) * owner.geometricDepthKm,
-        feature.attachmentFraction[2] * owner.radiusNorthKm,
-    ],
+    attachmentKm: cloudWeatherFeatureAttachmentWorldKm(feature, owner),
     scaleKm: feature.scaleKm,
     orientationRadians: owner.orientationRadians,
     lifecycleProgress01: feature.lifecycleProgress01,
