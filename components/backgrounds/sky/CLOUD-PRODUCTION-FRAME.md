@@ -77,6 +77,22 @@ Lifecycle events are considered only when their timestamp lies in the current
 frame interval. Historical birth or merge records therefore cannot invalidate a
 stable owner forever.
 
+## Owner-indexed physical sampling
+
+`sampleIndexedCloudWeatherPhysicalV1()` uses the production spatial index as a
+conservative broad phase, checks three-dimensional owner bounds, and evaluates
+only the remaining physical owners. It then uses the same mass-aware sample
+composition as the exhaustive path.
+
+`qualifyIndexedCloudWeatherSamplerV1()` compares exhaustive and indexed results
+through the five-pass parity harness and reports actual owner evaluations and
+the measured reduction fraction. `/api/cloud-generation` publishes this bounded
+diagnostic over the same Gate A sample lattice, so an acceleration is rejected
+when it changes condensate, phase, identity, precipitation, motion, or geometry.
+
+This is the CPU reference for later tile, cluster, or occupied-brick owner lists.
+It does not imply that the current shipping shader already skips owners.
+
 ## Pass parity and Gate A
 
 `qualifyCloudPhysicalPassParity()` compares camera, light-volume, atmospheric
@@ -105,6 +121,14 @@ shadows, hydrometeors, temporal reprojection, and remaining morphology
 migration as blockers. This prevents an adapter test from being mistaken for a
 shipping renderer milestone.
 
+## Real-browser WGSL probe
+
+`/cloud-production-probe` compiles the generated packed physical-sample decoder
+with the browser's actual `GPUShaderModule`, awaits compilation diagnostics, and
+checks a validation error scope. The page remains a diagnostic module probe: a
+pass does not qualify the composed shipping pipelines and does not promote a
+cloud route's support maturity.
+
 ## Integration boundary still open
 
 The live WebGPU graph still needs to:
@@ -127,12 +151,14 @@ node --test \
   scripts/test-cloud-production-gpu-session.mjs \
   scripts/test-cloud-production-physical-sample-wgsl.mjs \
   scripts/test-cloud-gate-a-qualification.mjs \
-  scripts/test-cloud-runtime-v2-adapter.mjs
+  scripts/test-cloud-runtime-v2-adapter.mjs \
+  scripts/test-cloud-production-shader-probe.mjs \
+  scripts/test-cloud-indexed-physical-sampler.mjs
 ```
 
 These tests cover bounded flattening and truncation, global feature rebasing,
 event deduplication, spatial DDA traversal, ordered ray intervals, temporal
 reuse/invalidation/retirement, allocation reuse and destruction, fail-closed
 uploads, CPU/WGSL record agreement, Gate A truthfulness, live-pass parity
-requirements, and migration of the current shipping runtime into V2 shadow
-frames.
+requirements, shipping-runtime V2 shadow frames, real-browser probe contracts,
+and owner-indexed parity with measured evaluation reduction.
