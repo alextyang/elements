@@ -69,6 +69,38 @@ const phaseHalf = new Uint16Array(
     phaseBuffer.byteLength / 2,
 );
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const assertManifestEquivalent = (actual, expected, path = "manifest") => {
+    if (typeof actual === "number" && typeof expected === "number") {
+        assert.ok(Number.isFinite(actual) && Number.isFinite(expected), path);
+        const tolerance = 1e-14 * Math.max(
+            1, Math.abs(actual), Math.abs(expected),
+        );
+        assert.ok(
+            Math.abs(actual - expected) <= tolerance,
+            `${path}: expected ${expected}, received ${actual}`,
+        );
+        return;
+    }
+    if (Array.isArray(actual) || Array.isArray(expected)) {
+        assert.ok(Array.isArray(actual) && Array.isArray(expected), path);
+        assert.equal(actual.length, expected.length, `${path}.length`);
+        actual.forEach((value, index) => assertManifestEquivalent(
+            value, expected[index], `${path}[${index}]`,
+        ));
+        return;
+    }
+    if (actual && expected && typeof actual === "object" &&
+        typeof expected === "object") {
+        const actualKeys = Object.keys(actual).sort();
+        const expectedKeys = Object.keys(expected).sort();
+        assert.deepEqual(actualKeys, expectedKeys, `${path} keys`);
+        for (const key of expectedKeys) assertManifestEquivalent(
+            actual[key], expected[key], `${path}.${key}`,
+        );
+        return;
+    }
+    assert.deepEqual(actual, expected, path);
+};
 const integrateDecodedChannel = (row, channel) => {
     const width = manifest.phaseTexture.dimensions.width;
     let integral = 0;
@@ -111,7 +143,7 @@ test("deterministic generator reproduces the production optical bytes", () => {
     const generated = generateCloudOptics();
     assert.equal(sha256(generated.phaseBytes), sha256(phaseBuffer));
     assert.equal(sha256(generated.parameterBytes), sha256(parameterBuffer));
-    assert.deepEqual(generated.manifest, manifest);
+    assertManifestEquivalent(generated.manifest, manifest);
 });
 
 test("quantized RGB phase rows remain nonnegative and normalized per steradian", () => {

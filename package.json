@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit --pretty false",
-    "test": "node --test scripts/test-*.mjs",
+    "test": "node scripts/run-unit-tests.mjs",
+    "test:black-box": "node scripts/test-cloud-previews-black-box.mjs",
     "sky:curate": "node scripts/curate-sky-benchmark.mjs && node scripts/curate-eye2sky-night.mjs && node scripts/assemble-sky-benchmark.mjs",
     "moon:curate": "node scripts/curate-moon-benchmark.mjs && node scripts/curate-eye2sky-night.mjs && node scripts/curate-nasa-lunar-truth.mjs && node scripts/curate-commons-moon.mjs && node scripts/normalize-moon-benchmark.mjs",
     "moon:render": "bash scripts/render-sky-benchmark.sh",
@@ -35,6 +36,7 @@
     "cloud:previews:watch:stop": "node scripts/manage-cloud-preview-watch.mjs stop",
     "cloud:previews:watch:restart": "node scripts/manage-cloud-preview-watch.mjs restart",
     "cloud:diagnostics": "node scripts/capture-cloud-diagnostics.mjs",
+    "cloud:production:probe": "bash scripts/qualify-cloud-production-shader.sh",
     "sky:qualify": "bash scripts/qualify-cloud-renderer.sh"
   },
   "dependencies": {

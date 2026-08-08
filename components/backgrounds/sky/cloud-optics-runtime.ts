@@ -8,6 +8,10 @@ import {
     type LoadedCloudOptics,
 } from "./cloud-optics";
 import {
+    attachCloudShippingGpuDeviceV1,
+} from "./cloud-shipping-gpu-registry";
+import type { CloudOwnerRecordV2 } from "./cloud-system-abi-v2";
+import {
     CLOUD_SYSTEM_MAX_COUNT,
     type CloudSystemRuntime,
     type RuntimeCloudSystem,
@@ -49,6 +53,7 @@ export interface CloudOpticsOwnerSelection {
     ownerId: string;
     layerIndex: number;
     systemIndex: number;
+    source: "v2-owner" | "legacy-runtime";
     liquid: RadiusBracket;
     ice: RadiusBracket;
     iceRegime: CloudIceOpticalRegime;
@@ -66,11 +71,14 @@ export interface CloudOpticsOwnerSelection {
 
 export interface CloudOpticsOwnerRuntime {
     signature: string;
+    /** Exact immutable world-runtime namespace for this optical owner set. */
+    productionRuntimeSignature: string | null;
     activeCount: number;
     capacity: typeof CLOUD_OPTICS_OWNER_COUNT;
     data: Float32Array;
     ownerIds: readonly (string | null)[];
     selections: readonly CloudOpticsOwnerSelection[];
+    v2OwnerCount: number;
 }
 
 interface BufferLike {
@@ -91,7 +99,21 @@ interface CloudOpticsOwnerGpuDevice {
 export interface UploadedCloudOpticsOwners {
     buffer: BufferLike;
     runtime: CloudOpticsOwnerRuntime;
+    /** V2 production owner/feature/event session sharing this renderer device. */
+    productionV2: ReturnType<typeof attachCloudShippingGpuDeviceV1>;
     destroy: () => void;
+}
+
+interface CloudSystemRuntimeWithV2Optics extends CloudSystemRuntime {
+    readonly productionV2?: {
+        readonly runtimeSignature: string;
+        readonly bridge: {
+            readonly systemsV2: readonly {
+                readonly owner: CloudOwnerRecordV2;
+            }[];
+            readonly frame: { readonly fingerprint: string };
+        };
+    };
 }
 
 const manifestOf = (optics: CloudOpticsManifest | LoadedCloudOptics) =>
@@ -194,18 +216,23 @@ const selectionForSystem = (
     system: RuntimeCloudSystem,
     ownerIndex: number,
     manifest: CloudOpticsManifest,
+    v2Owner: CloudOwnerRecordV2 | null,
 ): CloudOpticsOwnerSelection => {
     const iceRegime = selectCloudIceOpticalRegime(system);
+    const liquidRadius = v2Owner?.liquidEffectiveRadiusMicrons ??
+        system.compiled.material.liquidEffectiveRadiusMicrons;
+    const iceRadius = v2Owner?.iceEffectiveRadiusMicrons ??
+        system.compiled.material.iceEffectiveRadiusMicrons;
     const liquid = bracketRows(
         manifest.rows.filter((row) => row.phase === "liquid"),
-        system.compiled.material.liquidEffectiveRadiusMicrons,
+        liquidRadius,
     );
     const ice = bracketRows(
         manifest.rows.filter((row) =>
             row.phase === "ice" &&
             row.habit === iceRegime.habit &&
             row.roughness === iceRegime.roughness),
-        system.compiled.material.iceEffectiveRadiusMicrons,
+        iceRadius,
     );
     const species = system.compiled.recipeId;
     // Thin Cirrus is a sparse population of fine ice crystals rather than a
@@ -221,16 +248,25 @@ const selectionForSystem = (
         : species === "cirrus-castellanus" ? 0.24
         : species === "cirrus-spissatus" ? 0.08
         : 0;
+    const totalWaterPath = v2Owner
+        ? v2Owner.liquidWaterPathGramsPerSquareMetre +
+            v2Owner.iceWaterPathGramsPerSquareMetre
+        : 0;
+    const defaultIceFraction = v2Owner && totalWaterPath > 1e-8
+        ? clamp(v2Owner.iceWaterPathGramsPerSquareMetre / totalWaterPath)
+        : clamp(1 - system.compiled.material.liquidFraction01);
     return {
         ownerIndex,
         ownerId: system.state.id,
         layerIndex: system.layerIndex,
         systemIndex: system.systemIndex,
+        source: v2Owner ? "v2-owner" : "legacy-runtime",
         liquid,
         ice,
         iceRegime,
-        defaultIceFraction: clamp(1 - system.compiled.material.liquidFraction01),
-        topTemperatureKelvin: system.compiled.thermodynamics.topTemperatureKelvin,
+        defaultIceFraction,
+        topTemperatureKelvin: v2Owner?.topTemperatureKelvin ??
+            system.compiled.thermodynamics.topTemperatureKelvin,
         unresolvedIcePorosity,
     };
 };
@@ -245,15 +281,36 @@ const setVec4 = (
     ownerIndex * CLOUD_OPTICS_OWNER_STRIDE_FLOATS + vectorIndex * 4,
 );
 
+const v2OwnerFor = (
+    runtime: CloudSystemRuntime,
+    system: RuntimeCloudSystem,
+    ownerIndex: number,
+): CloudOwnerRecordV2 | null => {
+    const production = (runtime as CloudSystemRuntimeWithV2Optics).productionV2;
+    const owner = production?.bridge.systemsV2[ownerIndex]?.owner;
+    if (!owner) return null;
+    if (owner.sourceId !== system.state.id) {
+        throw new Error(
+            `V2 optical owner order mismatch at ${ownerIndex}: ` +
+            `${owner.sourceId} != ${system.state.id}.`,
+        );
+    }
+    return owner;
+};
+
 /**
  * Packs exactly the same owner index order used by `packCloudSystems`.
- * Inactive records keep their explicit index and negative layer/system IDs.
+ * When the shipping V2 frame is present, physically meaningful optical inputs
+ * come from its owner record; legacy compiled fields remain only a compatibility
+ * fallback for laboratory callers that have not crossed the world-frame bridge.
  */
 export const createCloudOpticsOwnerRuntime = (
     runtime: CloudSystemRuntime,
     optics: CloudOpticsManifest | LoadedCloudOptics,
 ): CloudOpticsOwnerRuntime => {
     const manifest = manifestOf(optics);
+    const latestRuntime =
+        (runtime as CloudSystemRuntimeWithV2Optics).productionV2;
     const activeCount = Math.min(runtime.systems.length, CLOUD_OPTICS_OWNER_COUNT);
     const data = new Float32Array(CLOUD_OPTICS_OWNER_BUFFER_FLOATS);
     const ownerIds: (string | null)[] = Array(CLOUD_OPTICS_OWNER_COUNT).fill(null);
@@ -264,7 +321,12 @@ export const createCloudOpticsOwnerRuntime = (
     const selections: CloudOpticsOwnerSelection[] = [];
     for (let ownerIndex = 0; ownerIndex < activeCount; ownerIndex += 1) {
         const system = runtime.systems[ownerIndex];
-        const selection = selectionForSystem(system, ownerIndex, manifest);
+        const selection = selectionForSystem(
+            system,
+            ownerIndex,
+            manifest,
+            v2OwnerFor(runtime, system, ownerIndex),
+        );
         selections.push(selection);
         ownerIds[ownerIndex] = selection.ownerId;
         setVec4(data, ownerIndex, CLOUD_OPTICS_OWNER_VEC4_LAYOUT.identity, [
@@ -282,8 +344,14 @@ export const createCloudOpticsOwnerRuntime = (
         setVec4(data, ownerIndex, CLOUD_OPTICS_OWNER_VEC4_LAYOUT.radiusInterpolation, [
             selection.liquid.amount,
             selection.ice.amount,
-            system.compiled.material.liquidEffectiveRadiusMicrons,
-            system.compiled.material.iceEffectiveRadiusMicrons,
+            selection.liquid.low.effectiveRadiusMicrons *
+                (1 - selection.liquid.amount) +
+                selection.liquid.high.effectiveRadiusMicrons *
+                selection.liquid.amount,
+            selection.ice.low.effectiveRadiusMicrons *
+                (1 - selection.ice.amount) +
+                selection.ice.high.effectiveRadiusMicrons *
+                selection.ice.amount,
         ]);
         setVec4(data, ownerIndex, CLOUD_OPTICS_OWNER_VEC4_LAYOUT.iceRegime, [
             CLOUD_OPTICS_ICE_HABITS.indexOf(selection.iceRegime.habit),
@@ -293,16 +361,25 @@ export const createCloudOpticsOwnerRuntime = (
         ]);
     }
     return {
-        signature: `${runtime.signature}:${manifest.checksums.phaseTexture}`,
+        signature: `${runtime.signature}:${manifest.checksums.phaseTexture}:` +
+            `${latestRuntime?.bridge.frame.fingerprint ?? "legacy"}`,
+        productionRuntimeSignature: latestRuntime?.runtimeSignature ?? null,
         activeCount,
         capacity: CLOUD_OPTICS_OWNER_COUNT,
         data,
         ownerIds,
         selections,
+        v2OwnerCount: selections.filter(({ source }) =>
+            source === "v2-owner").length,
     };
 };
 
-/** Creates binding 24's fixed-size read-only storage buffer. */
+/**
+ * Creates binding 24's fixed-size read-only storage buffer and, on the exact
+ * GPU device already owned by the shipping sky renderer, instantiates the
+ * persistent V2 owner/feature/event session. The V2 buffers are uploaded now
+ * but remain excluded from legacy shader bind groups until pass migration.
+ */
 export const uploadCloudOpticsOwnerRuntime = (
     device: CloudOpticsOwnerGpuDevice,
     runtime: CloudOpticsOwnerRuntime,
@@ -314,10 +391,20 @@ export const uploadCloudOpticsOwnerRuntime = (
         usage,
     });
     device.queue.writeBuffer(buffer, 0, runtime.data);
+    const productionV2 = attachCloudShippingGpuDeviceV1(
+        device as unknown as Parameters<
+            typeof attachCloudShippingGpuDeviceV1
+        >[0],
+        { runtimeSignature: runtime.productionRuntimeSignature },
+    );
     return {
         buffer,
         runtime,
-        destroy: () => buffer.destroy?.(),
+        productionV2,
+        destroy: () => {
+            productionV2.destroy();
+            buffer.destroy?.();
+        },
     };
 };
 

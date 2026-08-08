@@ -71,9 +71,74 @@ for (const name of [
         .replaceAll('"./cloud-photograph-benchmark"',
             '"./cloud-photograph-benchmark.mjs"')
         .replaceAll('"./cloud-morphology-photograph-qualification"',
-            '"./cloud-morphology-photograph-qualification.mjs"');
+            '"./cloud-morphology-photograph-qualification.mjs"')
+        .replaceAll('"./cloud-shipping-production-runtime"',
+            '"./cloud-shipping-production-runtime.mjs"');
     writeFileSync(join(temporaryRoot, `${name}.mjs`), output);
 }
+writeFileSync(join(temporaryRoot, "cloud-shipping-production-runtime.mjs"), `
+const ownerFromSystem = system => {
+    const state = system.state;
+    const physical = state.physical;
+    const windSpeedKmPerSecond =
+        physical.kinematics.windSpeed / 1_000;
+    return {
+        sourceId: state.id,
+        centerKm: [
+            state.extent.centerEastKm,
+            physical.baseAltitudeKm + physical.geometricDepthKm * 0.5,
+            state.extent.centerNorthKm,
+        ],
+        horizontalRadiusKm: [
+            state.extent.majorRadiusKm,
+            physical.geometricDepthKm * 0.5,
+            state.extent.minorRadiusKm,
+        ],
+        orientationRadians: state.extent.orientation,
+        boundaryTransitionKm: state.extent.boundaryTransitionKm,
+        baseAltitudeKm: physical.baseAltitudeKm,
+        geometricDepthKm: physical.geometricDepthKm,
+        liquidWaterPathGramsPerSquareMetre:
+            physical.condensate.liquidWaterPath,
+        iceWaterPathGramsPerSquareMetre:
+            physical.condensate.iceWaterPath,
+        liquidEffectiveRadiusMicrons:
+            physical.condensate.dropletEffectiveRadius,
+        iceEffectiveRadiusMicrons:
+            physical.condensate.iceEffectiveRadius,
+        baseTemperatureKelvin:
+            physical.thermodynamics.baseTemperatureKelvin,
+        topTemperatureKelvin:
+            physical.thermodynamics.topTemperatureKelvin,
+        relativeHumidity01:
+            physical.thermodynamics.relativeHumidity,
+        velocityKmPerSecond: [
+            Math.sin(physical.kinematics.windDirection) *
+                windSpeedKmPerSecond,
+            physical.thermodynamics.verticalVelocity / 1_000,
+            Math.cos(physical.kinematics.windDirection) *
+                windSpeedKmPerSecond,
+        ],
+        turbulenceDissipation:
+            physical.kinematics.turbulenceDissipation,
+        precipitationRate: physical.precipitation.rate,
+        lifecycleAgeSeconds: state.lifecycle.ageSeconds,
+        lifecycleProgress01: state.lifecycle.stageProgress,
+    };
+};
+export const compileCloudShippingProductionRuntimeV1 = runtime => ({
+    schemaVersion: 1,
+    runtimeSignature: runtime.signature,
+    frameIndex: 0,
+    simulationTimeSeconds: 0,
+    bridge: {
+        systemsV2: runtime.systems.map(system => ({
+            owner: ownerFromSystem(system),
+        })),
+        frame: { fingerprint: runtime.signature },
+    },
+});
+`);
 
 const runtimeModule = await import(
     new URL(`file://${join(temporaryRoot, "cloud-system-runtime.mjs")}`)
@@ -363,11 +428,22 @@ test("camera world embedding rigidly co-rotates owners, morphology, and producti
         embedded,
         "one immutable base runtime/yaw pair should reuse one derived runtime",
     );
+    const zeroYaw = cloudWorldFrameModule.embedCloudRuntimeInCameraWorld(
+        base, 0,
+    );
+    assert.notEqual(zeroYaw, base,
+        "zero yaw must attach the cached shipping V2 frame");
     assert.equal(
         cloudWorldFrameModule.embedCloudRuntimeInCameraWorld(base, 0),
-        base,
-        "the explicit 180-degree reference view must remain allocation-free",
+        zeroYaw,
+        "zero yaw must reuse one attached shipping runtime",
     );
+    assert.equal(zeroYaw.signature, base.signature);
+    assert.equal(zeroYaw.systems.length, base.systems.length);
+    zeroYaw.systems.forEach((system, index) => {
+        assert.equal(system.productionV2Owner.sourceId,
+            base.systems[index].state.id);
+    });
     assert.notEqual(embedded, base);
     assert.match(embedded.signature, /earth-frame-yaw=/);
     assert.deepEqual([
