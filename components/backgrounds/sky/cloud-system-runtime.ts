@@ -1490,6 +1490,14 @@ const createSystemPlacements = (
             }
         }
         if (!best) break;
+        if (species === "cumulus-congestus" && companionIndex === 0) {
+            // The broad protected support of the dominant owner can overlap
+            // the nearest companion in angular projection even when their
+            // source cores are physically clear. Keep this companion on the
+            // adjacent Earth-local bearing so the production Cu group does
+            // not form a false bridge between separate owners.
+            best.angle = wrapAngle(best.angle + 0.20);
+        }
         if (species === "cirrocumulus-floccus" && companionIndex === 0) {
             // Detached Cc floccus packets share a formation history but do
             // not occupy one projected stack. A small deterministic bearing
@@ -3276,12 +3284,12 @@ const buildLayerSystems = (
             ? [0.72, 0.90, 1.06]
             : species === "cumulus-mediocris"
                 ? [0.74, 0.96, 1.18]
-                : [0.92, 1.12, 0.82];
+                : [1.18, 1.12, 0.82];
         const cumulusHorizontalPhenotypes = species === "cumulus-humilis"
             ? [1.17, 1.03, 0.91]
             : species === "cumulus-mediocris"
                 ? [1.12, 1.00, 0.90]
-                : [1.02, 0.86, 1.15];
+                : [0.98, 0.86, 1.15];
         const cumulusVerticalScale = generatedCumulus
             ? cumulusVerticalPhenotypes[topologyExemplar.ordinal] *
                 lerp(0.94, 1.06, seeds[0])
@@ -3292,7 +3300,7 @@ const buildLayerSystems = (
             : 1;
         const cumulusPopulationScale = generatedCumulus &&
             species === "cumulus-congestus"
-            ? [1.14, 0.96, 0.78, 0.88, 0.70][
+            ? [1.00, 0.96, 0.78, 0.88, 0.70][
                 Math.min(populationIndex, 4)
             ]
             : 1;

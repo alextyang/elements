@@ -1185,13 +1185,31 @@ fn cloud_lv_fine_equation_terms(
     if (correction) {
         numerator = textureLoad(cloud_lv_direct_0, atlas, 0).rgb;
     } else {
+        // Delta-Eddington removes the unresolved forward delta peak before
+        // the P1 solve. Using full Beer here deposited nearly all solar energy
+        // in round sunward atlas lobes; the transformed beam carries those
+        // forward events deeper while conserving the integrated diffuse
+        // source. The exact first-order camera path remains unchanged.
+        let forward_peak = pow(clamp(scattering_record.a, 0.0, 0.99), 2.0);
+        let single_scattering_albedo = clamp(
+            scattering / max(vec3<f32>(1e-8), extinction),
+            vec3<f32>(0.0), vec3<f32>(1.0));
+        let delta_extinction_fraction = max(
+            vec3<f32>(1e-4),
+            vec3<f32>(1.0) - single_scattering_albedo * forward_peak);
+        let delta_scattering = scattering * (1.0 - forward_peak);
         var incident_direct = vec3<f32>(0.0);
         for (var source_index = 0u; source_index < 2u; source_index += 1u) {
             if (cloud_lv_sources[source_index].direction_active.w <= 0.5) { continue; }
-            incident_direct += cloud_lv_source_irradiance_at(world, source_index) *
+            let direct_transmittance =
                 cloud_lv_all_owner_direct_transmittance(world, source_index);
+            let delta_direct_transmittance = exp(
+                log(max(vec3<f32>(1e-30), direct_transmittance)) *
+                    delta_extinction_fraction);
+            incident_direct += cloud_lv_source_irradiance_at(world, source_index) *
+                delta_direct_transmittance;
         }
-        numerator = scattering * incident_direct;
+        numerator = delta_scattering * incident_direct;
     }
     var denominator = absorption;
     let offsets = array<vec3<i32>, 6>(

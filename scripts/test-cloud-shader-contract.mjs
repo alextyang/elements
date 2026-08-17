@@ -708,6 +708,9 @@ test("every mapped WMO family samples camera-independent manifest macro volumes"
         /directional_axis_scale = length\(\s*sdf_normal \* detail_contract\.axis_scale\)/);
     assert.match(displacedBoundary,
         /displacement_voxels > 0\.0 && sdf_normal\.y < 0\.0/);
+    assert.match(displacedBoundary,
+        /species == 19 && detail_code == CLOUD_EXTERIOR_LIQUID_CAULI[\s\S]*?displacement_voxels < 0\.0[\s\S]*?max\(\s*-directional_reach_voxels/,
+        "Congestus mixed flanks may erode but must stay inside the SDF reach");
     const deepCoreReturn = displacedBoundary.indexOf(
         "if (sdf_voxels <= -6.0) { return protected_core; }",
     );
@@ -1125,6 +1128,30 @@ test("formation code 6 preserves authoritative Sc circulation surfaces", () => {
     );
 });
 
+test("parcel-thermal Cumulus preserves authored fringe while other liquid cores stay protected", () => {
+    const protectedCore = shaderSource.match(
+        /fn cloud_macro_protected_core_density\([\s\S]*?\n\}/,
+    )?.[0] ?? "";
+    const cuRawBranch = protectedCore.indexOf(
+        "if (genus == 9 && formation_mechanism == 1)",
+    );
+    const genericFloor = protectedCore.indexOf(
+        "var core_floor = mix(0.76, 0.68, saturate(macro_sample.b));",
+    );
+    assert.ok(cuRawBranch >= 0, "parcel-thermal Cumulus must have a raw-R branch");
+    assert.ok(cuRawBranch < genericFloor,
+        "Cumulus raw R must return before the generic protected-core floor");
+    assert.match(protectedCore,
+        /if \(genus == 9 && formation_mechanism == 1\) \{[\s\S]*?return saturate\(macro_sample\.r\);/,
+        "low-density Cumulus fringe and clefts must remain authored atlas-R");
+    assert.match(protectedCore,
+        /if \(formation_mechanism == 4\) \{ core_floor = 0\.46; \}/,
+        "non-Cumulus liquid protected-core paths must remain active");
+    assert.match(protectedCore,
+        /if \(formation_mechanism == 6\) \{[\s\S]*?return saturate\(macro_sample\.r\);/,
+        "Sc authoritative raw-R exception must remain intact");
+});
+
 test("cloud illumination is material- and optical-depth-owned", () => {
     assert.match(shaderSource, /CLOUD_OPTICS_WGSL/);
     assert.match(shaderSource, /fn cloud_optical_multiple_scattering\(/);
@@ -1447,6 +1474,9 @@ test("production cloud layers co-integrate air and condensate as one relative op
         /fn cloud_relative_transport_from_air_moment\([\s\S]*?let k = clamp\(select\(q, proxy_k,[\s\S]*?\), q, vec3<f32>\(1\.0\)\)[\s\S]*?\(k - q\) \* exact_shared_air\.radiance/,
         "the exact air correction must obey Q <= K <= 1");
     assert.match(cloudShaderSource,
+        /fn cloud_relative_transport_from_air_moment\([\s\S]*?if \(debug_view == 9 \|\| debug_view == 10 \|\| debug_view == 11 \|\|[\s\S]*?debug_view == 13\) \{[\s\S]*?return CameraTransport\(cloud_source_radiance, q\)/,
+        "lighting diagnostics must exclude the production shared-air residual");
+    assert.match(cloudShaderSource,
         /fn cloud_source_share_of_combined_segment\([\s\S]*?combined_segment\.radiance \* source_share/,
         "cloud source must retain the combined-medium Beer denominator");
 
@@ -1495,7 +1525,7 @@ test("resident and fallback cloud sources partition direct and hemispheric paths
     const fallbackStart = march.indexOf(
         "if (strict_radiometric_agreement ||", residentStart);
     const blendStart = march.indexOf(
-        "var higher_order_blend_confidence", fallbackStart);
+        "let higher_order_blend_confidence", fallbackStart);
     assert.ok(residentStart >= 0 && fallbackStart > residentStart &&
         blendStart > fallbackStart);
     const resident = march.slice(residentStart, fallbackStart);
@@ -1526,6 +1556,9 @@ test("resident and fallback cloud sources partition direct and hemispheric paths
     assert.match(march,
         /cloud_local_sdf_diffuse_optical_depth\([\s\S]*?cloud_p1_diffusion_validity\([\s\S]*?diffuse_optical_depth\.upper_rgb \+[\s\S]*?diffuse_optical_depth\.lower_rgb/);
     assert.match(march,
+        /let local_diffusion_validity = select\([\s\S]*?1\.0,[\s\S]*?genus == 9 && species == 19\)/,
+        "transport-thick Congestus must retain its Marshak P1 surface solution");
+    assert.match(march,
         /let light_volume_confidence = min\([\s\S]*?\*\s*local_diffusion_validity/);
     assert.doesNotMatch(resident,
         /source_sun_direct \+ source_moon_direct/);
@@ -1552,7 +1585,7 @@ test("resident and fallback cloud sources partition direct and hemispheric paths
     assert.match(fallback,
         /cloud_fallback_diffuse_radiance\(\s*sun_optics,[\s\S]*?directional_atmosphere_phase_integral,[\s\S]*?incident_sky,[\s\S]*?lower_atmosphere,[\s\S]*?ground,[\s\S]*?sky_tau,[\s\S]*?ground_tau\)/);
     assert.match(march.slice(blendStart),
-        /cloud_higher_order_agreement_weight\([\s\S]*?direct_radiance \+ mix\([\s\S]*?analytic_diffuse_radiance,[\s\S]*?light_volume_p1,[\s\S]*?higher_order_blend_confidence/);
+        /let higher_order_blend_confidence =\s*resolved_light_volume_confidence[\s\S]*?direct_radiance \+ mix\([\s\S]*?analytic_diffuse_radiance,[\s\S]*?light_volume_p1,[\s\S]*?higher_order_blend_confidence/);
 
     const fallbackDiffuseStart = shaderSource.indexOf(
         "fn cloud_fallback_diffuse_radiance(");
@@ -1981,7 +2014,7 @@ test("bounded camera cloud lighting uses atlas direct and local analytic diffuse
         /same_layer_light_tau|cloud_integrate_owner_support_tau|cloud_owner_spectral_extinction_at/);
     assert.doesNotMatch(cameraSource,
         /cloud_lv_sample_layer_direct_transmittance|resident_sun_t|missing_sun_tau|cached_sun_tau_rgb/);
-    assert.match(shaderSource, /fn cloud_higher_order_agreement_weight\(/);
+    assert.doesNotMatch(shaderSource, /fn cloud_higher_order_agreement_weight\(/);
     assert.match(cameraSource,
         /resolved_light_volume_confidence = 0\.0/);
 });
@@ -2040,7 +2073,7 @@ test("world-space light volumes own exact material, Beer, P1, and boundary trans
         /resident_sun_t|missing_sun_tau|same_layer_light_tau/);
     assert.match(shaderSource,
         /direct_radiance \+ mix\([\s\S]*?analytic_diffuse_radiance,[\s\S]*?light_volume_p1,[\s\S]*?higher_order_blend_confidence/);
-    assert.match(shaderSource,
+    assert.doesNotMatch(shaderSource,
         /cloud_higher_order_agreement_weight\(/);
     assert.match(cloudLightWgslSource, /smoothstep\(0\.0, 2\.0/);
     assert.match(cloudLightWgslSource,
@@ -2048,7 +2081,11 @@ test("world-space light volumes own exact material, Beer, P1, and boundary trans
     assert.match(cloudLightWgslSource,
         /fn cloud_lv_all_owner_direct_transmittance\(/);
     assert.match(cloudLightWgslSource,
-        /incident_direct \+= cloud_lv_source_irradiance_at\(world, source_index\) \*[\s\S]*?cloud_lv_all_owner_direct_transmittance\(world, source_index\)/);
+        /let direct_transmittance =\s*cloud_lv_all_owner_direct_transmittance\(world, source_index\)/);
+    assert.match(cloudLightWgslSource,
+        /let delta_direct_transmittance = exp\([\s\S]*?delta_extinction_fraction/);
+    assert.match(cloudLightWgslSource,
+        /numerator = delta_scattering \* incident_direct/);
     assert.match(cloudLightWgslSource,
         /fn cloud_lv_halo_sample\(\s*world: vec3<f32>, current_brick: u32, level: u32/);
     for (const topology of [
@@ -2058,7 +2095,30 @@ test("world-space light volumes own exact material, Beer, P1, and boundary trans
     }
 });
 
-test("P1 publication rejects missing internal halos and strict captures compare interiors", () => {
+test("production P1 passes bind the same minimal ABI as validation", () => {
+    for (const [phase, pipeline] of [
+        ["prolongate-medium", "cloudLightProlongateMediumPipeline"],
+        ["restrict-medium", "cloudLightRestrictMediumPipeline"],
+        ["prolongate", "cloudLightProlongatePipeline"],
+        ["copy-packed", "cloudLightCopyPipeline"],
+    ]) {
+        assert.match(rendererSource, new RegExp(
+            `${pipeline},[\\s\\S]{0,120}undefined,[\\s\\S]{0,120}` +
+                `\\[\\s*uniformEntry,\\s*brickEntry`),
+            `${phase} must bind the brick record consumed by its pruned WGSL`);
+    }
+    for (const pipeline of [
+        "cloudLightSmoothPipeline",
+        "cloudLightRestrictResidualPipeline",
+        "cloudLightMeasureResidualPipeline",
+    ]) {
+        assert.match(rendererSource, new RegExp(
+            `${pipeline},\\s*undefined,`),
+        `${pipeline} must not construct a removed physical-atmosphere group`);
+    }
+});
+
+test("P1 publication rejects missing internal halos and strict captures preserve production residency", () => {
     assert.match(cloudLightRuntimeSource,
         /qualifyCloudLightVolumeInternalHaloTopology\(selected\)/);
     assert.match(cloudLightRuntimeSource,
@@ -2098,9 +2158,11 @@ test("P1 publication rejects missing internal halos and strict captures compare 
         ...shaderSource.matchAll(
             /if \(strict_radiometric_agreement \|\|\s*resolved_light_volume_confidence < 0\.9999/g),
     ].length, 2);
-    assert.ok([
-        ...shaderSource.matchAll(/cloud_higher_order_agreement_weight\(/g),
-    ].length >= 3, "strict analytic references must feed radiometric agreement");
+    assert.equal([
+        ...shaderSource.matchAll(
+            /let higher_order_blend_confidence =\s*resolved_light_volume_confidence;/g),
+    ].length, 2, "paused captures must use the same qualified P1 field as live production");
+    assert.doesNotMatch(shaderSource, /cloud_higher_order_agreement_weight\(/);
 });
 
 test("light-volume refreshes are bounded and atomically published", () => {

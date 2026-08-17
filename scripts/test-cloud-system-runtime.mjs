@@ -807,7 +807,10 @@ test("four-okta congestus creates a readable cluster and broad finite field", ()
         `expected a dominant tree and at least one separated companion, got ${frame.visibleOwnerCount}`);
     assert.ok(frame.supportFraction >= 0.14,
         `64×42° congestus support was only ${(frame.supportFraction * 100).toFixed(1)}%`);
-    assert.ok(dome.supportFraction >= 0.07,
+    // The dominant balanced owner is intentionally taller and narrower than
+    // the former round dome; the finite three-owner field still occupies a
+    // material full-sky solid angle without widening that owner again.
+    assert.ok(dome.supportFraction >= 0.06,
         `full-dome congestus support was only ${(dome.supportFraction * 100).toFixed(1)}%`);
     const angularScales = runtime.systems.map(({ state }) => {
         const range = Math.hypot(state.extent.centerEastKm, state.extent.centerNorthKm);
@@ -860,6 +863,38 @@ test("partial-cover Cu protects world-space source cores while permitting real o
         [0, 1, 2],
         "the local Cu group must expose every materialized thermal genealogy",
     );
+});
+
+test("production congestus keeps the nearest companion outside the dominant support", () => {
+    const benchmarkCase = benchmarkModule.CLOUD_PHOTOGRAPH_CASES.find(
+        ({ id }) => id === "cu-congestus--day-oblique-natural",
+    );
+    assert.ok(benchmarkCase);
+    const runtime = runtimeModule.createCloudSystemRuntime(
+        benchmarkCase.preview.cloudScene,
+    );
+    assert.equal(runtime.systems.length, 3);
+    const footprints = runtime.systems.slice(0, 2).map(({ state }) =>
+        runtimeModule.estimateThermalOwnerAngularFootprint(state.extent));
+    const rawDifference = Math.abs(
+        footprints[0].bearingRadians - footprints[1].bearingRadians,
+    ) % (Math.PI * 2);
+    const separation = Math.min(rawDifference, Math.PI * 2 - rawDifference);
+    assert.ok(
+        separation >= footprints[0].halfWidthRadians +
+            footprints[1].halfWidthRadians,
+        `dominant/companion support overlaps by ${(
+            footprints[0].halfWidthRadians + footprints[1].halfWidthRadians -
+            separation) * 180 / Math.PI} degrees`,
+    );
+    for (let left = 0; left < runtime.systems.length; left += 1) {
+        for (let right = left + 1; right < runtime.systems.length; right += 1) {
+            assert.ok(runtimeModule.congestusOwnerWorldClearance(
+                runtime.systems[left].state.extent,
+                [runtime.systems[right].state.extent],
+            ) >= -1e-9);
+        }
+    }
 });
 
 test("cumulus species use distinct owner populations and physical scales", () => {

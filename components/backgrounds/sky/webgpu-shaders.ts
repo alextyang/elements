@@ -1524,6 +1524,15 @@ fn cloud_relative_transport_from_air_moment(
 ) -> CameraTransport {
     let q = clamp(cloud_transmittance,
         vec3<f32>(0.0), vec3<f32>(1.0));
+    let debug_view = i32(round(p[22].y));
+    if (debug_view == 9 || debug_view == 10 || debug_view == 11 ||
+        debug_view == 13) {
+        // Lighting partitions must expose the selected cloud source itself.
+        // The production affine operator still owns interleaved atmospheric
+        // in-scattering; adding it here made every diagnostic look blue and
+        // prevented source/P1 defects from being isolated.
+        return CameraTransport(cloud_source_radiance, q);
+    }
     // K = integral(q(s) dA) / integral(dA). q(s) is the weather Beer
     // throughput in front of an air-source event. Therefore Q <= K <= 1:
     // foreground air has K=1, air behind all cloud has K=Q, and interleaved
@@ -6803,6 +6812,12 @@ fn cloud_macro_protected_core_density(
     genus: i32, species: i32,
 ) -> f32 {
     if (macro_sample.r <= 0.0001) { return 0.0; }
+    if (genus == 9 && formation_mechanism == 1) {
+        // Cumulus parcel-thermal-tree R is authored as the connected
+        // condensate field. Keep its low-density fringe and clefts instead
+        // of filling them with the generic liquid protected-core floor.
+        return saturate(macro_sample.r);
+    }
     var core_floor = mix(0.76, 0.68, saturate(macro_sample.b));
     if (formation_mechanism == 3) {
         if (species == 1 || species == 2) {
@@ -7171,6 +7186,17 @@ fn cloud_macro_displaced_boundary_density(
     let coherent_signal = smoothstep(0.16, 0.84, shape_signal);
     var displacement_voxels = directional_reach_voxels * mix(
         -inward_fraction, outward_fraction, coherent_signal);
+    if (species == 19 && detail_code == CLOUD_EXTERIOR_LIQUID_CAULI &&
+        displacement_voxels < 0.0) {
+        // Growing Congestus entrains dry environmental air most strongly on
+        // its mixed flanks and underside. Preserve the hard buoyant domes,
+        // but let the same bounded SDF signal carve those softer faces deeply
+        // enough to survive the 48^3 atlas and camera reconstruction.
+        let underside = saturate(-sdf_normal.y);
+        displacement_voxels = max(
+            -directional_reach_voxels,
+            displacement_voxels * mix(1.22, 1.48, underside));
+    }
 
     // The lifting-condensation level is a physical interface.  Outward
     // displacement on its underside is reduced by the per-volume protected
@@ -11204,33 +11230,6 @@ fn cloud_finite_nonnegative_radiance(
     return vec3<f32>(0.0);
 }
 
-// A resident P1 tile is an alternate representation of the same higher-order
-// field as the analytic closure. Confidence alone says that the sample lies in
-// the packed volume; it cannot prove radiometric agreement. This continuous
-// luminance/chroma gate prevents a finite but stale or differently partitioned
-// tile from painting a rectangular gray patch at a residency boundary.
-fn cloud_higher_order_agreement_weight(
-    analytic: vec3<f32>, resident_p1: vec3<f32>,
-) -> f32 {
-    if (!finite_rgb(analytic) || !finite_rgb(resident_p1) ||
-        any(analytic < vec3<f32>(0.0)) ||
-        any(resident_p1 < vec3<f32>(0.0))) { return 0.0; }
-    let analytic_luminance = photopic(analytic);
-    let resident_luminance = photopic(resident_p1);
-    if (analytic_luminance <= 1e-7 && resident_luminance <= 1e-7) {
-        return 1.0;
-    }
-    let log_luminance_delta = abs(log2(
-        (resident_luminance + 1e-5) / (analytic_luminance + 1e-5)));
-    let luminance_agreement =
-        1.0 - smoothstep(0.75, 2.25, log_luminance_delta);
-    let analytic_chroma = analytic / max(1e-5, analytic_luminance);
-    let resident_chroma = resident_p1 / max(1e-5, resident_luminance);
-    let chroma_delta = length(analytic_chroma - resident_chroma);
-    let chroma_agreement = 1.0 - smoothstep(0.16, 0.52, chroma_delta);
-    return saturate(min(luminance_agreement, chroma_agreement));
-}
-
 // Diagnostic-only source partition. These modes are selected before camera
 // integration so every view retains the production density, extinction,
 // temporal reconstruction, camera and exposure. Mode zero through eight and
@@ -11881,11 +11880,7 @@ fn sheet_node_source_radiance(
     // Adding the complete direct term outside the convex blend makes the
     // source/ambient chromatic separation exact and prevents a tile state from
     // ever modulating resolved Sun or Moon first order.
-    var higher_order_blend_confidence = resolved_light_volume_confidence;
-    if (analytic_reference_evaluated) {
-        higher_order_blend_confidence *= cloud_higher_order_agreement_weight(
-            analytic_diffuse_radiance, light_volume_p1);
-    }
+    let higher_order_blend_confidence = resolved_light_volume_confidence;
     let direct_radiance = cloud_finite_nonnegative_radiance(
         source_sun_direct + source_moon_direct, vec3<f32>(0.0));
     let production_radiance = cloud_finite_nonnegative_radiance(
@@ -12333,10 +12328,18 @@ fn march_layer(
             // transport depth before admitting P1.  Thin forward-scattering
             // ice therefore keeps its resolved phase/blue-sky convolution;
             // deep liquid and ice volumes transition continuously to P1.
-            let local_diffusion_validity = cloud_p1_diffusion_validity(
-                sun_optics,
-                diffuse_optical_depth.upper_rgb +
-                    diffuse_optical_depth.lower_rgb);
+            let local_diffusion_validity = select(
+                cloud_p1_diffusion_validity(
+                    sun_optics,
+                    diffuse_optical_depth.upper_rgb +
+                        diffuse_optical_depth.lower_rgb),
+                // Congestus is globally transport-thick and its resident solve
+                // already imposes the physical Marshak exterior boundary.
+                // Requiring another transport mean free path at the receiver
+                // suppressed diffuse reflection at the visible surface—the
+                // exact place that makes a sunlit liquid cloud white.
+                1.0,
+                genus == 9 && species == 19);
             var primary_volume_confidence = 0.0;
             if (local_material.atlas_match > 0.5) {
                 primary_volume_confidence = cloud_lv_owner_sample_confidence(
@@ -12471,13 +12474,8 @@ fn march_layer(
                         cloud_finite_nonnegative_radiance(
                             source_higher_order, vec3<f32>(0.0)));
             }
-            var higher_order_blend_confidence =
+            let higher_order_blend_confidence =
                 resolved_light_volume_confidence;
-            if (analytic_reference_evaluated) {
-                higher_order_blend_confidence *=
-                    cloud_higher_order_agreement_weight(
-                        analytic_diffuse_radiance, light_volume_p1);
-            }
             let direct_radiance = cloud_finite_nonnegative_radiance(
                 source_sun_direct + source_moon_direct, vec3<f32>(0.0));
             var sample_radiance = cloud_finite_nonnegative_radiance(
@@ -15793,7 +15791,7 @@ fn cloud_lv_truncated_directional_radiance(
         let local_optics = CloudLocalOptics(
             vec3<f32>(1.0), albedo, medium.asymmetry_rgb,
             vec3<f32>(0.07957747154594767), 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         let diffuse_incident = (
             physical_diffuse_irradiance_at(point) +
             physical_lower_atmosphere_irradiance_at(point) +

@@ -1033,7 +1033,7 @@ async function validate() {
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
     const cloudLightResidualBuffer = device.createBuffer({
-        size: 16,
+        size: 80,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC |
             GPUBufferUsage.COPY_DST,
     });
@@ -1177,10 +1177,10 @@ async function validate() {
             { binding: 25, resource: { buffer: physicalAtmosphereBuffer } },
             { binding: 30, resource: cloudMorphologyModifiers.createView() },
             { binding: 31, resource: directionalCouplingAtlasView },
-            ...(directional ? [{
+            {
                 binding: 34,
                 resource: { buffer: directionalCloudVisibilityUniformBuffer },
-            }] : []),
+            },
             { binding: 36,
                 resource: { buffer: directionalCloudVisibilityOwnerMaskBuffer } },
         ],
@@ -1366,6 +1366,7 @@ async function validate() {
             { binding: 2, resource: { buffer: parameterBuffer } },
             { binding: 3, resource: { buffer: cloudMetricsBuffer } },
             { binding: 4, resource: cloudTargets[1].createView() },
+            { binding: 5, resource: cloudTargets[0].createView() },
         ],
     });
     const cloudLayerCompositorBindGroup = device.createBindGroup({
@@ -1468,7 +1469,7 @@ async function validate() {
             { binding: 2, resource: baseVolume.createView() },
             { binding: 3, resource: detailVolume.createView() },
             { binding: 5, resource: volumeSampler },
-            { binding: 6, resource: atmosphereTexture.createView() },
+            { binding: 6, resource: atmosphereTransmittance.createView() },
             { binding: 16, resource: cloudMacroAtlas.createView() },
             { binding: 17, resource: cloudMacroMajorants.createView() },
             { binding: 18, resource: clampSampler },
@@ -1478,7 +1479,7 @@ async function validate() {
             { binding: 23, resource: { buffer: cloudOpticalStateBuffer } },
             { binding: 24, resource: { buffer: cloudOpticalOwnerBuffer } },
             { binding: 25, resource: { buffer: physicalAtmosphereBuffer } },
-            { binding: 26, resource: atmosphereTexture.createView() },
+            { binding: 26, resource: atmosphereMultipleScattering.createView() },
             { binding: 28, resource: clampSampler },
             { binding: 30, resource: cloudMorphologyModifiers.createView() },
             { binding: 35, resource: { buffer: weatherSceneUniformBuffer } },
@@ -1592,7 +1593,7 @@ async function validate() {
     const prolongateMediumPipeline = lightPipeline(
         "cloud_lv_prolongate_medium_compute");
     encodeLightPass(warmupEncoder, prolongateMediumPipeline, undefined, [
-        lightUniformFor(0, false, false),
+        lightUniformFor(0, false, false), lightBrickEntry,
         { binding: 3, resource: lightMipView(cloudLightMediumExtinction, 0) },
         { binding: 4, resource: lightMipView(cloudLightMediumScattering, 0) },
         { binding: 6, resource: lightMipView(cloudLightMediumExtinction, 1) },
@@ -1639,7 +1640,7 @@ async function validate() {
         "cloud_lv_restrict_medium_compute");
     for (let level = 1; level < 4; level += 1) {
         encodeLightPass(warmupEncoder, restrictMediumPipeline, undefined, [
-            lightUniformFor(level, false, false),
+            lightUniformFor(level, false, false), lightBrickEntry,
             { binding: 3, resource: lightMipView(cloudLightMediumExtinction, level) },
             { binding: 4, resource: lightMipView(cloudLightMediumScattering, level) },
             { binding: 6, resource: lightMipView(cloudLightMediumExtinction, level - 1) },
@@ -1663,7 +1664,7 @@ async function validate() {
             const read = readPacked ? cloudLightPackedView : cloudLightFluenceScratch;
             const write = readPacked ? cloudLightFluenceScratch : cloudLightPackedView;
             encodeLightPass(warmupEncoder, smoothPipeline,
-                lightPhysicalGroup0(smoothPipeline, false), [
+                undefined, [
                     lightUniformFor(level, readPacked, !readPacked),
                     lightBrickEntry, lightSourceEntry,
                     { binding: 6, resource: cloudLightMediumExtinction.createView() },
@@ -1681,7 +1682,7 @@ async function validate() {
     for (let level = 1; level < 4; level += 1) {
         const sourceLevel = level - 1;
         encodeLightPass(warmupEncoder, restrictResidualPipeline,
-            lightPhysicalGroup0(restrictResidualPipeline, false), [
+            undefined, [
                 lightUniformFor(level, true, false), lightBrickEntry,
                 lightSourceEntry,
                 { binding: 5, resource: lightMipView(cloudLightDirectSun, level) },
@@ -1706,13 +1707,13 @@ async function validate() {
         const dispatch = [Math.ceil((48 >> level) / 4),
             Math.ceil((32 >> level) / 4), Math.ceil((48 >> level) / 4)];
         encodeLightPass(warmupEncoder, prolongatePipeline, undefined, [
-            lightUniformFor(level, true, false),
+            lightUniformFor(level, true, false), lightBrickEntry,
             { binding: 10, resource: cloudLightPackedView.createView() },
             { binding: 11, resource: lightMipView(cloudLightFluenceScratch, level) },
         ], dispatch);
         smoothLevel(level, 2, false);
         encodeLightPass(warmupEncoder, copyPipeline, undefined, [
-            lightUniformFor(level, false, true),
+            lightUniformFor(level, false, true), lightBrickEntry,
             { binding: 10, resource: lightMipView(cloudLightFluenceScratch, level) },
             { binding: 11, resource: lightMipView(cloudLightPackedView, level) },
         ], dispatch);
@@ -1720,7 +1721,7 @@ async function validate() {
     const residualPipeline = lightPipeline("cloud_lv_measure_residual_compute");
     warmupEncoder.clearBuffer(cloudLightResidualBuffer);
     encodeLightPass(warmupEncoder, residualPipeline,
-        lightPhysicalGroup0(residualPipeline, false), [
+        undefined, [
             lightUniformFor(0, true, false), lightBrickEntry, lightSourceEntry,
             { binding: 6, resource: cloudLightMediumExtinction.createView() },
             { binding: 7, resource: cloudLightMediumScattering.createView() },
@@ -1804,10 +1805,10 @@ async function validate() {
             })),
         });
         cloudLayerPass.setPipeline(
-            createdPipelines["cloud layer " + layerIndex + " MRT pipeline"]);
+            createdPipelines["cloud layer 0 MRT pipeline"]);
         cloudLayerPass.setBindGroup(0, cloudBindGroup);
         cloudLayerPass.setBindGroup(1, cloudLightViewBindGroup);
-        cloudLayerPass.draw(3);
+        cloudLayerPass.draw(3, 1, 0, layerIndex);
         cloudLayerPass.end();
     }
     for (const [packetLayer, pipelineName] of [

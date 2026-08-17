@@ -4814,6 +4814,7 @@ function WebGpuSkyCanvas({
                         undefined,
                         [
                             uniformEntry,
+                            brickEntry,
                             {
                                 binding: 3,
                                 resource: mipView(
@@ -4863,6 +4864,7 @@ function WebGpuSkyCanvas({
                         undefined,
                         [
                             uniformEntry,
+                            brickEntry,
                             {
                                 binding: 3,
                                 resource: mipView(cloudLightMediumExtinction, level),
@@ -5111,7 +5113,7 @@ function WebGpuSkyCanvas({
                             `${work.iteration + 1} brick ${brickIndex} ` +
                             `z ${work.slabStart}+${slabDepth}`,
                         cloudLightSmoothPipeline,
-                        cloudLightPhysicalGroup0(cloudLightSmoothPipeline, false),
+                        undefined,
                         [
                             uniformEntry, brickEntry, sourceEntry,
                             {
@@ -5176,8 +5178,7 @@ function WebGpuSkyCanvas({
                         `cloud light-volume residual restrict L${sourceLevel}->` +
                             `L${level} brick ${brickIndex}`,
                         cloudLightRestrictResidualPipeline,
-                        cloudLightPhysicalGroup0(
-                            cloudLightRestrictResidualPipeline, false),
+                        undefined,
                         [
                             uniformEntry, brickEntry, sourceEntry,
                             {
@@ -5223,6 +5224,7 @@ function WebGpuSkyCanvas({
                         undefined,
                         [
                             uniformEntry,
+                            brickEntry,
                             {
                                 binding: 10,
                                 resource: cloudLightPackedView.createView({
@@ -5252,6 +5254,7 @@ function WebGpuSkyCanvas({
                         undefined,
                         [
                             uniformEntry,
+                            brickEntry,
                             {
                                 binding: 10,
                                 resource: mipView(cloudLightFluenceScratch, level),
@@ -5280,8 +5283,7 @@ function WebGpuSkyCanvas({
                         encoder,
                         `cloud light-volume normalized residual brick ${brickIndex}`,
                         cloudLightMeasureResidualPipeline,
-                        cloudLightPhysicalGroup0(
-                            cloudLightMeasureResidualPipeline, false),
+                        undefined,
                         [
                             uniformEntry, brickEntry, sourceEntry,
                             {

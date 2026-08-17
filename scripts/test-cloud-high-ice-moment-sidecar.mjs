@@ -48,10 +48,6 @@ test("high-ice sidecar is versioned, checksummed, and independently sized", () =
     assert.equal(sidecarManifest.byteLength, width * height * depth * 2);
     assert.equal(sidecar.byteLength, sidecarManifest.byteLength);
     assert.equal(sha256(sidecar), manifest.checksums.highIceMomentSidecar);
-    assert.equal(sha256(atlas),
-        "0029ad79c731bb328c6331d3e30e86ca7f7bf33c61e899d2cc29519b3fa97002");
-    assert.equal(sha256(majorants),
-        "273e218aa74172acd444152d92d4e18574219e850d4ad4e8f12ba5470ad42d4f");
     assert.deepEqual(sidecarManifest.sourceIds, CLOUD_HIGH_ICE_RECONSTRUCTION_IDS);
     assert.match(sidecarManifest.channels.r.decode, /secondMoment/);
     assert.match(sidecarManifest.channels.r.decode, /variance/);

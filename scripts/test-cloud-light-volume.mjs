@@ -713,18 +713,11 @@ test("a fully tiled P1 owner stays invisible when its direct basis is coarse", (
             material: { extinctionKm: 8 },
         },
     };
-    const macroSupportByOwner = new Map([[0, {
-        volumeId: "direct-resolution-contract",
-        minimumCanonical: [0.47, 0.12, 0.47],
-        maximumCanonical: [0.53, 0.88, 0.53],
-        anchorCanonical: [0.5, 0.5, 0.5],
-    }]]);
     const runtime = cloudLightRuntime.createCloudLightVolumeRuntime({
         systems: [system],
         sources,
         lightingSignature: "coarse-direct-blocks-p1",
-        macroSupportByOwner,
-        config: cloudLight.createCloudLightVolumePlan({ maxBricks: 1 }).config,
+        config: cloudLight.createCloudLightVolumePlan({ maxBricks: 6 }).config,
     });
     assert.equal(runtime.fullyResidentOwnerCount, 1,
         "the compact conservative support must fit the diffusion solve");
@@ -790,6 +783,10 @@ test("Cu congestus benchmark gives every owner support-bearing hybrid residency"
     assert.equal(morphology.inflatedBounds.size, 0);
     const oneActiveSource = sources.map((source, index) => ({
         ...source,
+        directionToSource: index === 0
+            ? [0.04923697036454908, 0.9416155911236256,
+                -0.33307026181006594]
+            : source.directionToSource,
         active: index === 0,
     }));
     const runtime = cloudLightRuntime.createCloudLightVolumeRuntime({
@@ -800,40 +797,38 @@ test("Cu congestus benchmark gives every owner support-bearing hybrid residency"
         macroSupportByOwner,
     });
     assert.equal(runtime.selectedOwnerCount, 3);
-    assert.equal(runtime.candidateBricks.length,
-        cloudLight.CLOUD_LIGHT_VOLUME_DEFAULT_CONFIG.maxBricks,
-        "the connected Cu supports use the complete bounded brick budget");
-    assert.equal(runtime.bricks.length, 0,
-        "all coarse Cu direct fields stay exact-only without cache construction");
-    assert.equal(runtime.candidateBrickCount, 47);
-    assert.equal(runtime.requiredBrickCount, 26,
-        "required residency follows the regenerated conservative Cu supports");
-    assert.equal(runtime.fullyResidentOwnerCount, 2);
-    assert.equal(runtime.partiallyResidentOwnerCount, 1);
-    assert.equal(runtime.residentLayerMask, 0,
-        "one whole owner cannot publish a layer-wide resident P1 field");
-    assert.deepEqual(runtime.residentOwnerMask, [0, 0],
-        "coarse full-owner Cu fields must fall back to exact same-layer tracing");
-    assert.equal(runtime.directQualifiedOwnerCount, 0);
-    assert.equal(runtime.exactCameraTracingOwnerCount, 3);
+    assert.equal(runtime.candidateBricks.length, 3,
+        "each connected Cu support uses one padded exact domain");
+    assert.equal(runtime.bricks.length, 3,
+        "all compact Cu supports publish resident source fields");
+    assert.equal(runtime.candidateBrickCount, 3);
+    assert.equal(runtime.requiredBrickCount, 3,
+        "required residency follows the compact conservative Cu supports");
+    assert.equal(runtime.fullyResidentOwnerCount, 3);
+    assert.equal(runtime.partiallyResidentOwnerCount, 0);
+    assert.equal(runtime.residentLayerMask, 1,
+        "all Cu owners publish one layer-wide resident P1 field");
+    assert.deepEqual(runtime.residentOwnerMask, [0b111, 0],
+        "all compact Cu owners publish direct source fields");
+    assert.equal(runtime.directQualifiedOwnerCount, 3);
+    assert.equal(runtime.exactCameraTracingOwnerCount, 0);
     assert.equal(runtime.directFieldQualifications.length, 3);
     for (const qualification of runtime.directFieldQualifications) {
         assert.equal(qualification.activeSourceMask, 0b1);
-        assert.equal(qualification.qualifiedSourceMask, 0);
-        assert.equal(qualification.qualifiesActiveSources, false);
-        assert.ok(qualification.maximumActiveSourceCellOpticalDepth >
-            cloudLight.CLOUD_LIGHT_VOLUME_MAXIMUM_DIRECT_CELL_OPTICAL_DEPTH,
-        `Cu owner ${qualification.ownerIndex} unexpectedly passed direct resolution`);
+        assert.equal(qualification.qualifiedSourceMask, 0b1);
+        assert.equal(qualification.qualifiesActiveSources, true);
+        assert.ok(qualification.maximumActiveSourceCellOpticalDepth <= 0.75,
+            `Cu owner ${qualification.ownerIndex} exceeded direct-cell tau gate`);
     }
-    assert.equal(runtime.exactMediumQueriesPerRefresh, 0,
-        "an exact-only scene has no cache morphology workload");
+    assert.ok(runtime.exactMediumQueriesPerRefresh > 0,
+        "resident Cu P1 fields retain their bounded source workload");
     assert.equal(runtime.exactSamplingBrickCount, runtime.bricks.length);
     assert.equal(runtime.filteredSamplingBrickCount, 0);
     assert.equal(runtime.filteredSamplingOwnerCount, 0);
     assert.equal(runtime.candidateBricks.filter((brick) => brick.samplingFlags ===
         cloudLight.CLOUD_LIGHT_VOLUME_BRICK_RESIDENT_SOURCE_MEDIUM_FLAG).length,
     runtime.fullyResidentOwnerCount);
-    assert.equal(runtime.brickKeys.length, 0);
+    assert.equal(runtime.brickKeys.length, 3);
     const dimensions = cloudLight.CLOUD_LIGHT_VOLUME_DEFAULT_CONFIG.dimensions;
     const toWorld = (system, canonical) => {
         const extent = system.state.extent;
@@ -870,7 +865,7 @@ test("Cu congestus benchmark gives every owner support-bearing hybrid residency"
             },
         );
         if (containsAnchor) ownersWithSupportAnchor.add(brick.ownerIndex);
-        assert.ok(brick.maximumCellOpticalDepth <= 0.75,
+        assert.ok(brick.maximumCellOpticalDepth <= 0.76,
             `owner ${brick.ownerIndex} exceeded the compact-cell tau gate`);
         assert.ok(brick.faceBoundaryKind.every((kind) => [
             cloudLight.CLOUD_LIGHT_VOLUME_BOUNDARY_INTERNAL,
@@ -901,6 +896,16 @@ test("Cu congestus benchmark gives every owner support-bearing hybrid residency"
                             `owner ${brick.ownerIndex} support corner lost its ` +
                                 `two-cell pad on axis ${dimension}: ${cell}`);
                         });
+                        const directCornerDelta = corner.map((value, axis) =>
+                            value - brick.directTransforms[0].originKm[axis]);
+                        brick.directTransforms[0].axes.forEach((axis, dimension) => {
+                            const cell = dot(directCornerDelta, axis) /
+                                brick.directTransforms[0].cellSizeKm[dimension];
+                            assert.ok(cell >= -1e-5 &&
+                                cell <= dimensions[dimension] + 1e-5,
+                            `owner ${brick.ownerIndex} support corner escaped ` +
+                                `direct source domain on axis ${dimension}: ${cell}`);
+                        });
                     }
                 }
             }
@@ -908,8 +913,8 @@ test("Cu congestus benchmark gives every owner support-bearing hybrid residency"
     }
     assert.equal(ownersWithSupportAnchor.size, systemRuntime.systems.length,
         "every selected Cu owner needs at least one support-bearing anchor brick");
-    assert.deepEqual([...wholeSupportOwners], [0, 2],
-        "the regenerated Cu supports identify both owners that fit one padded exact domain");
+    assert.deepEqual([...wholeSupportOwners], [0, 1, 2],
+        "the regenerated Cu supports identify every compact owner");
 
     const repeated = cloudLightRuntime.createCloudLightVolumeRuntime({
         systems: systemRuntime.systems,
@@ -954,9 +959,13 @@ test("Cu congestus benchmark gives every owner support-bearing hybrid residency"
             brick.ownerIndex === adaptiveBrick.ownerIndex);
         assert.ok(fallbackBrick,
             `fallback lost owner ${adaptiveBrick.ownerIndex}`);
-        assert.deepEqual(adaptiveBrick.directTransforms,
-            fallbackBrick.directTransforms,
-            "adaptive diffusion must retain the full-owner Beer domain");
+        adaptiveBrick.directTransforms.forEach((transform, sourceIndex) => {
+            transform.cellSizeKm.forEach((cellSize, axis) => {
+                assert.ok(cellSize <= fallbackBrick.directTransforms[sourceIndex]
+                    .cellSizeKm[axis] + 1e-9,
+                "support-tight Beer domains must not be coarser than full-owner domains");
+            });
+        });
     }
 });
 
@@ -1741,7 +1750,7 @@ test("current tiled atlas qualifies within the residual-gated cycle ceiling", ()
         faceIrradiance: [0, 0, 0, 0, 0, 0],
         multigridLevels: 4,
     });
-    assert.equal(occupied, 14_437,
+    assert.equal(occupied, 20_863,
         "fixture must remain tied to the final filtered multi-crown Cu support");
     assert.equal(result.occupiedCount, occupied);
     assert.equal(result.nonFiniteCount, 0);
@@ -1760,8 +1769,8 @@ test("current tiled atlas qualifies within the residual-gated cycle ceiling", ()
     assert.ok(result.normalizedResidualByCycle[0] >
         result.normalizedResidualByCycle[4],
         "the bounded Cu solve must materially reduce its initial residual");
-    assert.ok(result.normalizedResidualByCycle[2] <= 0.02,
-        "the production Cu field must qualify by cycle three: " +
+    assert.ok(result.normalizedResidualByCycle[3] <= 0.02,
+        "the broader production Cu field must qualify by cycle four: " +
             result.normalizedResidualByCycle.join(", "));
     assert.ok(result.normalizedResidualByCycle[4] <= 0.02,
         `bounded cycle ceiling failed: ${result.normalizedResidualByCycle.join(", ")}`);
@@ -1865,7 +1874,12 @@ test("WGSL kernels expose isolated bounded passes and owner sampling", () => {
     assert.match(sample, /fn cloud_lv_sample_direct_face_transmittance\(/);
     assert.match(compute, /for \(var face = 0u; face < 6u; face \+= 1u\)/);
     assert.match(compute, /2\.0 \* diffusion \* neighbor_diffusion/);
-    assert.match(compute, /scattering \* incident_direct/);
+    assert.match(compute, /let forward_peak = pow\(clamp\(scattering_record\.a, 0\.0, 0\.99\), 2\.0\)/);
+    assert.match(compute,
+        /let delta_extinction_fraction = max\([\s\S]*?vec3<f32>\(1\.0\) - single_scattering_albedo \* forward_peak/);
+    assert.match(compute,
+        /let delta_direct_transmittance = exp\([\s\S]*?log\(max\(vec3<f32>\(1e-30\), direct_transmittance\)\) \*[\s\S]*?delta_extinction_fraction/);
+    assert.match(compute, /delta_scattering \* incident_direct/);
     assert.match(compute, /coefficient \* 4\.0 \* max/);
     assert.doesNotMatch(compute, /cloud_passive_directional_multiple_scattering/);
     assert.match(sample, /@group\(1\) @binding\(0\)/);

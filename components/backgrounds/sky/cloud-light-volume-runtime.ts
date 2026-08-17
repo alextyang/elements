@@ -180,9 +180,12 @@ const PLANET_RADIUS_KM = 6_371;
 const TARGET_TILE_HALF_EXTENT_KM = [1.44, 0.8, 1.44] as const;
 const OVERLAP_CELLS = 2;
 const WHOLE_SUPPORT_PADDING_CELLS = 2;
-const WHOLE_SUPPORT_MAXIMUM_CELL_OPTICAL_DEPTH = 0.75;
-const WHOLE_SUPPORT_MAXIMUM_EXACT_FOOTPRINT_OPTICAL_DEPTH = 1.5;
-const WHOLE_SUPPORT_MAXIMUM_EXACT_AXIS_KM = 0.30;
+const WHOLE_SUPPORT_MAXIMUM_CELL_OPTICAL_DEPTH = 0.76;
+const WHOLE_SUPPORT_MAXIMUM_EXACT_FOOTPRINT_OPTICAL_DEPTH = 1.52;
+const WHOLE_SUPPORT_MAXIMUM_EXACT_AXIS_KM = 0.36;
+// Keep the complete conservative support while tightening the source-aligned
+// Beer domain enough for the fixed 32-cell source axis.
+const WHOLE_SUPPORT_DIRECT_DOMAIN_SCALE = 0.9815;
 // Direct-disc activity is scheduling metadata only. Source irradiance remains
 // byte-for-byte TOA radiometry in the packed source record.
 export const CLOUD_LIGHT_VOLUME_SOURCE_ABSOLUTE_IRRADIANCE_THRESHOLD = 1e-10;
@@ -274,6 +277,12 @@ interface TileCandidate {
     faceBoundaryKind: readonly CloudLightVolumeBoundaryKind[];
     ownerDomain: OwnerDomain;
     localCenter: CloudLightVolumeVec3;
+    /** Source-aligned Beer domain; absent tiles use the full owner domain. */
+    directDomain?: {
+        centerKm: CloudLightVolumeVec3;
+        halfExtentKm: CloudLightVolumeVec3;
+        axes: OwnerDomain["axes"];
+    };
     score: number;
 }
 
@@ -889,6 +898,12 @@ const createWholeSupportCandidate = (
             CloudLightVolumeBoundaryKind[],
         ownerDomain: domain,
         localCenter,
+        directDomain: {
+            centerKm: center,
+            halfExtentKm: scale3(halfExtent,
+                WHOLE_SUPPORT_DIRECT_DOMAIN_SCALE),
+            axes: domain.axes,
+        },
         score: projectedScale * (1 + Math.log1p(opticalPriority)),
     };
 };
@@ -1123,7 +1138,7 @@ export const createCloudLightVolumeRuntime = (
             localUpDirection: tile.axes[1],
             quadratureSampleCount: 256,
         },
-        directDomain: {
+        directDomain: tile.directDomain ?? {
             centerKm: tile.ownerDomain.center,
             halfExtentKm: tile.ownerDomain.halfExtent,
             axes: tile.ownerDomain.axes,

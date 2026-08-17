@@ -2417,29 +2417,36 @@ const buildCongestusModel = (config, seed) => {
     const profiles = {
         balanced: {
             roots: [
-                [-0.012, 0.010, 0.35, 0.034, 0.42],
-                [-0.045, -0.026, 0.25, 0.028, 0.32],
-                [0.038, 0.024, 0.23, 0.026, 0.30],
+                [-0.025, 0.010, 0.58, 0.042, 0.64],
+                [-0.075, -0.026, 0.48, 0.034, 0.54],
+                [0.062, 0.024, 0.44, 0.032, 0.50],
             ],
-            mainTop: 0.675,
+            mainTop: 0.600,
             main: [
                 // One resolved parcel per buoyant pulse.  Unequal spacing and
                 // width create the mushroom/neck profile seen in LES instead
                 // of a densely overlapping stack whose union is a silo.
-                [0.00, 0.58, -0.028, 0.018],
-                [0.18, 0.50, -0.012, -0.004],
-                [0.43, 0.68, 0.036, -0.030],
-                [0.70, 0.52, 0.082, 0.026],
-                [1.00, 0.72, 0.137, 0.016],
+                [0.00, 0.78, -0.030, 0.015],
+                [0.16, 0.76, -0.018, -0.008],
+                [0.36, 0.88, 0.002, -0.016],
+                [0.60, 0.78, 0.030, 0.006],
+                [0.90, 0.85, 0.058, 0.016],
             ],
-            crownBoundary: 0.890,
+            lowerBody: [
+                [-0.070, 0.030, 0.300, 1.35, 0.72, 1.20, 1],
+                [0.040, -0.040, 0.460, 1.70, 0.90, 1.55, 3],
+            ],
+            // Leave physical clear-air headroom above the highest terminal.
+            // Clipping the active dome at y=1 flattened the crown envelope
+            // and erased every reconstructed inter-head cleft.
+            crownBoundary: 0.860,
             crown: [
                 // Adjacent heads overlap as one cauliflower crown. Their
                 // unequal z offsets and top ages preserve genuine 3-D clefts;
                 // large radial offsets would expose the lineage as a Y tree.
-                [-0.105, -0.055, 0.50, 0.025],
-                [0.015, 0.075, 0.70, 0.055],
-                [0.125, -0.045, 0.55, -0.035],
+                [-0.180, -0.060, 0.64, 0.075],
+                [0.000, 0.080, 0.82, 0.095],
+                [0.160, -0.050, 0.62, 0.020],
             ],
             // The crown is not a radial tree. Each head continues a distinct
             // late parcel lineage; at most two heads share one ancestor and
@@ -2451,34 +2458,41 @@ const buildCongestusModel = (config, seed) => {
             ],
             feeders: [[-1, 0.58, 3, 2, 0.56]],
             shoulders: [
-                [2, -0.105, 0.070, 0.52, 0.70, 0.66],
-                [3, -0.080, -0.092, 0.45, 0.78, 0.61],
-                [4, 0.078, 0.102, 0.36, 0.64, 0.56],
+                // Retain the authored lifecycle event (and deterministic
+                // random stream) inside the moist core; the former large
+                // outward remnant projected as an artificial shelf.
+                [2, -0.020, 0.020, 0.24, 0.82, 0.72],
+                [3, -0.070, -0.082, 0.58, 0.84, 0.68],
+                [4, 0.060, 0.072, 0.48, 0.72, 0.62],
             ],
         },
         turreted: {
             roots: [
-                [-0.008, 0.008, 0.36, 0.033, 0.38],
-                [-0.038, -0.024, 0.25, 0.028, 0.28],
-                [0.032, 0.026, 0.23, 0.026, 0.26],
+                [-0.020, 0.008, 0.54, 0.041, 0.58],
+                [-0.065, -0.024, 0.42, 0.033, 0.46],
+                [0.055, 0.026, 0.40, 0.031, 0.43],
             ],
-            mainTop: 0.735,
+            mainTop: 0.640,
             main: [
                 // A turreted tower is a visible succession of contracting
                 // necks and fresh broad bubbles, not a constant-width stack.
                 // The alternating parcel scales keep that source genealogy
                 // legible while the curved centers prevent a stepped silo.
-                [0.00, 0.61, -0.024, 0.025],
-                [0.13, 0.44, 0.010, -0.045],
-                [0.41, 0.70, 0.032, 0.035],
-                [0.69, 0.34, 0.095, 0.095],
-                [1.00, 0.70, 0.142, -0.050],
+                [0.00, 0.92, -0.020, 0.018],
+                [0.14, 0.84, -0.008, -0.012],
+                [0.34, 1.10, 0.000, 0.008],
+                [0.58, 0.86, 0.016, 0.020],
+                [0.88, 1.08, 0.040, -0.004],
             ],
-            crownBoundary: 0.860,
+            lowerBody: [
+                [-0.060, 0.030, 0.300, 1.28, 0.72, 1.12, 1],
+                [0.050, -0.040, 0.470, 1.48, 0.86, 1.28, 3],
+            ],
+            crownBoundary: 0.895,
             crown: [
-                [-0.080, 0.090, 0.46, 0.030],
-                [0.035, -0.070, 0.76, 0.065],
-                [0.120, 0.055, 0.46, -0.025],
+                [-0.160, 0.085, 0.50, 0.015],
+                [0.020, -0.085, 0.92, 0.065],
+                [0.150, 0.060, 0.44, -0.015],
             ],
             crownParents: [
                 ["feeder", 0, -1],
@@ -2487,30 +2501,34 @@ const buildCongestusModel = (config, seed) => {
             ],
             feeders: [[-1, 0.62, 3, 2, 0.52]],
             shoulders: [
-                [2, -0.126, 0.084, 0.47, 0.68, 0.62],
-                [3, 0.098, -0.106, 0.33, 0.62, 0.56],
+                [2, -0.100, 0.065, 0.58, 0.78, 0.68],
+                [3, 0.075, -0.080, 0.48, 0.72, 0.60],
             ],
         },
         multicell: {
             roots: [
-                [-0.065, -0.028, 0.31, 0.028, 0.31],
-                [-0.006, 0.034, 0.41, 0.033, 0.40],
-                [0.062, -0.018, 0.29, 0.027, 0.31],
+                [-0.085, -0.030, 0.48, 0.034, 0.48],
+                [-0.008, 0.035, 0.60, 0.040, 0.58],
+                [0.080, -0.018, 0.46, 0.033, 0.46],
             ],
-            mainTop: 0.655,
+            mainTop: 0.620,
             main: [
-                [0.00, 0.60, -0.030, 0.020],
-                [0.15, 0.52, -0.012, -0.006],
-                [0.43, 0.70, 0.034, -0.020],
-                [0.69, 0.52, 0.078, 0.032],
-                [1.00, 0.72, 0.104, 0.012],
+                [0.00, 0.76, -0.035, 0.018],
+                [0.15, 0.78, -0.015, -0.004],
+                [0.43, 0.90, 0.024, -0.018],
+                [0.69, 0.76, 0.060, 0.022],
+                [1.00, 0.88, 0.092, 0.010],
             ],
-            crownBoundary: 0.890,
+            lowerBody: [
+                [-0.100, 0.050, 0.300, 1.45, 0.75, 1.30, 1],
+                [0.000, -0.050, 0.470, 1.60, 0.92, 1.45, 3],
+            ],
+            crownBoundary: 0.900,
             crown: [
-                [-0.200, -0.080, 0.60, -0.030],
-                [-0.060, 0.090, 0.70, 0.045],
-                [0.080, -0.070, 0.66, 0.047],
-                [0.200, 0.060, 0.52, -0.055],
+                [-0.220, -0.095, 0.68, -0.020],
+                [-0.075, 0.110, 0.82, 0.050],
+                [0.080, -0.090, 0.76, 0.042],
+                [0.225, 0.080, 0.62, -0.035],
             ],
             crownParents: [
                 ["feeder", 0, -1],
@@ -2523,64 +2541,34 @@ const buildCongestusModel = (config, seed) => {
                 [1, 0.52, 4, 3, 0.54],
             ],
             shoulders: [
-                [2, -0.225, 0.125, 0.64, 0.76, 0.63, 0.60],
-                [3, 0.235, -0.142, 0.62, 0.78, 0.58, 0.48],
-                [4, -0.094, -0.108, 0.38, 0.62, 0.54],
-                [4, 0.110, 0.082, 0.31, 0.58, 0.50],
+                [2, -0.190, 0.100, 0.72, 0.82, 0.70, 0.46],
+                [3, 0.190, -0.115, 0.70, 0.84, 0.66, 0.42],
+                [4, -0.078, -0.085, 0.52, 0.70, 0.60],
+                [4, 0.090, 0.066, 0.46, 0.66, 0.56],
             ],
         },
     };
     const profile = profiles[morphology] ?? profiles.balanced;
 
     const addConnectedNeck = (start, end, radius, role = "thermal-junction") => {
-        const dx = end[0] - start[0];
-        const dy = end[1] - start[1];
-        const dz = end[2] - start[2];
-        const distance = Math.max(1e-6, Math.hypot(dx, dy, dz));
-        // One axis-aligned ellipsoid spanning both endpoints promoted every
-        // diagonal lineage into its entire bounding box.  Several such boxes
-        // reconstructed as flat support walls.  A short chain of overlapping,
-        // near-spherical parcels follows the actual trajectory while remaining
-        // above the 48^3 reconstructibility limit.
         const safeRadius = Math.max(0.026, radius);
-        const interiorCount = clamp(
-            Math.ceil(distance / (safeRadius * 1.50)) - 1,
-            1,
-            12,
-        );
-        const horizontalLength = Math.hypot(dx, dz);
-        let normalX = horizontalLength > 0.012 ? -dz / horizontalLength : 0.78;
-        let normalZ = horizontalLength > 0.012 ? dx / horizontalLength : -0.63;
-        const bendSign = (start[0] + start[2] + end[0] + end[2]) >= 1.96
-            ? -1
-            : 1;
-        normalX *= bendSign;
-        normalZ *= bendSign;
-        const bend = Math.min(safeRadius * 0.34, distance * 0.075);
-        for (let index = 1; index <= interiorCount; index += 1) {
-            const t = index / (interiorCount + 1);
-            const curve = Math.sin(t * Math.PI) * bend;
-            const taper = 1 - Math.abs(t - 0.5) * 0.10;
-            addEllipsoid(shapes, [
-                mix(start[0], end[0], t) + normalX * curve,
-                mix(start[1], end[1], t),
-                mix(start[2], end[2], t) + normalZ * curve,
-            ], [
-                safeRadius * 0.94 * taper,
-                safeRadius * 1.08,
-                safeRadius * 0.88 * taper,
-            ], {
-                density: 0.985,
-                detail,
-                rotation: Math.atan2(dz, dx),
-                role,
-                // A neck communicates cloudy material; it is not an
-                // undiluted updraft head.  Let its boundary entrain rather than
-                // unioning every level through the hard protected floor.
-                protectedCoreInset: null,
-            });
-            mergedBodyLobeCount += 1;
-        }
+        // A connector is continuous cloudy material, not another row of
+        // spherical thermal heads. The old overlapping-sphere chain survived
+        // into P1 lighting as a repeated bubble stamp. A capsule preserves the
+        // same connected support with one smooth, finite primitive.
+        shapes.push({
+            kind: "capsule",
+            start: [...start],
+            end: [...end],
+            radius: safeRadius,
+            verticalScale: 1,
+            density: 0.985,
+            detail,
+            phase: 0,
+            role,
+            protectedCoreInset: null,
+        });
+        mergedBodyLobeCount += 1;
         authoredNeckRadii.push(safeRadius);
         communicatingNeckCount += 1;
     };
@@ -2698,7 +2686,8 @@ const buildCongestusModel = (config, seed) => {
                 mainCenters[level - 1],
                 center,
                 Math.min(mainRadii[level - 1], radius) *
-                    (morphology === "turreted" ? 0.40 : 0.43),
+                    (morphology === "turreted" ? 0.70
+                        : morphology === "multicell" ? 0.56 : 0.66),
             );
             // Expose one oblique, exterior entrainment bay rather than
             // subtracting the complete pulse junction. Mid-plane cuts read as
@@ -2742,7 +2731,7 @@ const buildCongestusModel = (config, seed) => {
             }
         }
 
-        if (level === 0) continue;
+        if (level < profile.main.length - 2) continue;
         // One attached head is enough to reveal an individual buoyant event at
         // 48^3. A second head is reserved for the terminal event; decorating
         // every level twice reconstructs as a row of laterally offset columns.
@@ -2807,6 +2796,35 @@ const buildCongestusModel = (config, seed) => {
         }
     }
 
+    // Two broad, source-connected parcels make the lower plume a coherent
+    // moist body before it separates into individual towers. They are finite
+    // thermals rather than a planar shelf, so both canonical elevations keep
+    // real depth and an irregular LCL silhouette.
+    for (const [dx, dz, y, radiusX, radiusY, radiusZ, mainIndex] of
+        profile.lowerBody) {
+        const center = [sourceX + dx, y, sourceZ + dz];
+        const horizontalRadius = config.radius * Math.min(radiusX, radiusZ);
+        addEllipsoid(shapes, center, [
+            config.radius * radiusX,
+            config.radius * radiusY,
+            config.radius * radiusZ,
+        ], {
+            density: 0.995,
+            detail,
+            rotation: Math.atan2(dz, dx),
+            role: "lower-body-parcel",
+            protectedCoreInset: null,
+        });
+        addConnectedNeck(
+            center,
+            mainCenters[Math.min(mainIndex, mainCenters.length - 1)],
+            Math.min(horizontalRadius, mainRadii[mainIndex]) *
+                (morphology === "turreted" ? 0.60 : 0.52),
+        );
+        mergedBodyLobeCount += 1;
+        resolvedThermalHeadCount += 1;
+    }
+
     // Secondary source thermals are younger or older parcels from the same
     // lifting area. They remain laterally readable through most of their life
     // and merge only below the selected dominant event. This prevents both a
@@ -2823,8 +2841,8 @@ const buildCongestusModel = (config, seed) => {
         const lineage = [];
         for (let step = 1; step <= feederSteps; step += 1) {
             const u = step / feederSteps;
-            const feederEndScale = morphology === "turreted" ? 0.42
-                : morphology === "multicell" ? 0.44 : 0.40;
+            const feederEndScale = morphology === "turreted" ? 0.54
+                : morphology === "multicell" ? 0.58 : 0.56;
             const feederMiddleScale = peakScale;
             const radius = config.radius * mix(
                 feederEndScale,
@@ -2850,7 +2868,7 @@ const buildCongestusModel = (config, seed) => {
             });
             resolvedThermalHeadCount += 1;
             addConnectedNeck(previous, center,
-                Math.min(previousRadius, radius) * 0.46);
+                Math.min(previousRadius, radius) * 0.56);
             previous = center;
             previousRadius = radius;
             lineage.push({ center, radius });
@@ -2991,9 +3009,9 @@ const buildCongestusModel = (config, seed) => {
         );
         const branchActivity = (topOffset - minimumCrownTopOffset) /
             Math.max(0.001, maximumCrownTopOffset - minimumCrownTopOffset);
-        const terminalRadius = config.radius * radiusScale *
+        const terminalRadius = config.radius * radiusScale * 1.18 *
             mix(0.97, 1.03, random());
-        const terminalVerticalScale = mix(1.00, 1.12, random());
+        const terminalVerticalScale = mix(1.12, 1.32, random());
         const terminal = [
             sourceX + dx + mix(-0.004, 0.004, random()),
             profile.crownBoundary + topOffset -
@@ -3026,8 +3044,8 @@ const buildCongestusModel = (config, seed) => {
         // expansion until the crown. The narrow turreted phenotype occupies
         // the physically intermediate case. This is parcel genealogy, not a
         // view-dependent silhouette adjustment.
-        const precursorHorizontalT = morphology === "multicell" ? 0.70
-            : morphology === "turreted" ? 0.58 : 0.52;
+        const precursorHorizontalT = morphology === "multicell" ? 0.56
+            : morphology === "turreted" ? 0.50 : 0.46;
         const precursor = [
             mix(anchor.center[0], terminal[0], precursorHorizontalT) -
                 branchDz / horizontalDistance * bend * bendSign,
@@ -3035,8 +3053,10 @@ const buildCongestusModel = (config, seed) => {
             mix(anchor.center[2], terminal[2], precursorHorizontalT) +
                 branchDx / horizontalDistance * bend * bendSign,
         ];
+        const crownNeckScale = morphology === "multicell" ? 0.40 : 0.44;
         addConnectedNeck(anchor.center, precursor,
-            Math.max(0.024, Math.min(anchor.radius, precursorRadius) * 0.44),
+            Math.max(0.024,
+                Math.min(anchor.radius, precursorRadius) * crownNeckScale),
             "crown-lineage-neck");
         addEllipsoid(shapes, precursor, [
             precursorRadius * mix(0.94, 1.02, random()),
@@ -3051,7 +3071,7 @@ const buildCongestusModel = (config, seed) => {
         });
         addConnectedNeck(precursor, terminal,
             Math.max(0.024,
-                Math.min(precursorRadius, terminalRadius) * 0.44),
+                Math.min(precursorRadius, terminalRadius) * crownNeckScale),
             "crown-lineage-neck");
         addEllipsoid(shapes, terminal, [
             terminalRadius * mix(0.96, 1.05, random()),
@@ -3078,8 +3098,8 @@ const buildCongestusModel = (config, seed) => {
         // on a flat ellipsoid plateau; it survives a radius-two footprint and
         // keeps the summit recognizably cauliflower-shaped without adding a
         // fourth lateral tower.
-        if ((morphology === "turreted" || morphology === "multicell") &&
-            branch === 1) {
+        if ((morphology === "balanced" || morphology === "turreted" ||
+            morphology === "multicell") && branch === 1) {
             // The merged multicell crown also needs one actively rising dome.
             // Its other heads are deliberately older and broader, so lifting
             // this continuation above their shared envelope produces a real
@@ -3087,13 +3107,16 @@ const buildCongestusModel = (config, seed) => {
             // Keep it attached to the dominant lineage rather than adding a
             // laterally offset fifth column.
             const apicalRadius = Math.max(
-                morphology === "multicell" ? 0.042 : 0.046,
-                terminalRadius * (morphology === "multicell" ? 0.46 : 0.54),
+                morphology === "multicell" ? 0.042
+                    : morphology === "balanced" ? 0.044 : 0.046,
+                terminalRadius * (morphology === "multicell" ? 0.46
+                    : morphology === "balanced" ? 0.50 : 0.54),
             );
             const apical = [
                 terminal[0] - apicalRadius * 0.10,
                 terminal[1] + terminalRadius *
-                    (morphology === "multicell" ? 0.82 : 0.76),
+                    (morphology === "multicell" ? 0.82
+                        : 0.30),
                 terminal[2] + apicalRadius * 0.08,
             ];
             addEllipsoid(shapes, apical, [
@@ -3121,13 +3144,10 @@ const buildCongestusModel = (config, seed) => {
         // The newest heads carry a smaller, lower companion beside the hard
         // rising bud. Unequal radii and vertical ages create cauliflower
         // hierarchy without giving each terminal a symmetric forked crown.
-        const budAngles = branchActivity >= 0.52
-            ? morphology === "turreted"
-                ? [primaryDirection * 0.62, 0]
-                : morphology === "multicell"
-                    ? [primaryDirection * 0.62]
-                    : [primaryDirection * 0.62, -primaryDirection * 0.96]
-            : [primaryDirection * 0.76];
+        const budAngles = branchActivity >=
+            (morphology === "balanced" ? 0.90 : 0.52)
+            ? [primaryDirection * 0.62]
+            : [];
         for (let bud = 0; bud < budAngles.length; bud += 1) {
             const angle = outwardAngle + budAngles[bud] +
                 mix(-0.12, 0.12, random());
@@ -3229,6 +3249,7 @@ const buildCongestusModel = (config, seed) => {
         crownTerminals.push({
             center: terminal,
             radius: terminalRadius,
+            verticalRadius: terminalRadius * terminalVerticalScale,
             anchorKey: anchor.key,
         });
     }
@@ -3255,21 +3276,28 @@ const buildCongestusModel = (config, seed) => {
             right.center[0] - left.center[0],
         );
         const minimumRadius = Math.min(left.radius, right.radius);
-        const cutRadius = clamp(minimumRadius * 0.48, 0.028, 0.040);
-        const leftTop = left.center[1] + left.radius;
-        const rightTop = right.center[1] + right.radius;
+        const cutRadius = clamp(
+            minimumRadius * (morphology === "turreted" ? 0.76 : 0.58),
+            0.032,
+            morphology === "turreted" ? 0.064 : 0.050,
+        );
+        const leftTop = left.center[1] + left.verticalRadius;
+        const rightTop = right.center[1] + right.verticalRadius;
         const depth = Math.max(
-            morphology === "balanced" ? 0.048 : 0,
+            morphology === "balanced" ? 0.058 : 0,
             minimumRadius * mix(
-                morphology === "turreted" ? 0.88 : 0.86,
-                morphology === "turreted" ? 1.10 : 1.08,
+                morphology === "turreted" ? 1.40 : 1.06,
+                morphology === "turreted" ? 1.70 : 1.34,
                 random(),
             ),
         );
         cavities.push({
             center: [
                 mix(left.center[0], right.center[0], 0.50),
-                Math.min(leftTop, rightTop) - depth * 0.28,
+                // Inter-head entrainment descends from clear air above the
+                // crown. Centering this below the lower summit left the top
+                // envelope intact and only hollowed the hidden interior.
+                Math.min(leftTop, rightTop) + depth * 0.28,
                 mix(left.center[2], right.center[2], 0.50),
             ],
             radii: [cutRadius, depth, cutRadius * 1.26],
@@ -3284,7 +3312,7 @@ const buildCongestusModel = (config, seed) => {
     // Keep them large enough to survive the 48^3 reconstruction theorem.
     const flankAnchors = shapes.filter((shape) =>
         shape.role === "convex-bud" || shape.role === "crown-convex-bud");
-    const evaporatingFlankCount = morphology === "multicell" ? 7 : 6;
+    const evaporatingFlankCount = morphology === "multicell" ? 5 : 4;
     for (let index = 0; index < evaporatingFlankCount; index += 1) {
         const anchor = flankAnchors[(index * 3 + 1) % flankAnchors.length];
         let outwardX = anchor.center[0] - sourceX;
@@ -3387,35 +3415,22 @@ const buildCumulusModel = (config, seed) => {
     const shapes = [];
     const cavities = [];
     const baseY = 0.145;
-    const congestus = config.species === "congestus";
     const mediocris = config.species === "mediocris";
-    const morphology = config.morphologyVariant ?? config.species;
-    const rootDefinitions = congestus
+    const rootDefinitions = mediocris
         ? [
-            // A coherent LCL is a plane, not a rectangular platform. These
-            // unequal, overlapping source lobes keep that plane while making
-            // its footprint materially smaller and less box-like than the
-            // developing tower above it.
-            [0.49, 0.50, 0.26, 0.18, 0.34],
-            [0.445, 0.515, 0.16, 0.14, 0.22],
-            [0.55, 0.47, 0.15, 0.15, 0.22],
-            [0.515, 0.445, 0.13, 0.12, 0.18],
+            [0.49, 0.50, 0.50, 0.43, 0.68],
+            [0.38, 0.51, 0.34, 0.34, 0.51],
+            [0.61, 0.46, 0.31, 0.37, 0.47],
+            [0.51, 0.38, 0.27, 0.30, 0.42],
         ]
-        : mediocris
-            ? [
-                [0.49, 0.50, 0.50, 0.43, 0.68],
-                [0.38, 0.51, 0.34, 0.34, 0.51],
-                [0.61, 0.46, 0.31, 0.37, 0.47],
-                [0.51, 0.38, 0.27, 0.30, 0.42],
-            ]
-            : [
-                [0.49, 0.50, 0.50, 0.36, 0.69],
-                [0.40, 0.51, 0.35, 0.31, 0.49],
-                [0.59, 0.47, 0.31, 0.34, 0.45],
-            ];
+        : [
+            [0.49, 0.50, 0.50, 0.36, 0.69],
+            [0.40, 0.51, 0.35, 0.31, 0.49],
+            [0.59, 0.47, 0.31, 0.34, 0.45],
+        ];
     const rootCenters = [];
     for (const [x, z, widthScale, heightScale, depthScale] of rootDefinitions) {
-        const rootJitter = congestus ? 0.012 : 0.026;
+        const rootJitter = 0.026;
         const verticalRadius = config.radius * heightScale;
         const center = [
             x + (random() - 0.5) * rootJitter,
@@ -3440,11 +3455,11 @@ const buildCumulusModel = (config, seed) => {
         const root = rootCenters[0];
         addEllipsoid(shapes, [
             mix(root[0], center[0], 0.52),
-            baseY + (congestus ? 0.030 : 0.027),
+            baseY + 0.027,
             mix(root[2], center[2], 0.52),
         ], [
             Math.max(0.035, Math.abs(root[0] - center[0]) * 0.62),
-            congestus ? 0.031 : 0.027,
+            0.027,
             Math.max(0.035, Math.abs(root[2] - center[2]) * 0.62),
         ], {
             density: 0.98,
@@ -3456,11 +3471,11 @@ const buildCumulusModel = (config, seed) => {
 
     // Perimeter-only entrainment leaves a credible flat central LCL instead
     // of either a rectangular slab or globally ragged underside.
-    const baseBiteCount = congestus ? 9 : mediocris ? 6 : 4;
+    const baseBiteCount = mediocris ? 6 : 4;
     for (let index = 0; index < baseBiteCount; index += 1) {
         const angle = index * 2.399963229728653 + random() * 0.42;
-        const radial = mix(congestus ? 0.065 : 0.125, congestus ? 0.118 : 0.185, random());
-        const radius = mix(congestus ? 0.016 : 0.022, congestus ? 0.032 : 0.037, random());
+        const radial = mix(0.125, 0.185, random());
+        const radius = mix(0.022, 0.037, random());
         cavities.push({
             center: [
                 0.50 + Math.cos(angle) * radial,
@@ -3471,13 +3486,13 @@ const buildCumulusModel = (config, seed) => {
                 radius * mix(0.82, 1.18, random())],
             rotation: angle,
             strength: mix(0.58, 0.86, random()),
-            role: congestus ? "base-entrainment-bite" : "perimeter-entrainment-bite",
+            role: "perimeter-entrainment-bite",
         });
     }
 
-    const levels = congestus ? Math.max(10, config.levels) : mediocris ? 7 : 4;
-    const driftScale = congestus ? 1 : mediocris ? 0.68 : 0.42;
-    const driftSign = morphology === "turreted" ? 1 : morphology === "multicell" ? -1 : 0.62;
+    const levels = mediocris ? 7 : 4;
+    const driftScale = mediocris ? 0.68 : 0.42;
+    const driftSign = 0.62;
     // A rising cloud is a sequence of buoyant thermal events, not a stack of
     // evenly spaced horizontal slices. Equal-height samples and a periodic
     // radius function survived 48^3 voxelization as repeated terraces. Draw
@@ -3502,9 +3517,8 @@ const buildCumulusModel = (config, seed) => {
     }, 0) / Math.max(1, eventIntervals.length)) / meanEventInterval;
 
     // The centreline follows an integrated, correlated lateral velocity. A
-    // sinusoid made every congestus variant bend back and forth at the same
-    // vertical wavelengths; this trajectory remains smooth and connected but
-    // never becomes bilateral or periodically repeated.
+    // This trajectory remains smooth and connected but never becomes bilateral
+    // or periodically repeated.
     let trajectoryX = 0.49;
     let trajectoryZ = 0.49;
     let trajectoryVelocityX = driftSign * mix(0.004, 0.011, random());
@@ -3521,39 +3535,26 @@ const buildCumulusModel = (config, seed) => {
         const t = eventTimes[level];
         thermalGrowthState = clamp(
             thermalGrowthState * mix(0.38, 0.58, random()) +
-                (random() - 0.5) * (congestus ? 0.46 : mediocris ? 0.32 : 0.22),
-            congestus ? -0.25 : -0.18,
-            congestus ? 0.28 : 0.20,
+                (random() - 0.5) * (mediocris ? 0.32 : 0.22),
+            -0.18,
+            0.20,
         );
         const fairWeatherPulseMotif = mediocris
             ? [1.08, 0.77, 1.16, 0.84, 1.04, 0.72, 1.12]
             : [1.10, 0.82, 1.04, 0.74];
-        const pulse = congestus
-            ? 0.96 + thermalGrowthState *
-                    (morphology === "multicell" ? 1.75 : 1) +
-                smoothstep(0.66, 1, t) * (morphology === "turreted" ? 0.055 : 0.085)
-            : fairWeatherPulseMotif[level] + thermalGrowthState *
-                (mediocris ? 0.46 : 0.34);
+        const pulse = fairWeatherPulseMotif[level] + thermalGrowthState *
+            (mediocris ? 0.46 : 0.34);
         // The protected trunk narrows between buoyant events and expands into
         // its crown. Keeping one nearly constant radius through twelve close
         // samples made the reconstructed owner a rectangular pillar even
         // though its source ellipsoids varied numerically.
-        const trunkEnvelope = !congestus ? 1
-            : morphology === "multicell"
-                ? mix(0.74, 0.84, smoothstep(0.05, 0.86, t))
-                : morphology === "turreted"
-                    ? mix(0.62, 0.75, smoothstep(0.04, 0.90, t))
-                    : mix(0.67, 0.80, smoothstep(0.04, 0.86, t));
-        const horizontalRadius = config.radius * pulse * trunkEnvelope * (
-            morphology === "multicell" ? 1.06 : morphology === "turreted" ? 0.91 : 1
-        );
+        const horizontalRadius = config.radius * pulse;
         // Growing liquid thermal heads are close to spherical or vertically
         // elongated. The old 0.68--0.82 scale authored flat spheroids, so an
         // oblique view literally exposed each successive one as a shelf.
-        let verticalRadius = horizontalRadius * (congestus
-            ? mix(0.91, 1.14, t) * mix(0.94, 1.08, random())
-            : mediocris ? mix(0.78, 0.96, t) * mix(0.96, 1.05, random())
-                : mix(0.64, 0.80, t) * mix(0.96, 1.05, random()));
+        let verticalRadius = horizontalRadius * (mediocris
+            ? mix(0.78, 0.96, t) * mix(0.96, 1.05, random())
+            : mix(0.64, 0.80, t) * mix(0.96, 1.05, random()));
         if (level > 0) {
             const eventInterval = eventTimes[level] - eventTimes[level - 1];
             trajectoryVelocityX = trajectoryVelocityX * 0.62 +
@@ -3568,11 +3569,11 @@ const buildCumulusModel = (config, seed) => {
         }
         const center = [
             trajectoryX + driftSign * driftScale *
-                (congestus ? 0.068 : 0.042) * t * t,
-            mix(baseY + (congestus ? 0.070 : mediocris ? 0.066 : 0.058),
-                congestus ? config.topY - 0.050 : config.topY,
+                0.042 * t * t,
+            mix(baseY + (mediocris ? 0.066 : 0.058),
+                config.topY,
                 Math.pow(t, 1.03)),
-            trajectoryZ - driftScale * (congestus ? 0.034 : 0.017) * t * t,
+            trajectoryZ - driftScale * 0.017 * t * t,
         ];
         // The first source-connected head must meet, but not punch through,
         // the central lifting-condensation surface.  Upper heads keep their
@@ -3591,9 +3592,7 @@ const buildCumulusModel = (config, seed) => {
         ], {
             density: mix(0.96, 1.04, random()),
             detail: config.detailBase,
-            role: congestus
-                ? t > 0.62 ? "crown-main-thermal" : "thermal-mass"
-                : "thermal",
+            role: "thermal",
         });
         mainCenters.push(center);
         mainRadii.push(horizontalRadius);
@@ -3603,63 +3602,53 @@ const buildCumulusModel = (config, seed) => {
         if (level > 0) {
             const previous = mainCenters[level - 1];
             const bridgeRadius = Math.min(mainRadii[level - 1], horizontalRadius) *
-                (congestus ? 0.40 : 0.56);
+                0.56;
             const verticalGap = Math.abs(center[1] - previous[1]);
             addEllipsoid(shapes, [
                 mix(previous[0], center[0], 0.50),
                 mix(previous[1], center[1], 0.50),
                 mix(previous[2], center[2], 0.50),
-            ], [bridgeRadius * (congestus ? 0.72 : 0.82),
+            ], [bridgeRadius * 0.82,
                 Math.max(
-                    bridgeRadius * (congestus ? 1 : 1.08),
-                    verticalGap * (congestus ? 0.54 : 0.62),
+                    bridgeRadius * 1.08,
+                    verticalGap * 0.62,
                 ),
-                bridgeRadius * (congestus ? 0.78 : 0.90)], {
+                bridgeRadius * 0.90], {
                 density: 0.97,
                 detail: config.detailBase,
-                role: congestus ? "thermal-junction" : "thermal",
+                role: "thermal",
             });
             mergedBodyLobeCount += 1;
         }
 
         if (level === 0) continue;
         const crown = t > 0.72;
-        const daughterCount = congestus
-            ? (crown ? 3 : t > 0.38 ? 3 : 2)
-            : mediocris ? (crown ? 4 : 2) : (crown ? 3 : 1);
+        const daughterCount = mediocris ? (crown ? 4 : 2) : (crown ? 3 : 1);
         const shellPhase = random() * Math.PI * 2;
         for (let daughter = 0; daughter < daughterCount; daughter += 1) {
             const azimuth = shellPhase + daughter * 2.399963229728653 +
-                (random() - 0.5) * (congestus ? 0.58 : mediocris ? 1.35 : 1.05);
-            const dominantPulse = congestus && daughter === 0 &&
-                (crown || level % 3 === 1);
+                (random() - 0.5) * (mediocris ? 1.35 : 1.05);
             const daughterRadius = Math.max(
-                congestus ? 0.031 : mediocris ? 0.027 : 0.024,
-                horizontalRadius * mix(congestus ? 0.36 : 0.34,
-                    congestus ? 0.56 : 0.50, random()),
-            ) * (dominantPulse ? mix(1.08, 1.24, random()) : 1);
+                mediocris ? 0.027 : 0.024,
+                horizontalRadius * mix(0.34, 0.50, random()),
+            );
             // Couple displacement to radius so every visible daughter both
             // protrudes as a hard cusp and overlaps its parent substantially.
             const offset = horizontalRadius * mix(0.58, 0.69, random()) +
                 daughterRadius * mix(0.16, 0.28, random());
             const daughterCenter = [
                 center[0] + Math.cos(azimuth) * offset,
-                center[1] + daughterRadius * (dominantPulse
-                    ? mix(crown ? 0.72 : 0.44, crown ? 1.28 : 0.92, random())
-                    : mix(crown ? -0.12 : -0.34,
-                        crown ? 0.76 : 0.62, random())),
+                center[1] + daughterRadius * mix(crown ? -0.12 : -0.34,
+                    crown ? 0.76 : 0.62, random()),
                 center[2] + Math.sin(azimuth) * offset * mix(0.78, 1.02, random()),
             ];
-            if (!congestus) {
-                daughterCenter[1] = Math.min(
-                    daughterCenter[1],
-                    config.topY - daughterRadius * 0.50,
-                );
-            }
+            daughterCenter[1] = Math.min(
+                daughterCenter[1],
+                config.topY - daughterRadius * 0.50,
+            );
             addEllipsoid(shapes, daughterCenter, [
                 daughterRadius * mix(0.90, 1.12, random()),
-                daughterRadius * mix(dominantPulse ? 1.00 : 0.90,
-                    dominantPulse ? 1.22 : 1.10, random()),
+                daughterRadius * mix(0.90, 1.10, random()),
                 daughterRadius * mix(0.88, 1.10, random()),
             ], {
                 density: mix(0.91, 0.99, random()),
@@ -3683,10 +3672,8 @@ const buildCumulusModel = (config, seed) => {
             nestedPulseCount += 1;
             if (crown) crownLobeCount += 1;
 
-            const addCusp = congestus
-                ? (daughter + level) % 2 === 0
-                : mediocris ? crown && daughter % 2 === 0
-                    : crown && daughter === 0;
+            const addCusp = mediocris ? crown && daughter % 2 === 0
+                : crown && daughter === 0;
             if (!addCusp) continue;
             const cuspRadius = daughterRadius * mix(0.48, 0.64, random());
             const cuspAngle = azimuth + mix(0.42, 0.92, random());
@@ -3718,192 +3705,15 @@ const buildCumulusModel = (config, seed) => {
     }
 
     let crownBranchCount = 0;
-    if (congestus) {
-        // Split the upper parcel trajectory into several unequal, connected
-        // toroidal heads. A single enlarged terminal ellipsoid—however noisy—
-        // reads as one rounded cap; real Congestus crowns expose simultaneous
-        // buoyant events, subordinate buds, necks, and dry clefts.
-        crownBranchCount = morphology === "multicell" ? 5
-            : morphology === "turreted" ? 3 : 4;
-        const crownRootIndex = Math.max(1, Math.floor((levels - 1) * 0.66));
-        const crownRoot = mainCenters[crownRootIndex];
-        const branchPhase = random() * Math.PI * 2;
-        const branchAngleMotif = crownBranchCount === 3
-            ? [0, 1.36, 3.92]
-            : crownBranchCount === 4
-                ? [0, 0.94, 2.73, 4.66]
-                : [0, 0.82, 2.18, 3.06, 5.12];
-        const branchHeightMotif = crownBranchCount === 3
-            ? [0.045, -0.020, 0.016]
-            : crownBranchCount === 4
-                ? [0.050, -0.018, 0.022, -0.042]
-                : [0.045, -0.010, 0.026, -0.048, 0.008];
-        const crownTerminals = [];
-        for (let branch = 0; branch < crownBranchCount; branch += 1) {
-            const angle = branchPhase + branchAngleMotif[branch] +
-                mix(-0.20, 0.20, random());
-            const radial = config.radius * mix(
-                morphology === "turreted" ? 0.65 : 0.78,
-                morphology === "multicell" ? 1.80 :
-                    morphology === "turreted" ? 1.50 : 1.65,
-                random(),
-            );
-            const branchTop = Math.min(
-                0.90,
-                config.topY + branchHeightMotif[branch] +
-                    mix(-0.010, 0.010, random()),
-            );
-            let previous = crownRoot;
-            let previousRadius = Math.max(0.034,
-                mainRadii[crownRootIndex] * 0.42);
-            const branchSteps = branch === 0 ? 4 : 3;
-            for (let step = 1; step <= branchSteps; step += 1) {
-                const u = step / branchSteps;
-                const lateral = radial * Math.pow(u, 1.18);
-                const radius = config.radius * mix(
-                    morphology === "turreted" ? 0.42 : 0.46,
-                    branch === 0 ? 0.78 : 0.66,
-                    Math.pow(u, 0.72),
-                ) * mix(0.88, 1.12, random());
-                const center = [
-                    crownRoot[0] + Math.cos(angle) * lateral +
-                        Math.cos(angle + 1.4) * radius * 0.12 * Math.sin(u * Math.PI),
-                    mix(crownRoot[1], branchTop, u),
-                    crownRoot[2] + Math.sin(angle) * lateral *
-                        mix(0.80, 1.08, random()),
-                ];
-                const neckRadius = Math.max(0.021,
-                    Math.min(previousRadius, radius) * 0.48);
-                addEllipsoid(shapes, [
-                    mix(previous[0], center[0], 0.52),
-                    mix(previous[1], center[1], 0.52),
-                    mix(previous[2], center[2], 0.52),
-                ], [neckRadius * 0.86,
-                    Math.max(neckRadius, Math.abs(center[1] - previous[1]) * 0.56),
-                    neckRadius * 0.92], {
-                    density: 0.97,
-                    detail: config.detailBase,
-                    role: "crown-branch-neck",
-                });
-                addEllipsoid(shapes, center, [
-                    radius * mix(0.92, 1.10, random()),
-                    radius * mix(0.94, 1.18, random()),
-                    radius * mix(0.86, 1.08, random()),
-                ], {
-                    density: mix(0.94, 1, random()),
-                    detail: config.detailBase,
-                    rotation: angle,
-                    role: "crown-branch-thermal",
-                });
-                mergedBodyLobeCount += 2;
-                nestedPulseCount += 1;
-                crownLobeCount += 1;
-                previous = center;
-                previousRadius = radius;
-                if (step !== branchSteps) continue;
-                const terminalBudCount = branch === 0 ? 3 : 2;
-                for (let bud = 0; bud < terminalBudCount; bud += 1) {
-                    const budAngle = angle + (bud - 0.7) * 1.38 +
-                        mix(-0.18, 0.18, random());
-                    const budRadius = radius * mix(0.34, 0.52, random());
-                    const budCenter = [
-                        center[0] + Math.cos(budAngle) * radius * mix(0.58, 0.82, random()),
-                        center[1] + budRadius * mix(0.25, 0.78, random()),
-                        center[2] + Math.sin(budAngle) * radius * mix(0.48, 0.76, random()),
-                    ];
-                    addEllipsoid(shapes, budCenter, [
-                        budRadius * 1.06,
-                        budRadius * mix(0.96, 1.18, random()),
-                        budRadius * 0.94,
-                    ], {
-                        density: 0.92,
-                        detail: config.detailBase,
-                        rotation: budAngle,
-                        role: "crown-branch-bud",
-                    });
-                    const budNeckRadius = Math.max(0.017, budRadius * 0.52);
-                    addEllipsoid(shapes, [
-                        mix(center[0], budCenter[0], 0.55),
-                        mix(center[1], budCenter[1], 0.55),
-                        mix(center[2], budCenter[2], 0.55),
-                    ], [budNeckRadius, budNeckRadius * 1.08, budNeckRadius], {
-                        density: 0.95,
-                        detail: config.detailBase,
-                        role: "crown-branch-bud-neck",
-                    });
-                    mergedBodyLobeCount += 1;
-                    nestedPulseCount += 1;
-                    cuspCount += 1;
-                    crownLobeCount += 1;
-                }
-            }
-            crownTerminals.push({ center: previous, radius: previousRadius });
-        }
-        for (let branch = 0; branch + 1 < crownTerminals.length; branch += 1) {
-            const left = crownTerminals[branch];
-            const right = crownTerminals[branch + 1];
-            const separation = Math.hypot(
-                right.center[0] - left.center[0],
-                right.center[2] - left.center[2],
-            );
-            const cutRadius = clamp(separation * 0.18, 0.022, 0.042);
-            cavities.push({
-                center: [
-                    mix(left.center[0], right.center[0], 0.5),
-                    Math.min(left.center[1], right.center[1]) +
-                        Math.min(left.radius, right.radius) * 0.42,
-                    mix(left.center[2], right.center[2], 0.5),
-                ],
-                radii: [cutRadius * 1.10, cutRadius * 1.46, cutRadius * 1.10],
-                rotation: Math.atan2(
-                    right.center[2] - left.center[2],
-                    right.center[0] - left.center[0],
-                ),
-                strength: mix(0.82, 0.95, random()),
-                role: "crown-interthermal-cleft",
-            });
-        }
-
-        // Opposed, alternating flank cuts at event junctions reveal the neck
-        // hierarchy without severing the protected central parcel path.
-        for (let level = 1; level < mainCenters.length; level += 1) {
-            const previous = mainCenters[level - 1];
-            const current = mainCenters[level];
-            const tangentX = current[0] - previous[0];
-            const tangentZ = current[2] - previous[2];
-            const tangentLength = Math.max(0.012, Math.hypot(tangentX, tangentZ));
-            const normalX = -tangentZ / tangentLength;
-            const normalZ = tangentX / tangentLength;
-            const fallbackAngle = level * 2.399963229728653;
-            const outwardX = tangentLength > 0.018 ? normalX : Math.cos(fallbackAngle);
-            const outwardZ = tangentLength > 0.018 ? normalZ : Math.sin(fallbackAngle);
-            const side = level % 2 === 0 ? -1 : 1;
-            const neckRadius = Math.min(mainRadii[level - 1], mainRadii[level]);
-            const cutRadius = Math.max(0.018, neckRadius * mix(0.26, 0.38, random()));
-            cavities.push({
-                center: [
-                    mix(previous[0], current[0], 0.52) +
-                        outwardX * side * neckRadius * 0.78,
-                    mix(previous[1], current[1], 0.52),
-                    mix(previous[2], current[2], 0.52) +
-                        outwardZ * side * neckRadius * 0.78,
-                ],
-                radii: [cutRadius * 1.16, cutRadius * 0.90, cutRadius],
-                rotation: Math.atan2(outwardZ, outwardX),
-                strength: mix(0.66, 0.84, random()),
-                role: "thermal-neck-cleft",
-            });
-        }
-    }
 
     // Unequal feeder thermals merge below the dominant trajectory. They add
     // asymmetry and depth without producing several equal detached towers.
-    const feederCount = congestus ? (morphology === "multicell" ? 3 : 2) : mediocris ? 2 : 1;
+    const feederCount = mediocris ? 2 : 1;
     for (let feeder = 0; feeder < feederCount; feeder += 1) {
         const root = rootCenters[(feeder + 1) % rootCenters.length];
         const side = feeder % 2 === 0 ? -1 : 1;
-        const feederTopT = congestus ? mix(0.46, 0.68, random()) : mediocris ? 0.48 : 0.32;
-        const steps = congestus ? 4 : 3;
+        const feederTopT = mediocris ? 0.48 : 0.32;
+        const steps = 3;
         for (let step = 0; step < steps; step += 1) {
             const t = (step + 1) / steps;
             const mainIndex = Math.min(levels - 1, Math.round(feederTopT * t * (levels - 1)));
@@ -3913,8 +3723,7 @@ const buildCumulusModel = (config, seed) => {
                 mix(baseY + 0.070, main[1], t),
                 mix(root[2], main[2] - side * config.radius * 0.16, t),
             ];
-            const radius = config.radius * mix(congestus ? 0.76 : 0.66,
-                congestus ? 0.56 : 0.48, t);
+            const radius = config.radius * mix(0.66, 0.48, t);
             addEllipsoid(shapes, center, [radius,
                 radius * mix(0.94, 1.10, random()), radius * 0.92], {
                 density: 0.94,
@@ -3992,7 +3801,7 @@ const buildCumulusModel = (config, seed) => {
     const cavityAnchors = shapes.filter((shape) =>
         (shape.role === "thermal-shell-pulse" || shape.role === "thermal-cusp") &&
         shape.center[1] > baseY + 0.10 && shape.center[1] < config.topY - 0.025);
-    const evaporatingFlankCount = congestus ? 12 : mediocris ? 5 : 0;
+    const evaporatingFlankCount = mediocris ? 5 : 0;
     for (let index = 0; index < evaporatingFlankCount; index += 1) {
         const anchor = cavityAnchors[(index * 5 + 2) % Math.max(1, cavityAnchors.length)];
         if (!anchor) break;
@@ -4017,7 +3826,7 @@ const buildCumulusModel = (config, seed) => {
     // Resolved negative clefts represent toroidal-vortex entrainment below and
     // around growing heads. They are attached to exterior shell pulses and
     // cannot sever the protected source/updraft core in evaluateModel.
-    const flankCavityCount = congestus ? 14 : mediocris ? 6 : 2;
+    const flankCavityCount = mediocris ? 6 : 2;
     for (let index = 0; index < flankCavityCount; index += 1) {
         const anchor = cavityAnchors[index % Math.max(1, cavityAnchors.length)];
         if (!anchor) break;
@@ -4026,7 +3835,7 @@ const buildCumulusModel = (config, seed) => {
         const length = Math.max(0.02, Math.hypot(outwardX, outwardZ));
         outwardX /= length;
         outwardZ /= length;
-        const radius = mix(0.018, congestus ? 0.038 : 0.030, random());
+        const radius = mix(0.018, 0.030, random());
         cavities.push({
             center: [anchor.center[0] + outwardX * radius * mix(0.32, 0.74, random()),
                 anchor.center[1] - radius * mix(0.08, 0.54, random()),
@@ -4055,7 +3864,7 @@ const buildCumulusModel = (config, seed) => {
         mergedBodyLobeCount,
         evaporatingFlankCount,
         secondaryLobeCount: nestedPulseCount + cuspCount,
-        hierarchyLevelCount: congestus ? 4 : mediocris ? 3 : 2,
+        hierarchyLevelCount: mediocris ? 3 : 2,
         branchSpread: rootCenters.reduce((maximum, center) => Math.max(maximum,
             Math.hypot(center[0] - 0.5, center[2] - 0.49) * 2), 0),
         cumulusNestedPulseCount: nestedPulseCount,
@@ -4096,6 +3905,10 @@ const ellipsoidField = (x, y, z, shape) => {
     return (1 - distance) * Math.min(...shape.radii);
 };
 
+const authoredShapeField = (x, y, z, shape) => shape.kind === "capsule"
+    ? capsuleField(x, y, z, shape)
+    : ellipsoidField(x, y, z, shape);
+
 const evaluateModel = (model, config, x, y, z, seed) => {
     const congestusMorphology = config.species === "congestus";
     // The explicit Congestus thermal tree now resolves the visible curvature.
@@ -4115,17 +3928,23 @@ const evaluateModel = (model, config, x, y, z, seed) => {
     let support = -1;
     let protectedCore = -1;
     const baseY = model.baseY ?? 0.145;
+    let secondarySupport = -1;
     let attributeWeight = 0;
     let detail = config.detailBase;
     let phase = 0;
     for (const shape of model.shapes) {
-        const field = ellipsoidField(warpedX, warpedY, warpedZ, shape);
+        const field = authoredShapeField(warpedX, warpedY, warpedZ, shape);
         // Density is not a distance scale: multiplying negative SDF values by
         // a weak wisp density expands its nominal support. Instead, low-density
         // condensate receives a small physical inset and therefore remains a
         // narrow fringe around its authored centerline.
         const weightedField = field - (1 - shape.density) * 0.020;
-        support = Math.max(support, weightedField);
+        if (weightedField > support) {
+            secondarySupport = support;
+            support = weightedField;
+        } else {
+            secondarySupport = Math.max(secondarySupport, weightedField);
+        }
         // Only the connected, lower liquid updraft of deep convection receives
         // a hard core floor. A universal floor on every thermal inflated fair-
         // weather cumulus into smooth ovals and prevented scalloped dry-air
@@ -4176,6 +3995,24 @@ const evaluateModel = (model, config, x, y, z, seed) => {
     }
     detail /= Math.max(1, attributeWeight);
     phase /= Math.max(1, attributeWeight);
+
+    if (congestusMorphology && secondarySupport > -1) {
+        // Real neighboring thermals exchange condensate across their moist
+        // interface. A hard max preserved each source ellipsoid as a round
+        // extinction stamp in P1 lighting. Blend only the two nearest fields,
+        // so the C2 union removes that seam without accumulating support over
+        // the full primitive population or erasing the explicit dry clefts.
+        const moistInterfaceBlend = config.radius * 0.18 *
+            smoothstep(baseY + 0.12, baseY + 0.24, y) *
+            (1 - smoothstep(0.64, 0.82, y));
+        if (moistInterfaceBlend > 1e-6) {
+            support = -smoothMinimumC2(
+                -support,
+                -secondarySupport,
+                moistInterfaceBlend,
+            );
+        }
+    }
 
     let cavity = 0;
     let baseEntrainmentCavity = 0;
@@ -4242,7 +4079,9 @@ const evaluateModel = (model, config, x, y, z, seed) => {
             // than cuts through the communicating lineage below.
             crownEntrainmentCavity * (config.morphologyVariant === "multicell"
                 ? mix(0.140, 0.240, edgeFactor)
-                : mix(0.090, 0.160, edgeFactor)),
+                : config.morphologyVariant === "balanced"
+                    ? mix(0.160, 0.280, edgeFactor)
+                    : mix(0.090, 0.160, edgeFactor)),
         )
         : cavity * mix(0.034, config.dissipating ? 0.092 : 0.074, edgeFactor);
     const erodedSupport = Math.max(support + erosion + baseFractal - cavityCut, protectedCore);
@@ -11805,6 +11644,7 @@ const buildMacroModel = (config, seed) => {
     }
 };
 
+
 const evaluateMacroModel = (model, config, x, y, z, seed) => {
     switch (model.kind) {
         case "primitive": return evaluatePrimitiveModel(model, config, x, y, z, seed);
@@ -15404,6 +15244,8 @@ export const generateCloudMacroAtlas = ({
         let signedDistance;
         let highIceMoments;
         let topologyCleanup;
+        let preRepairComponentCount = null;
+        let addedConnectorVoxels = 0;
         let sourceTopologyCleanup = {
             removedVoxelCount: 0,
             removedVoxelFraction: 0,
@@ -15430,6 +15272,7 @@ export const generateCloudMacroAtlas = ({
                 source.occupied,
                 sourceResolution,
             ).connectedComponentCount;
+            preRepairComponentCount = preCleanupSourceComponentCount;
             const preCleanupSourceSupportChecksum = sha256(source.occupied);
             const preCleanupSourceDensityChecksum = sha256(
                 reconstructHighIce ? source.authoredDensity : source.density,
@@ -15480,6 +15323,7 @@ export const generateCloudMacroAtlas = ({
                     ).connectedComponentCount,
                     addedConnectorVoxels: 0,
                 };
+            addedConnectorVoxels = supportRepair.addedConnectorVoxels;
             // Protected liquid towers need the fine-lattice SDF restriction to
             // preserve their exact LCL/exterior contract. High ice needs the
             // 2x optical-mass reconstruction but not a 96^3 distance transform:
@@ -15647,6 +15491,10 @@ export const generateCloudMacroAtlas = ({
                     resolution,
                 )
                 : { removedVoxelCount: 0, removedVoxelFraction: 0 };
+            preRepairComponentCount = measureConnectivity(
+                occupied,
+                resolution,
+            ).connectedComponentCount;
             signedDistance = createSignedDistanceChannel(
                 occupied,
                 resolution,
@@ -15738,6 +15586,17 @@ export const generateCloudMacroAtlas = ({
                 );
             }
         }
+        const projectionPeriodicity = measureProjectedAutocorrelation(
+            density,
+            resolution,
+        );
+        const cumulusProjectionAnatomy = measureCumulusProjectionAnatomy(
+            occupied,
+            density,
+            resolution,
+            model.baseY ?? null,
+            reconstructProtectedCu ? occupancyThreshold + 1 : 1,
+        );
         const statistics = {
             ...connectivity,
             ...exteriorPotential.statistics,
@@ -15773,15 +15632,9 @@ export const generateCloudMacroAtlas = ({
             ...measureReconstructionSupport(occupied, resolution),
             ...measureProjectedFootprint(occupied, resolution),
             ...measureProjectedDensityPaths(density, resolution),
-            ...measureProjectedAutocorrelation(density, resolution),
+            ...projectionPeriodicity,
             ...measureVerticalSilhouette(occupied, resolution),
-            ...measureCumulusProjectionAnatomy(
-                occupied,
-                density,
-                resolution,
-                model.baseY ?? null,
-                reconstructProtectedCu ? occupancyThreshold + 1 : 1,
-            ),
+            ...cumulusProjectionAnatomy,
             ...measureVerticalSpanProfile(occupied, resolution),
             ...measureHorizontalSliceTopology(occupied, resolution),
             ...measureLowerBoundaryRoughness(occupied, resolution, model.baseY ?? null),
@@ -15930,6 +15783,22 @@ export const generateCloudMacroAtlas = ({
             convectiveCrownLobeCount: model.crownLobeCount ?? 0,
             convectiveMergedBodyLobeCount: model.mergedBodyLobeCount ?? 0,
             convectiveEvaporatingFlankCount: model.evaporatingFlankCount ?? 0,
+            convectivePrimitiveUnionCount:
+                model.primitives?.length ?? 0,
+            convectiveCavityCount: model.cavities?.length ?? 0,
+            convectivePreRepairComponentCount:
+                preRepairComponentCount ?? 0,
+            convectiveFinalComponentCount:
+                connectivity.connectedComponentCount,
+            convectiveAddedConnectorVoxels:
+                addedConnectorVoxels,
+            convectiveConvexScaleBandCount:
+                cumulusProjectionAnatomy.cumulusCrownConvexScaleBandCount ?? 0,
+            convectivePeriodicScore:
+                Math.max(
+                    projectionPeriodicity.projectedGridAutocorrelationScore ?? 0,
+                    projectionPeriodicity.projectedOneAxisPeriodicScore ?? 0,
+                ),
             cirrusCommaHeadLobeCount: model.commaHeadCount ?? 0,
             cirrusTaperedFallstreakCount: model.taperedFallstreakCount ?? 0,
             cirrusMeanFallstreakTerminalRadiusRatio: model.meanFallstreakTerminalRadiusRatio ?? 0,
