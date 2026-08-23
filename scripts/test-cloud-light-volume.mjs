@@ -1750,8 +1750,8 @@ test("current tiled atlas qualifies within the residual-gated cycle ceiling", ()
         faceIrradiance: [0, 0, 0, 0, 0, 0],
         multigridLevels: 4,
     });
-    assert.equal(occupied, 20_863,
-        "fixture must remain tied to the final filtered multi-crown Cu support");
+    assert.equal(occupied, 21_489,
+        "fixture must remain tied to the final filtered source-authored Cu support");
     assert.equal(result.occupiedCount, occupied);
     assert.equal(result.nonFiniteCount, 0);
     for (const value of result.fluence) {
