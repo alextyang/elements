@@ -23,8 +23,14 @@ const manifestPath = join(
 const wdasManifestPath = join(
     repositoryRoot, "data/cloud-plate-assets/wdas-cloud.json",
 );
+const authoredManifestPath = join(
+    repositoryRoot, "data/cloud-plate-assets/authored-vdb.json",
+);
 const targetRoot = join(repositoryRoot, "output/tools/cloud-vdb");
 const wdasTargetRoot = join(repositoryRoot, "output/tools/wdas-cloud");
+const authoredTargetRoot = join(
+    repositoryRoot, "output/cloud-plates/authored-vdb",
+);
 
 const sha256File = (path) => createHash("sha256")
     .update(readFileSync(path)).digest("hex");
@@ -113,11 +119,71 @@ const installWdasAssets = (manifest, temporaryRoot) => {
     }
 };
 
+const installAuthoredAssets = (manifest) => {
+    const generator = join(repositoryRoot, manifest.generator);
+    if (!existsSync(generator) ||
+        sha256File(generator) !== manifest.generatorSourceSha256) {
+        throw new Error("Authored VDB generator checksum mismatch.");
+    }
+    const missing = manifest.assets.filter((asset) => {
+        const target = join(authoredTargetRoot, asset.entry);
+        const valid = existsSync(target) && sha256File(target) === asset.vdbSha256;
+        if (valid) process.stdout.write(`Verified ${asset.id}.vdb\n`);
+        return !valid;
+    });
+    if (!missing.length) return;
+    const build = spawnSync(process.execPath, [
+        join(repositoryRoot, "scripts/author-cloud-vdb.mjs"), "--build-only",
+    ], { cwd: repositoryRoot, encoding: "utf8" });
+    if (build.status !== 0) {
+        throw new Error(`Authored VDB build failed: ${build.stderr.trim()}`);
+    }
+    const executable = join(
+        repositoryRoot, "output/tools/cloud-vdb-author-build/cloud-vdb-author",
+    );
+    mkdirSync(authoredTargetRoot, { recursive: true });
+    for (const asset of missing) {
+        const target = join(authoredTargetRoot, asset.entry);
+        const staged = `${target}.${process.pid}.${randomBytes(4)
+            .toString("hex")}.tmp.vdb`;
+        const authored = asset.authoring;
+        const generation = spawnSync(executable, [
+            "--genus", authored.genus,
+            "--species", authored.species,
+            "--output", staged,
+            "--width", String(authored.width),
+            "--depth", String(authored.depth),
+            "--height", String(authored.height),
+            "--voxel-size", String(authored.voxelSize),
+            "--seed", String(authored.seed),
+            "--evolution", String(authored.evolution),
+        ], { cwd: repositoryRoot, encoding: "utf8" });
+        if (generation.status !== 0) {
+            rmSync(staged, { force: true });
+            throw new Error(
+                `Authored VDB generation failed for ${asset.id}: ` +
+                `${generation.stderr.trim()}`,
+            );
+        }
+        if (!existsSync(staged) || sha256File(staged) !== asset.vdbSha256) {
+            rmSync(staged, { force: true });
+            throw new Error(`Authored VDB checksum mismatch for ${asset.id}.`);
+        }
+        rmSync(target, { force: true });
+        renameSync(staged, target);
+        process.stdout.write(`Installed ${asset.id}.vdb\n`);
+    }
+};
+
 const main = async () => {
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
     const wdasManifest = JSON.parse(readFileSync(wdasManifestPath, "utf8"));
+    const authoredManifest = JSON.parse(readFileSync(
+        authoredManifestPath, "utf8"));
     if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.assets) ||
-        wdasManifest.schemaVersion !== 1 || !Array.isArray(wdasManifest.assets)) {
+        wdasManifest.schemaVersion !== 1 || !Array.isArray(wdasManifest.assets) ||
+        authoredManifest.schemaVersion !== 1 ||
+        !Array.isArray(authoredManifest.assets)) {
         throw new Error("Unsupported cloud VDB asset manifest.");
     }
     const temporaryRoot = mkdtempSync(join(tmpdir(), "cloud-vdb-bootstrap-"));
@@ -126,6 +192,7 @@ const main = async () => {
             await fetchAsset(asset, temporaryRoot);
         }
         installWdasAssets(wdasManifest, temporaryRoot);
+        installAuthoredAssets(authoredManifest);
     } finally {
         rmSync(temporaryRoot, { recursive: true, force: true });
     }

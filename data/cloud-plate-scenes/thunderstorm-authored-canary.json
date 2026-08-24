@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "thunderstorm-authored-canary",
+  "fixedCamera": {
+    "perspectiveId": "oblique-natural",
+    "horizontalFovDegrees": 64,
+    "verticalFovDegrees": 43.52,
+    "viewElevationDegrees": 27,
+    "position": [16, -30, 3.3],
+    "target": [0, 0, 7.1],
+    "lensMm": 31
+  },
+  "offlineComposition": {
+    "sourceKind": "authored-continuous-field",
+    "axisConvention": "z-up",
+    "sourceAssetId": "authored-cumulonimbus-capillatus-incus",
+    "scatteringStrength": 2.4,
+    "radianceCalibration": 0.28,
+    "volumeInstances": [
+      {
+        "id": "continuous-storm-field",
+        "sourceAssetId": "authored-cumulonimbus-capillatus-incus",
+        "componentId": "storm-mature-core",
+        "target": [0, 0.5, 6.9],
+        "scale": [1.15, 1.15, 1.15],
+        "rotationDegrees": -7,
+        "scatteringMultiplier": 1,
+        "detailStrength": 0,
+        "bottomFade": 0,
+        "phaseOffset": 0
+      }
+    ],
+    "precipitation": {
+      "componentId": "storm-rain-core",
+      "target": [0.3, -1.4, 1.8],
+      "dimensions": [15, 3.5, 9],
+      "rotationDegrees": -6,
+      "densityScale": 0.22
+    }
+  },
+  "lighting": {
+    "sunEnergy": 4.5,
+    "keyEnergy": 0,
+    "worldStrength": 0.065,
+    "worldColor": [0.52, 0.66, 0.94]
+  }
+}

@@ -37,7 +37,8 @@ def look_at(obj, target):
     ).to_euler()
 
 
-def cloud_volume_material(name, scattering_strength, bottom_fade=0.0):
+def cloud_volume_material(
+        name, scattering_strength, bottom_fade=0.0, detail_strength=0.0):
     material = bpy.data.materials.new(name)
     material.use_nodes = True
     tree = material.node_tree
@@ -50,6 +51,60 @@ def cloud_volume_material(name, scattering_strength, bottom_fade=0.0):
     attribute = tree.nodes.new("ShaderNodeAttribute")
     attribute.attribute_name = "density"
     density_source = attribute.outputs["Fac"]
+    if detail_strength > 0.0:
+        coordinates = tree.nodes.new("ShaderNodeTexCoord")
+        macro_noise = tree.nodes.new("ShaderNodeTexNoise")
+        macro_noise.noise_dimensions = "3D"
+        macro_noise.inputs["Scale"].default_value = 4.2
+        macro_noise.inputs["Detail"].default_value = 6.0
+        macro_noise.inputs["Roughness"].default_value = 0.68
+        macro_noise.inputs["Distortion"].default_value = 0.22
+        tree.links.new(coordinates.outputs["Generated"], macro_noise.inputs["Vector"])
+        macro_range = tree.nodes.new("ShaderNodeMapRange")
+        macro_range.interpolation_type = "SMOOTHERSTEP"
+        macro_range.clamp = True
+        macro_range.inputs["From Min"].default_value = 0.24
+        macro_range.inputs["From Max"].default_value = 0.78
+        macro_range.inputs["To Min"].default_value = max(
+            0.16, 1.0 - 0.72 * detail_strength
+        )
+        macro_range.inputs["To Max"].default_value = 1.0 + 0.58 * detail_strength
+        tree.links.new(macro_noise.outputs["Fac"], macro_range.inputs["Value"])
+        macro_density = tree.nodes.new("ShaderNodeMath")
+        macro_density.operation = "MULTIPLY"
+        tree.links.new(density_source, macro_density.inputs[0])
+        tree.links.new(macro_range.outputs["Result"], macro_density.inputs[1])
+
+        fine_noise = tree.nodes.new("ShaderNodeTexNoise")
+        fine_noise.noise_dimensions = "3D"
+        fine_noise.inputs["Scale"].default_value = 18.0
+        fine_noise.inputs["Detail"].default_value = 4.0
+        fine_noise.inputs["Roughness"].default_value = 0.72
+        fine_noise.inputs["Distortion"].default_value = 0.10
+        tree.links.new(coordinates.outputs["Generated"], fine_noise.inputs["Vector"])
+        fine_range = tree.nodes.new("ShaderNodeMapRange")
+        fine_range.interpolation_type = "SMOOTHERSTEP"
+        fine_range.clamp = True
+        fine_range.inputs["From Min"].default_value = 0.28
+        fine_range.inputs["From Max"].default_value = 0.74
+        fine_range.inputs["To Min"].default_value = max(
+            0.45, 1.0 - 0.30 * detail_strength
+        )
+        fine_range.inputs["To Max"].default_value = 1.0 + 0.28 * detail_strength
+        tree.links.new(fine_noise.outputs["Fac"], fine_range.inputs["Value"])
+        fine_density = tree.nodes.new("ShaderNodeMath")
+        fine_density.operation = "MULTIPLY"
+        tree.links.new(macro_density.outputs[0], fine_density.inputs[0])
+        tree.links.new(fine_range.outputs["Result"], fine_density.inputs[1])
+        eroded_density = tree.nodes.new("ShaderNodeMath")
+        eroded_density.operation = "SUBTRACT"
+        eroded_density.inputs[1].default_value = 0.14 * detail_strength
+        tree.links.new(fine_density.outputs[0], eroded_density.inputs[0])
+        nonnegative_density = tree.nodes.new("ShaderNodeMath")
+        nonnegative_density.operation = "MAXIMUM"
+        nonnegative_density.inputs[1].default_value = 0.0
+        tree.links.new(eroded_density.outputs[0], nonnegative_density.inputs[0])
+        density_source = nonnegative_density.outputs[0]
     if bottom_fade > 0.0:
         coordinates = tree.nodes.new("ShaderNodeTexCoord")
         separate = tree.nodes.new("ShaderNodeSeparateXYZ")
@@ -231,11 +286,16 @@ def add_precipitation_curtain(time_seconds, scene_definition):
     return curtain
 
 
-def place_wdas_volume(obj, target, scale, rotation_degrees):
+def place_volume(obj, target, scale, rotation_degrees, axis_convention):
     obj.rotation_mode = "XYZ"
-    obj.rotation_euler = (
-        math.radians(90.0), 0.0, math.radians(rotation_degrees)
-    )
+    if axis_convention == "wdas-y-up":
+        obj.rotation_euler = (
+            math.radians(90.0), 0.0, math.radians(rotation_degrees)
+        )
+    elif axis_convention == "z-up":
+        obj.rotation_euler = (0.0, 0.0, math.radians(rotation_degrees))
+    else:
+        raise RuntimeError(f"Unsupported volume axis convention: {axis_convention}")
     obj.scale = scale
     obj.location = (0.0, 0.0, 0.0)
     bpy.context.view_layer.update()
@@ -244,17 +304,6 @@ def place_wdas_volume(obj, target, scale, rotation_degrees):
 
 
 def add_composed_storm_group(time_seconds, scene_definition):
-    path = os.environ.get("CLOUD_STORM_VDB_PATH")
-    if not path or not os.path.isfile(path):
-        raise RuntimeError(
-            "CLOUD_STORM_VDB_PATH must name the composed storm density VDB"
-        )
-    bpy.ops.object.volume_import(filepath=path)
-    obj = bpy.context.object
-    obj.name = "continuous cumulonimbus capillatus incus storm group"
-    obj.data.grids.load()
-    if not obj.bound_box:
-        raise RuntimeError(f"Composed storm VDB has no renderable bounds: {path}")
     composition = scene_definition["offlineComposition"]
     source_kind = os.environ.get("CLOUD_STORM_SOURCE_KIND")
     if source_kind != composition["sourceKind"]:
@@ -262,16 +311,35 @@ def add_composed_storm_group(time_seconds, scene_definition):
             f"Source kind {source_kind!r} does not match authored composition"
         )
     specifications = composition["volumeInstances"]
-    instances = [obj]
-    for index in range(1, len(specifications)):
-        instance = obj.copy()
-        instance.name = specifications[index]["id"]
-        if (specifications[index]["scatteringMultiplier"] !=
-                specifications[0]["scatteringMultiplier"] or
-                specifications[index]["bottomFade"] !=
-                specifications[0]["bottomFade"]):
-            instance.data = obj.data.copy()
-        bpy.context.collection.objects.link(instance)
+    fallback_path = os.environ.get("CLOUD_STORM_VDB_PATH")
+    source_map = json.loads(os.environ.get("CLOUD_VOLUME_SOURCE_MAP", "{}"))
+    source_objects = {}
+    instances = []
+    for specification in specifications:
+        source_id = specification.get(
+            "sourceAssetId", composition.get("sourceAssetId", "default")
+        )
+        path = source_map.get(source_id, fallback_path)
+        if not path or not os.path.isfile(path):
+            raise RuntimeError(
+                f"No density VDB is available for source asset {source_id!r}"
+            )
+        if source_id not in source_objects:
+            bpy.ops.object.volume_import(filepath=path)
+            source = bpy.context.object
+            source.name = source_id
+            source.data.grids.load()
+            if not source.bound_box:
+                raise RuntimeError(f"Cloud VDB has no renderable bounds: {path}")
+            source_objects[source_id] = source
+            instance = source
+        else:
+            instance = source_objects[source_id].copy()
+            bpy.context.collection.objects.link(instance)
+        # Materials are per authored component, even when multiple instances
+        # share immutable voxel storage.
+        instance.data = instance.data.copy()
+        instance.name = specification["id"]
         instances.append(instance)
     loop_phase = math.tau * ((time_seconds % 240.0) / 240.0)
     for instance, specification in zip(instances, specifications):
@@ -286,27 +354,27 @@ def add_composed_storm_group(time_seconds, scene_definition):
         )
         breathing = 1.0 + 0.008 * math.sin(component_phase)
         evolved_scale = tuple(value * breathing for value in scale)
-        place_wdas_volume(
+        axis_convention = specification.get(
+            "axisConvention", composition.get("axisConvention", "wdas-y-up")
+        )
+        place_volume(
             instance, evolved_target, evolved_scale,
             specification["rotationDegrees"] +
             1.2 * math.sin(component_phase),
+            axis_convention,
         )
     scattering_strength = float(os.environ.get(
         "CLOUD_STORM_SCATTERING_STRENGTH",
         str(composition["scatteringStrength"]),
     ))
-    materialized_data = set()
     for instance, specification in zip(instances, specifications):
-        data_key = instance.data.as_pointer()
-        if data_key in materialized_data:
-            continue
-        materialized_data.add(data_key)
         instance.data.materials.append(cloud_volume_material(
             f"{specification['id']} multiple-scattering medium",
             scattering_strength * specification["scatteringMultiplier"],
             bottom_fade=specification["bottomFade"],
+            detail_strength=specification.get("detailStrength", 0.0),
         ))
-    return obj
+    return instances[0]
 
 
 def configure_scene(config, scene_definition):
@@ -322,14 +390,16 @@ def configure_scene(config, scene_definition):
     camera_data = bpy.data.cameras.new("oblique-natural camera")
     camera = bpy.data.objects.new("oblique-natural camera", camera_data)
     bpy.context.collection.objects.link(camera)
-    camera.location = (17.0, -31.0, 3.2)
-    camera_data.lens = 31.0
+    fixed_camera = scene_definition["fixedCamera"]
+    camera.location = tuple(fixed_camera.get("position", [17.0, -31.0, 3.2]))
+    camera_data.lens = fixed_camera.get("lensMm", 31.0)
     camera_data.sensor_width = 36.0
-    look_at(camera, (1.2, 0.0, 7.6))
+    look_at(camera, tuple(fixed_camera.get("target", [1.2, 0.0, 7.6])))
     scene.camera = camera
 
     sun_data = bpy.data.lights.new("storm side sun", "SUN")
-    sun_data.energy = 3.0
+    lighting = scene_definition.get("lighting", {})
+    sun_data.energy = lighting.get("sunEnergy", 3.0)
     sun_data.angle = math.radians(0.53)
     sun = bpy.data.objects.new("storm side sun", sun_data)
     bpy.context.collection.objects.link(sun)
@@ -337,7 +407,7 @@ def configure_scene(config, scene_definition):
     look_at(sun, (0.0, 0.0, 8.0))
 
     key_data = bpy.data.lights.new("storm softbox", "AREA")
-    key_data.energy = 15.0
+    key_data.energy = lighting.get("keyEnergy", 15.0)
     key_data.shape = "DISK"
     key_data.size = 14.0
     key = bpy.data.objects.new("storm softbox", key_data)
@@ -348,8 +418,11 @@ def configure_scene(config, scene_definition):
     world = bpy.data.worlds.new("cloud lighting world")
     world.use_nodes = True
     background = world.node_tree.nodes.get("Background")
-    background.inputs["Color"].default_value = (0.52, 0.66, 0.94, 1.0)
-    background.inputs["Strength"].default_value = 0.08
+    world_color = lighting.get("worldColor", [0.52, 0.66, 0.94])
+    background.inputs["Color"].default_value = (*world_color, 1.0)
+    background.inputs["Strength"].default_value = lighting.get(
+        "worldStrength", 0.08
+    )
     scene.world = world
 
     scene.render.engine = "BLENDER_EEVEE"
@@ -385,8 +458,9 @@ def configure_scene(config, scene_definition):
     # the low-frequency volume crawl that becomes conspicuous when a canary
     # plate is enlarged in the live compositor; alpha remains the exact Cycles
     # coverage channel and is exported separately as transmittance.
-    scene.cycles.use_denoising = True
-    if hasattr(scene.cycles, "denoiser"):
+    denoiser = os.environ.get("CLOUD_PLATE_DENOISER", "OPENIMAGEDENOISE")
+    scene.cycles.use_denoising = denoiser != "NONE"
+    if scene.cycles.use_denoising and hasattr(scene.cycles, "denoiser"):
         scene.cycles.denoiser = "OPENIMAGEDENOISE"
     # Draft renders deliberately trade fine multiple scattering for turnaround;
     # production renders retain the much finer step size.
@@ -517,7 +591,9 @@ def main():
         "transportSamples": config["samples"],
         "adaptiveThreshold": None,
         "samplingMode": "paired-fixed-spp",
-        "denoiser": "OpenImageDenoise",
+        "denoiser": (
+            "OpenImageDenoise" if scene.cycles.use_denoising else "none"
+        ),
         "radianceCalibration": config["radiance_scale"],
         "convergenceDelta": None,
         "renderSeconds": time.time() - started,

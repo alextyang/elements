@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "source": "Elements continuous OpenVDB author",
+  "generator": "scripts/openvdb/cloud_vdb_author.cpp",
+  "generatorSourceSha256": "c568c0ca921084bcd866ee4480176f8c692c3e1e8e735c016b1e11c054d7914d",
+  "license": "project-generated",
+  "assets": [
+    {
+      "id": "authored-anvil-veil",
+      "quality": "review",
+      "entry": "cirrostratus-nebulosus-anvil-review.vdb",
+      "vdbSha256": "cdf6e009560f8ca8b49c290ac1283c5a7585eea7bb7756369ee3d5a3ec6e6d45",
+      "authoring": {
+        "genus": "cirrostratus",
+        "species": "cirrostratus-nebulosus",
+        "width": 320,
+        "depth": 192,
+        "height": 128,
+        "voxelSize": 0.08,
+        "seed": 8147,
+        "evolution": 0
+      }
+    },
+    {
+      "id": "authored-cirrus-spissatus",
+      "quality": "review",
+      "entry": "cirrus-spissatus-anvil-review.vdb",
+      "vdbSha256": "a187e8a833c59b1f3223914cf0f0f2b0fd8d7c329c8e71c4c9ccc85edbd93506",
+      "authoring": {
+        "genus": "cirrus",
+        "species": "cirrus-spissatus",
+        "width": 320,
+        "depth": 192,
+        "height": 96,
+        "voxelSize": 0.08,
+        "seed": 8147,
+        "evolution": 0
+      }
+    },
+    {
+      "id": "authored-cumulonimbus-capillatus-incus",
+      "quality": "review",
+      "entry": "cumulonimbus-capillatus-incus-review.vdb",
+      "vdbSha256": "e6b19f84e6fa4bd9f496867609ae03b5e15383b1e7542bcbcaace5bc1a0e0404",
+      "authoring": {
+        "genus": "cumulonimbus",
+        "species": "cumulonimbus-capillatus-incus",
+        "width": 256,
+        "depth": 160,
+        "height": 144,
+        "voxelSize": 0.08,
+        "seed": 7319,
+        "evolution": 0
+      }
+    }
+  ]
+}

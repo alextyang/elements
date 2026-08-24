@@ -7,7 +7,10 @@
     "perspectiveId": "oblique-natural",
     "horizontalFovDegrees": 64,
     "verticalFovDegrees": 43.52,
-    "viewElevationDegrees": 27
+    "viewElevationDegrees": 27,
+    "position": [16, -30, 3.3],
+    "target": [0, 0, 7.4],
+    "lensMm": 31
   },
   "source": {
     "captureParameter": "weather",
@@ -24,62 +27,43 @@
     "height": 1080,
     "minimumTransportSamples": 1024,
     "convergenceTarget": 0.002,
+    "minimumVolumeBounces": 1024,
+    "denoiser": "none",
     "backend": "blender-cycles-metal"
   },
   "offlineComposition": {
-    "sourceKind": "wdas-complex",
-    "sourceAssetId": "wdas-cloud",
-    "scatteringStrength": 1.35,
-    "radianceCalibration": 0.18,
+    "sourceKind": "authored-continuous-field",
+    "sourceAssetId": "authored-cumulonimbus-capillatus-incus",
+    "axisConvention": "z-up",
+    "scatteringStrength": 2.4,
+    "radianceCalibration": 0.28,
     "volumeInstances": [
       {
-        "id": "mature-core-volume",
+        "id": "continuous-storm-system-volume",
+        "sourceAssetId": "authored-cumulonimbus-capillatus-incus",
         "componentId": "storm-mature-core",
-        "target": [0, 1.1, 8.5],
-        "scale": [0.055, 0.065, 0.024],
-        "rotationDegrees": -5,
+        "target": [0, 0.5, 6.9],
+        "scale": [1.15, 1.15, 1.15],
+        "rotationDegrees": -7,
         "scatteringMultiplier": 1,
+        "detailStrength": 0,
         "bottomFade": 0,
         "phaseOffset": 0
-      },
-      {
-        "id": "western-feeder-volume",
-        "componentId": "storm-feeder-congestus",
-        "target": [-8, 0, 5.1],
-        "scale": [0.029, 0.036, 0.016],
-        "rotationDegrees": 24,
-        "scatteringMultiplier": 1,
-        "bottomFade": 0,
-        "phaseOffset": 1.73
-      },
-      {
-        "id": "eastern-feeder-volume",
-        "componentId": "storm-feeder-congestus",
-        "target": [7.8, -0.2, 5.4],
-        "scale": [0.028, 0.038, 0.016],
-        "rotationDegrees": -31,
-        "scatteringMultiplier": 1,
-        "bottomFade": 0,
-        "phaseOffset": 3.46
-      },
-      {
-        "id": "glaciated-anvil-volume",
-        "componentId": "storm-incus-anvil",
-        "target": [-1.4, 0.8, 11.3],
-        "scale": [0.09, 0.04, 0.024],
-        "rotationDegrees": 8,
-        "scatteringMultiplier": 0.35,
-        "bottomFade": 0.8,
-        "phaseOffset": 5.19
       }
     ],
     "precipitation": {
       "componentId": "storm-rain-core",
-      "target": [0.2, -2, 1.5],
-      "dimensions": [20, 4, 11],
-      "rotationDegrees": -4,
-      "densityScale": 0.28
+      "target": [-1.2, -1.5, 1.7],
+      "dimensions": [13, 3.5, 8.5],
+      "rotationDegrees": -7,
+      "densityScale": 0.30
     }
+  },
+  "lighting": {
+    "sunEnergy": 4.5,
+    "keyEnergy": 0,
+    "worldStrength": 0.065,
+    "worldColor": [0.52, 0.66, 0.94]
   },
   "groups": [
     {

@@ -33,21 +33,42 @@ continuous group shares one `continuityVolumeId` and is rendered into one
 transport operator.
 
 The first vertical slice is `data/cloud-plate-scenes/thunderstorm-mature.json`.
-It uses one continuous deep-convective group. The production source is Walt
-Disney Animation Studios' high-detail cloud density. Its `offlineComposition`
-is data, not a renderer special case: checksum-pinned source identity,
-overlapping volume transforms, per-instance scattering and bottom fades, slow
-loop phases, bounded precipitation domain, and the explicit reference-light to
-live-sky radiance calibration are all authored in the scene JSON. That same
-contract is the extension point for other species and weather groups. The
+It uses one continuous deep-convective OpenVDB field. A shared turbulent
+inflow shelf grows irregular feeder convection, joins a vertically sheared
+primary updraft, and exits through the same density domain as an asymmetric
+incus. There is no imported single-cloud hero core and no assembly of detached
+cloud volumes.
+
+`offlineComposition` is data, not a renderer special case: source identity,
+axis convention, fixed-camera transform, scattering, object-space density
+erosion, slow loop phase, bounded precipitation, and the explicit
+reference-light to live-sky radiance calibration are authored in the scene
+JSON. That same contract is the extension point for other species and weather
+groups. The
 calibration scales only the affine radiance source term; physical RGB
-transmittance is unchanged. The outflow's lower density fades into the core, so
-there is no floating slab boundary. The group is exported as one transport operator, never as
+transmittance is unchanged. The outflow is part of the core field, so there is
+no floating slab boundary. The group is exported as one transport operator, never as
 particles, spheres, screen-space noise, or camera-facing sprites.
 
 The rain/hail core is a continuous, vertically correlated extinction volume
 with tapered horizontal boundaries. It hangs beneath and overlaps the shared
 storm mass; it is not assembled from cloud primitives or an alpha overlay.
+
+### Continuous VDB authoring
+
+`scripts/openvdb/cloud_vdb_author.cpp` is the native density author. It emits a
+single sparse fog VDB for a whole formation and covers all ten WMO genera plus
+every renderer species route. Convective, stratiform, cellular, lenticular,
+roll, and fibrous structures use separate continuous field families. Macroform
+is established first, followed by aperiodic domain warp and scale-separated
+erosion. There is no particle or sphere emitter and no periodic sine-fibre
+construction.
+
+The ordering follows the production pattern of coherent source volume,
+fog-VDB conversion, then billowy and wispy detail. Build and author it with
+`npm run cloud:vdb:build` and `npm run cloud:vdb:author`; generated VDBs remain
+ignored, while exact generator and asset checksums are pinned under
+`data/cloud-plate-assets`.
 
 ## Local GPU worker
 
@@ -57,12 +78,11 @@ Bootstrap the checksum-pinned source volumes once:
 npm run cloud:plates:bootstrap
 ```
 
-The bootstrap verifies the five CC0 CGHEVEN component volumes and the WDAS
-cloud archive. The WDAS download is 2.97 GB; eighth, quarter, and half grids are
-staged under ignored `output/tools` storage. The pipeline selects eighth for
-fast canaries, quarter for review renders, and half for production. The WDAS
-asset is CC BY-SA 3.0 and its attribution and exact archive/grid checksums are
-recorded in `data/cloud-plate-assets/wdas-cloud.json`.
+The bootstrap verifies and, when needed, deterministically rebuilds the
+project-authored VDBs. It also retains checksum-pinned CGHEVEN and WDAS sources
+as research/reference inputs for other formations; the thunderstorm production
+scene does not use them. The authored source code and generated VDB checksums
+are recorded in `data/cloud-plate-assets/authored-vdb.json`.
 
 Render all frames with:
 
@@ -94,10 +114,18 @@ pair therefore receives its exact samples-per-pixel budget; otherwise an
 adaptive threshold near the acceptance residual can stop every doubled render
 at the same noise floor and prevent genuine convergence.
 
-The static radiance pass uses Open Image Denoise before transport export. This
-removes low-frequency volumetric Monte Carlo crawl that becomes conspicuous
-when a canary plate is enlarged, while the exact Cycles coverage channel is
-still exported independently as RGB transmittance.
+Convergence is necessary but not sufficient. After a frame meets paired
+transport RMS, the pipeline analyzes its display preview against the exported
+transmittance matte at a fixed 256-pixel width. Screen-wide radial organization,
+missing cloud support, or inadequate cloud-local multiscale structure rejects
+the frame before publication. A rejected frame remains in staging with its
+metrics; it cannot replace the stable live manifest. This prevents Monte Carlo
+noise or a numerically stable smooth blob from being mislabeled as ready.
+
+The denoiser is part of render identity. Open Image Denoise is useful for fast
+anatomy canaries; `CLOUD_PLATE_DENOISER=NONE` enables unbounded fixed-SPP
+production convergence without smoothing real VDB structure. The exact Cycles
+coverage channel is always exported independently as RGB transmittance.
 
 Production defaults to 1,024 total and volume bounces, matching the deep
 multiple-scattering regime required by optically thick water clouds. For

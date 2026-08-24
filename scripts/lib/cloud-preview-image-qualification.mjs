@@ -10,6 +10,8 @@ export const CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT = Object.freeze({
     minimumBroadBandRms: 0.012,
     maximumRadialExplainedVariance: 0.18,
     minimumRadialExplainedCoverage: 0.1,
+    minimumRadialOscillationRatio: 0.045,
+    minimumRadialOscillationSignChanges: 3,
     maximumFineToBroadRatioForRadialRejection: 0.38,
     minimumFineToBroadRatio: 0.4,
     minimumFineTextureFraction: 0.1,
@@ -186,10 +188,14 @@ const measureRadialEvidence = (values, width, height, contract, weights) => {
         return {
             explainedVariance: 0,
             explainedCoverage: 0,
+            oscillationRatio: 0,
+            oscillationSignChanges: 0,
         };
     }
     let maximum = 0;
     let maximumCoverage = 0;
+    let maximumOscillationRatio = 0;
+    let maximumOscillationSignChanges = 0;
     const steps = contract.radialCenterSteps;
     for (let centerYIndex = 0; centerYIndex < steps; centerYIndex += 1) {
         // Include a quarter-frame exterior margin: atmospheric cascade rings
@@ -235,6 +241,32 @@ const measureRadialEvidence = (values, width, height, contract, weights) => {
             const explainedVariance = explainedEnergy / totalEnergy;
             if (explainedVariance > maximum) {
                 maximum = explainedVariance;
+                const means = Array.from(sums, (sum, bin) =>
+                    counts[bin] > 0 ? sum / counts[bin] : 0);
+                let oscillationEnergy = 0;
+                let signChanges = 0;
+                let previousSign = 0;
+                for (let bin = 0; bin < means.length; bin += 1) {
+                    let smoothSum = 0;
+                    let smoothWeight = 0;
+                    for (let offset = -3; offset <= 3; offset += 1) {
+                        const neighbor = clamp(bin + offset, 0, means.length - 1);
+                        const weight = 4 - Math.abs(offset);
+                        smoothSum += means[neighbor] * weight;
+                        smoothWeight += weight;
+                    }
+                    const residual = means[bin] - smoothSum / smoothWeight;
+                    oscillationEnergy += residual * residual * counts[bin];
+                    const sign = Math.abs(residual) >= 0.00075
+                        ? Math.sign(residual) : 0;
+                    if (sign && previousSign && sign !== previousSign) {
+                        signChanges += 1;
+                    }
+                    if (sign) previousSign = sign;
+                }
+                maximumOscillationRatio = oscillationEnergy /
+                    Math.max(1e-12, explainedEnergy);
+                maximumOscillationSignChanges = signChanges;
                 binEnergies.sort((left, right) =>
                     right.energy - left.energy);
                 const coverageEnergy =
@@ -258,6 +290,8 @@ const measureRadialEvidence = (values, width, height, contract, weights) => {
     return {
         explainedVariance: maximum,
         explainedCoverage: maximumCoverage,
+        oscillationRatio: maximumOscillationRatio,
+        oscillationSignChanges: maximumOscillationSignChanges,
     };
 };
 
@@ -316,6 +350,8 @@ export const measureCloudPreviewImage = ({
         fineToBroadRatio: fineRms / Math.max(1e-9, broadBandRms),
         radialExplainedVariance: radialEvidence.explainedVariance,
         radialExplainedCoverage: radialEvidence.explainedCoverage,
+        radialOscillationRatio: radialEvidence.oscillationRatio,
+        radialOscillationSignChanges: radialEvidence.oscillationSignChanges,
         cloudMaskUsed: cloudMask !== undefined,
         cloudSupportFraction: cloudSupportWeight / luminance.length,
     };
@@ -426,6 +462,8 @@ export const evaluateCloudPreviewImage = (
         metrics.fineToBroadRatio,
         metrics.radialExplainedVariance,
         metrics.radialExplainedCoverage,
+        metrics.radialOscillationRatio,
+        metrics.radialOscillationSignChanges,
     ].every(Number.isFinite);
     const cloudMaskUsed = metrics.cloudMaskUsed === true;
     const localMetricKeys = [
@@ -459,6 +497,10 @@ export const evaluateCloudPreviewImage = (
             contract.maximumRadialExplainedVariance &&
         metrics.radialExplainedCoverage >=
             contract.minimumRadialExplainedCoverage &&
+        metrics.radialOscillationRatio >=
+            contract.minimumRadialOscillationRatio &&
+        metrics.radialOscillationSignChanges >=
+            contract.minimumRadialOscillationSignChanges &&
         metrics.fineToBroadRatio <=
             contract.maximumFineToBroadRatioForRadialRejection;
     // A volume may be optically thin, but its final pixels still need either

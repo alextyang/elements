@@ -28,6 +28,8 @@ const scene = {
         height: 1080,
         minimumTransportSamples: 1024,
         convergenceTarget: 0.002,
+        minimumVolumeBounces: 1024,
+        denoiser: "none",
         backend: "blender-cycles-metal",
     },
     offlineComposition: {
@@ -154,7 +156,7 @@ test("thunderstorm production scene selects Cycles on Metal", () => {
         process.cwd(), "data/cloud-plate-scenes/thunderstorm-mature.json",
     ), "utf8"));
     assert.equal(definition.render.backend, "blender-cycles-metal");
-    assert.equal(definition.offlineComposition.volumeInstances.length, 4);
+    assert.equal(definition.offlineComposition.volumeInstances.length, 1);
     assert.equal(
         definition.offlineComposition.precipitation.componentId,
         "storm-rain-core",
@@ -162,7 +164,7 @@ test("thunderstorm production scene selects Cycles on Metal", () => {
     assert.deepEqual(validateCloudPlateScene(definition), []);
 });
 
-test("thunderstorm uses pinned film-density tiers without primitive cloud blobs", () => {
+test("thunderstorm uses a pinned continuous authored field without primitive cloud blobs", () => {
     const assets = JSON.parse(readFileSync(join(
         process.cwd(), "data/cloud-plate-assets/wdas-cloud.json",
     ), "utf8"));
@@ -172,16 +174,35 @@ test("thunderstorm uses pinned film-density tiers without primitive cloud blobs"
     const renderer = readFileSync(join(
         process.cwd(), "scripts/blender/render_cloud_plate.py",
     ), "utf8");
+    const pipeline = readFileSync(join(
+        process.cwd(), "scripts/lib/cloud-plate-pipeline.mjs",
+    ), "utf8");
+    const authored = JSON.parse(readFileSync(join(
+        process.cwd(), "data/cloud-plate-assets/authored-vdb.json",
+    ), "utf8"));
     assert.equal(assets.license, "CC-BY-SA-3.0");
     assert.deepEqual(
         assets.assets.map(({ quality }) => quality),
         ["canary", "review", "production"],
     );
-    assert.equal(definition.offlineComposition.sourceKind, "wdas-complex");
+    assert.equal(
+        definition.offlineComposition.sourceKind,
+        "authored-continuous-field",
+    );
     assert.match(renderer, /CLOUD_PLATE_VOLUME_BOUNCES.*1024/);
     assert.match(renderer, /use_adaptive_sampling = False/);
-    assert.match(renderer, /use_denoising = True/);
+    assert.match(renderer, /use_denoising = denoiser != "NONE"/);
     assert.match(renderer, /OPENIMAGEDENOISE/);
+    assert.match(renderer, /CLOUD_VOLUME_SOURCE_MAP/);
+    assert.match(pipeline, /qualifyCloudPlateImage/);
+    assert.match(pipeline, /!imageEvidence\.qualification\.ready/);
+    assert.ok(authored.assets.some(
+        ({ id }) => id === "authored-cumulonimbus-capillatus-incus"));
+    assert.deepEqual(
+        definition.offlineComposition.volumeInstances.map(
+            ({ sourceAssetId }) => sourceAssetId),
+        ["authored-cumulonimbus-capillatus-incus"],
+    );
     assert.match(renderer, /continuous rain and hail precipitation curtain/);
     assert.doesNotMatch(renderer, /primitive_(?:uv_)?sphere_add|primitive_cube_add|ellipsoid/);
 });
@@ -208,13 +229,21 @@ test("an unconverged build cannot evict the stable live manifest", () => {
     const pipeline = readFileSync(join(
         process.cwd(), "scripts/lib/cloud-plate-pipeline.mjs",
     ), "utf8");
-    assert.match(pipeline, /publishStable\s*=\s*completed\.size\s*>\s*0/);
+    assert.match(pipeline,
+        /publishStable\s*=\s*productionContract\s*&&\s*completed\.size\s*>\s*0/);
+    assert.match(pipeline, /qualityTier:\s*productionContract/);
     assert.match(
         pipeline,
         /if \(publishStable\) writeJsonAtomic\(stableManifestPath, manifest\)/,
     );
     assert.match(
         pipeline,
+        /if \(publishContent\) writeJsonAtomic\(manifestPath, manifest\)/,
+    );
+    assert.match(
+        pipeline,
         /backendRendererInputsHash = blenderExecutable[\s\S]*CLOUD_PLATE_RENDERER_INPUTS/,
     );
+    assert.match(pipeline, /scripts\/blender\/render_cloud_plate\.py/);
+    assert.doesNotMatch(pipeline, /"scripts\/blender",/);
 });

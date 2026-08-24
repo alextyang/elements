@@ -35,7 +35,10 @@
     "cloud:previews:watch:stop": "node scripts/manage-cloud-preview-watch.mjs stop",
     "cloud:previews:watch:restart": "node scripts/manage-cloud-preview-watch.mjs restart",
     "cloud:plates:bootstrap": "node scripts/bootstrap-cloud-vdb-assets.mjs",
+    "cloud:plates:qualify": "node scripts/qualify-cloud-plate-frame.mjs",
     "cloud:plates:render": "node scripts/render-cloud-plates.mjs",
+    "cloud:vdb:build": "node scripts/author-cloud-vdb.mjs --build-only",
+    "cloud:vdb:author": "node scripts/author-cloud-vdb.mjs",
     "cloud:diagnostics": "node scripts/capture-cloud-diagnostics.mjs",
     "sky:qualify": "bash scripts/qualify-cloud-renderer.sh"
   },

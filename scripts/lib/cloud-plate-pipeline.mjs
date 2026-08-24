@@ -20,6 +20,8 @@ import {
     sha256,
     stableJson,
 } from "./cloud-preview-generation.mjs";
+import { qualifyCloudPlateImage } from
+    "./cloud-plate-image-qualification.mjs";
 
 export const CLOUD_PLATE_ASSET_SCHEMA_VERSION = 1;
 export const CLOUD_PLATE_PIPELINE_VERSION = 1;
@@ -28,8 +30,10 @@ export const CLOUD_PLATE_CAPTURE_TOKEN = "local-cloud-plate-capture";
 const CLOUD_PLATE_RENDERER_INPUTS = Object.freeze([
     "app/api/cloud-plates",
     "data/cloud-plate-assets",
-    "scripts/blender",
+    "scripts/blender/render_cloud_plate.py",
+    "scripts/lib/cloud-plate-image-qualification.mjs",
     "scripts/lib/cloud-plate-pipeline.mjs",
+    "scripts/lib/cloud-preview-image-qualification.mjs",
     "scripts/render-cloud-plates.mjs",
 ]);
 
@@ -70,6 +74,12 @@ export const validateCloudPlateScene = (scene) => {
     if (!(render.convergenceTarget > 0) || render.convergenceTarget > 1) {
         failures.push("invalid-convergence-target");
     }
+    if (render.backend === "blender-cycles-metal" &&
+        (!Number.isInteger(render.minimumVolumeBounces) ||
+            render.minimumVolumeBounces < 1 ||
+            !["none", "open-image-denoise"].includes(render.denoiser))) {
+        failures.push("invalid-offline-quality-contract");
+    }
     if (!Array.isArray(scene?.groups) || scene.groups.length === 0) {
         failures.push("scene-has-no-groups");
     }
@@ -104,8 +114,9 @@ export const validateCloudPlateScene = (scene) => {
             Array.isArray(value) && value.length === 3 &&
             value.every((entry) => Number.isFinite(entry) &&
                 (!positive || entry > 0));
-        if (composition?.sourceKind !== "wdas-complex" ||
-            composition?.sourceAssetId !== "wdas-cloud" ||
+        if (!new Set(["wdas-complex", "authored-continuous-field"]).has(
+                composition?.sourceKind) ||
+            !SAFE_ID.test(composition?.sourceAssetId ?? "") ||
             !(composition?.scatteringStrength > 0) ||
             !(composition?.radianceCalibration > 0) ||
             !Array.isArray(composition?.volumeInstances) ||
@@ -260,12 +271,15 @@ const blenderVersion = (executable) => {
     return result.stdout.split(/\r?\n/, 1)[0].trim();
 };
 
-const verifiedCloudVdbAssetHash = (repositoryRoot) => {
+const verifiedCloudVdbAssets = (repositoryRoot) => {
     const cghevenManifest = JSON.parse(readFileSync(join(
         repositoryRoot, "data/cloud-plate-assets/cgheven-vdb.json",
     ), "utf8"));
     const wdasManifest = JSON.parse(readFileSync(join(
         repositoryRoot, "data/cloud-plate-assets/wdas-cloud.json",
+    ), "utf8"));
+    const authoredManifest = JSON.parse(readFileSync(join(
+        repositoryRoot, "data/cloud-plate-assets/authored-vdb.json",
     ), "utf8"));
     const cghevenRoot = process.env.CLOUD_VDB_ROOT ?? join(
         repositoryRoot, "output/tools/cloud-vdb",
@@ -273,14 +287,19 @@ const verifiedCloudVdbAssetHash = (repositoryRoot) => {
     const wdasRoot = process.env.CLOUD_WDAS_ROOT ?? join(
         repositoryRoot, "output/tools/wdas-cloud/wdas_cloud",
     );
+    const authoredRoot = process.env.CLOUD_AUTHORED_VDB_ROOT ?? join(
+        repositoryRoot, "output/cloud-plates/authored-vdb",
+    );
     const failures = [];
     const verified = [];
+    const paths = {};
     for (const asset of cghevenManifest.assets ?? []) {
         const path = join(cghevenRoot, `${asset.id}.vdb`);
         if (!existsSync(path) || sha256File(path) !== asset.vdbSha256) {
             failures.push(asset.id);
         } else {
             verified.push(`${asset.id}:${asset.vdbSha256}`);
+            paths[asset.id] = path;
         }
     }
     for (const asset of wdasManifest.assets ?? []) {
@@ -289,6 +308,20 @@ const verifiedCloudVdbAssetHash = (repositoryRoot) => {
             failures.push(asset.id);
         } else {
             verified.push(`${asset.id}:${asset.vdbSha256}`);
+            paths[asset.id] = path;
+        }
+    }
+    if (sha256File(join(repositoryRoot, authoredManifest.generator)) !==
+        authoredManifest.generatorSourceSha256) {
+        failures.push("authored-vdb-generator");
+    }
+    for (const asset of authoredManifest.assets ?? []) {
+        const path = join(authoredRoot, asset.entry);
+        if (!existsSync(path) || sha256File(path) !== asset.vdbSha256) {
+            failures.push(asset.id);
+        } else {
+            verified.push(`${asset.id}:${asset.vdbSha256}`);
+            paths[asset.id] = path;
         }
     }
     if (failures.length) {
@@ -297,7 +330,11 @@ const verifiedCloudVdbAssetHash = (repositoryRoot) => {
             "Run npm run cloud:plates:bootstrap.",
         );
     }
-    return sha256(verified.map((value) => `${value}\0`));
+    return {
+        hash: sha256(verified.map((value) => `${value}\0`)),
+        paths,
+        manifests: { cghevenManifest, wdasManifest, authoredManifest },
+    };
 };
 
 const run = (command, args, options) => new Promise((resolvePromise, reject) => {
@@ -418,11 +455,15 @@ export const renderCloudPlateScene = async ({
     const volumeBounces = Number.parseInt(
         process.env.CLOUD_PLATE_VOLUME_BOUNCES ?? "1024", 10,
     );
+    const productionDenoiser = scene.render.denoiser === "none"
+        ? "NONE" : "OPENIMAGEDENOISE";
+    const denoiser = process.env.CLOUD_PLATE_DENOISER ?? productionDenoiser;
     if (!Number.isSafeInteger(samples) || samples < 64 ||
         !Number.isSafeInteger(width) || width < 64 ||
         !Number.isSafeInteger(height) || height < 64 ||
         !(convergenceTarget > 0) || convergenceTarget > 1 ||
-        !Number.isSafeInteger(volumeBounces) || volumeBounces < 1) {
+        !Number.isSafeInteger(volumeBounces) || volumeBounces < 1 ||
+        !["NONE", "OPENIMAGEDENOISE"].includes(denoiser)) {
         throw new Error("Samples and output dimensions are invalid.");
     }
     const blenderExecutable = scene.render.backend === "blender-cycles-metal"
@@ -431,25 +472,37 @@ export const renderCloudPlateScene = async ({
     const backendVersion = blenderExecutable
         ? blenderVersion(blenderExecutable)
         : "browser-webgpu";
+    const verifiedAssets = blenderExecutable
+        ? verifiedCloudVdbAssets(repositoryRoot)
+        : undefined;
     const authoredAssetHash = blenderExecutable
-        ? verifiedCloudVdbAssetHash(repositoryRoot)
+        ? verifiedAssets.hash
         : "browser-procedural-assets";
-    const useWdasStorm = Boolean(
-        blenderExecutable &&
-        scene.offlineComposition?.sourceAssetId === "wdas-cloud" &&
-        scene.offlineComposition?.sourceKind === "wdas-complex",
-    );
-    if (blenderExecutable && !useWdasStorm) {
+    if (blenderExecutable && !scene.offlineComposition?.sourceAssetId) {
         throw new Error(
             `Blender scene ${scene.id} has no checksum-pinned authored volume source.`,
         );
     }
     const wdasQuality = samples < 256
         ? "eighth" : samples < 1024 ? "quarter" : "half";
-    const wdasStormPath = useWdasStorm ? join(
-        repositoryRoot, "output/tools/wdas-cloud/wdas_cloud",
-        `wdas_cloud_${wdasQuality}.vdb`,
-    ) : undefined;
+    const sourceIds = blenderExecutable ? [...new Set(
+        scene.offlineComposition.volumeInstances.map((instance) =>
+            instance.sourceAssetId ?? scene.offlineComposition.sourceAssetId),
+    )] : [];
+    const volumeSourceMap = {};
+    for (const sourceId of sourceIds) {
+        const resolvedId = sourceId === "wdas-cloud"
+            ? `wdas-cloud-${wdasQuality}` : sourceId;
+        const path = verifiedAssets?.paths[resolvedId];
+        if (!path) {
+            throw new Error(
+                `Blender scene ${scene.id} references unavailable VDB ${sourceId}.`,
+            );
+        }
+        volumeSourceMap[sourceId] = path;
+    }
+    const primaryStormPath = volumeSourceMap[
+        scene.offlineComposition?.sourceAssetId];
     const backendRendererInputsHash = blenderExecutable
         ? contentHashForPaths(repositoryRoot, CLOUD_PLATE_RENDERER_INPUTS)
         : sha256([
@@ -461,12 +514,19 @@ export const renderCloudPlateScene = async ({
         `backend:${scene.render.backend}\0`,
         `backend-version:${backendVersion}\0`,
         `authored-assets:${authoredAssetHash}\0`,
-        `storm-source:${useWdasStorm ? `wdas-${wdasQuality}` : "browser"}\0`,
+        `storm-source:${sourceIds.join(",")}\0`,
         `volume-bounces:${volumeBounces}\0`,
+        `denoiser:${denoiser}\0`,
     ]);
     const identity = createCloudPlateBuildIdentity({
         scene, rendererHash, samples, width, height, convergenceTarget,
     });
+    const productionContract =
+        samples >= scene.render.minimumTransportSamples &&
+        width >= scene.render.width && height >= scene.render.height &&
+        convergenceTarget <= scene.render.convergenceTarget &&
+        volumeBounces >= scene.render.minimumVolumeBounces &&
+        denoiser === productionDenoiser;
     const totalFrames = cloudPlateFrameCount(scene.timeline);
     const frameIndices = requestedFrames?.length
         ? [...new Set(requestedFrames)].sort((a, b) => a - b)
@@ -500,19 +560,29 @@ export const renderCloudPlateScene = async ({
         definitionHash: identity.definitionHash,
         generatedAt: new Date().toISOString(),
         status,
+        qualityTier: productionContract ? "production" : "review",
         backend: scene.render.backend,
-        sourceAsset: useWdasStorm ? {
-            id: `wdas-cloud-${wdasQuality}`,
-            license: "CC-BY-SA-3.0",
-            attribution:
-                "Copyright 2017 Disney Enterprises, Inc.; cloud reference by Kevin Udy",
-        } : undefined,
+        sourceAsset: scene.offlineComposition?.sourceAssetId === "wdas-cloud"
+            ? {
+                id: `wdas-cloud-${wdasQuality}`,
+                license: "CC-BY-SA-3.0",
+                attribution:
+                    "Copyright 2017 Disney Enterprises, Inc.; cloud reference by Kevin Udy",
+            } : {
+                id: scene.offlineComposition?.sourceAssetId,
+                license: "project-generated",
+                attribution: "Elements continuous OpenVDB author",
+            },
+        sourceAssets: sourceIds.map((id) => ({
+            id: id === "wdas-cloud" ? `wdas-cloud-${wdasQuality}` : id,
+            sha256: sha256File(volumeSourceMap[id]),
+        })),
         fixedCamera: scene.fixedCamera,
         timeline: scene.timeline,
         groups: scene.groups,
         render: {
             width, height, minimumTransportSamples: samples,
-            convergenceTarget, volumeBounces,
+            convergenceTarget, volumeBounces, denoiser,
             radianceCalibration:
                 scene.offlineComposition?.radianceCalibration,
         },
@@ -522,11 +592,17 @@ export const renderCloudPlateScene = async ({
     });
     const publishManifest = (
         status,
-        { publishStable = completed.size > 0 } = {},
+        {
+            publishStable = productionContract && completed.size > 0,
+            publishContent = completed.size > 0,
+        } = {},
     ) => {
         const manifest = makeManifest(status);
         writeJsonAtomic(outputManifestPath, manifest);
-        writeJsonAtomic(manifestPath, manifest);
+        // A rejected first frame remains entirely in ignored staging.  There
+        // is no reason to expose a hash-addressed public manifest with zero
+        // qualified frames.
+        if (publishContent) writeJsonAtomic(manifestPath, manifest);
         // A build with no accepted frames must never evict the last-known-good
         // scene from the stable live URL while its first convergence pair is
         // still rendering (or if that pair fails).
@@ -534,7 +610,7 @@ export const renderCloudPlateScene = async ({
         return manifest;
     };
     publishManifest(completed.size ? "partial" : "rendering", {
-        publishStable: completed.size > 0,
+        publishStable: productionContract && completed.size > 0,
     });
 
     try {
@@ -579,13 +655,16 @@ export const renderCloudPlateScene = async ({
                         cwd: repositoryRoot,
                         env: {
                             ...process.env,
-                            CLOUD_STORM_VDB_PATH: wdasStormPath,
+                            CLOUD_STORM_VDB_PATH: primaryStormPath,
+                            CLOUD_VOLUME_SOURCE_MAP:
+                                JSON.stringify(volumeSourceMap),
                             CLOUD_STORM_SOURCE_KIND:
                                 scene.offlineComposition.sourceKind,
                             CLOUD_STORM_SCATTERING_STRENGTH: String(
                                 scene.offlineComposition.scatteringStrength,
                             ),
                             CLOUD_PLATE_VOLUME_BOUNCES: String(volumeBounces),
+                            CLOUD_PLATE_DENOISER: denoiser,
                         },
                     });
                 } else {
@@ -672,6 +751,24 @@ export const renderCloudPlateScene = async ({
                     );
                 }
             }
+            const imageEvidence = await qualifyCloudPlateImage({
+                previewPath,
+                transmittancePath: join(
+                    frameDirectory, "transmittance.rgba16f"),
+                width,
+                height,
+            });
+            const convergedMetrics = JSON.parse(readFileSync(metricsPath, "utf8"));
+            writeJsonAtomic(metricsPath, {
+                ...convergedMetrics,
+                imageQualification: imageEvidence.qualification,
+            });
+            if (!imageEvidence.qualification.ready) {
+                throw new Error(
+                    `Cloud plate frame ${frameIndex} failed image qualification: ` +
+                    `${JSON.stringify(imageEvidence.qualification)}`,
+                );
+            }
             const publishedFrameDirectory = join(
                 publicRoot, "frames", String(frameIndex).padStart(5, "0"),
             );
@@ -723,7 +820,7 @@ export const renderCloudPlateScene = async ({
         }
     } catch (error) {
         publishManifest(completed.size ? "partial" : "rendering", {
-            publishStable: completed.size > 0,
+            publishStable: productionContract && completed.size > 0,
         });
         throw error;
     }
