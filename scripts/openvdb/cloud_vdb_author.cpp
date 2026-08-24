@@ -126,6 +126,37 @@ double fbm(Vec3 p, std::uint32_t seed, int octaves)
     return value / normalization;
 }
 
+double worleyF1(Vec3 p, std::uint32_t seed)
+{
+    const int cellX = static_cast<int>(std::floor(p.x));
+    const int cellY = static_cast<int>(std::floor(p.y));
+    const int cellZ = static_cast<int>(std::floor(p.z));
+    double minimumSquared = std::numeric_limits<double>::max();
+    for (int z = -1; z <= 1; ++z) {
+        for (int y = -1; y <= 1; ++y) {
+            for (int x = -1; x <= 1; ++x) {
+                const int candidateX = cellX + x;
+                const int candidateY = cellY + y;
+                const int candidateZ = cellZ + z;
+                const Vec3 feature {
+                    candidateX + lattice(
+                        candidateX, candidateY, candidateZ, seed + 521U),
+                    candidateY + lattice(
+                        candidateX, candidateY, candidateZ, seed + 523U),
+                    candidateZ + lattice(
+                        candidateX, candidateY, candidateZ, seed + 541U),
+                };
+                const double dx = p.x - feature.x;
+                const double dy = p.y - feature.y;
+                const double dz = p.z - feature.z;
+                minimumSquared = std::min(
+                    minimumSquared, dx * dx + dy * dy + dz * dz);
+            }
+        }
+    }
+    return clamp01(std::sqrt(minimumSquared) / 1.05);
+}
+
 Vec3 warp(Vec3 p, std::uint32_t seed, double strength)
 {
     const Vec3 q { p.x * 0.42, p.y * 0.42, p.z * 0.42 };
@@ -198,10 +229,14 @@ double stormComplexEnvelope(Vec3 p, std::uint32_t seed, bool anvil)
     const double lowerBroadening = std::exp(-std::pow((z - 0.23) / 0.19, 2.0));
     const double upperPulse = std::exp(-std::pow((z - 0.67) / 0.17, 2.0));
     const double tropopausePinch = smoothstep(0.82, 0.97, z);
-    const double radiusX = 0.155 + 0.110 * lowerBroadening +
-        0.058 * upperPulse - 0.040 * tropopausePinch;
-    const double radiusY = 0.140 + 0.086 * lowerBroadening +
-        0.035 * upperPulse - 0.030 * tropopausePinch;
+    const double pulseX = fbm({z * 6.8, 5.7, 2.3}, seed + 423U, 5);
+    const double pulseY = fbm({3.1, z * 7.4, 8.9}, seed + 427U, 5);
+    const double radiusX = (0.155 + 0.110 * lowerBroadening +
+        0.058 * upperPulse - 0.040 * tropopausePinch) *
+        (0.72 + 0.66 * pulseX);
+    const double radiusY = (0.140 + 0.086 * lowerBroadening +
+        0.035 * upperPulse - 0.030 * tropopausePinch) *
+        (0.74 + 0.62 * pulseY);
     const double dx = (q.x - centerX) / std::max(0.070, radiusX);
     const double dy = (q.y - centerY) / std::max(0.065, radiusY);
     const double angularBreakup = 0.12 * (fbm(
@@ -254,8 +289,12 @@ double stormComplexEnvelope(Vec3 p, std::uint32_t seed, bool anvil)
         const double iceTurbulence = 0.34 * (fbm(
             {(q.x + 0.3) * 11.0, (q.y - 0.2) * 14.0, z * 8.0},
             seed + 467U, 6) - 0.49);
+        const double iceFibres = 0.20 * (fbm(
+            {(q.x + 0.1) * 4.0, (q.y - 0.2) * 36.0, z * 11.0},
+            seed + 471U, 6) - 0.50);
         const double anvilField = std::min(
-            std::min(vertical, lateral), downwind) + iceTurbulence - 0.12;
+            std::min(vertical, lateral), downwind) + iceTurbulence +
+            iceFibres - 0.12;
         field = std::max(field, anvilField);
 
         // A small overshooting top is part of the same updraft field.  Its
@@ -275,10 +314,18 @@ double stormComplexEnvelope(Vec3 p, std::uint32_t seed, bool anvil)
     const double macroEdge = fbm(
         {(q.x + 0.23) * 9.0, (q.y - 0.31) * 10.5, z * 7.5},
         seed + 481U, 6);
+    const double coarseBillow = 1.0 - worleyF1(
+        {(q.x + 0.19) * 7.0, (q.y - 0.23) * 8.0, z * 6.2},
+        seed + 482U);
+    const double fineBillow = 1.0 - worleyF1(
+        {(q.x - 0.11) * 15.0, (q.y + 0.29) * 17.0, z * 13.0},
+        seed + 483U);
     const double edgeDetail = fbm(
         {q.x * 26.0, q.y * 29.0, z * 23.0}, seed + 487U, 6);
-    field += (0.42 * (macroEdge - 0.50) +
-        0.28 * (edgeDetail - 0.50)) *
+    field += (0.38 * (macroEdge - 0.50) +
+        0.68 * (coarseBillow - 0.48) +
+        0.30 * (fineBillow - 0.48) +
+        0.18 * (edgeDetail - 0.50)) *
         (1.0 - smoothstep(0.10, 0.58, field));
     return field;
 }

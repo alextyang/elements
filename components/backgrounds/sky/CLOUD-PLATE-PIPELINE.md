@@ -61,8 +61,10 @@ single sparse fog VDB for a whole formation and covers all ten WMO genera plus
 every renderer species route. Convective, stratiform, cellular, lenticular,
 roll, and fibrous structures use separate continuous field families. Macroform
 is established first, followed by aperiodic domain warp and scale-separated
-erosion. There is no particle or sphere emitter and no periodic sine-fibre
-construction.
+erosion. Convective boundaries receive attenuated coarse and fine cellular
+billow passes; glaciated outflow receives anisotropic, surface-local fibrous
+displacement. There is no particle or sphere emitter and no periodic
+sine-fibre construction.
 
 The ordering follows the production pattern of coherent source volume,
 fog-VDB conversion, then billowy and wispy detail. Build and author it with

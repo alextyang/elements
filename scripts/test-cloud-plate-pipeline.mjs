@@ -30,6 +30,9 @@ const scene = {
         convergenceTarget: 0.002,
         minimumVolumeBounces: 1024,
         denoiser: "none",
+        pathGuiding: "none",
+        phaseFunction: "henyey-greenstein",
+        worldModel: "flat",
         backend: "blender-cycles-metal",
     },
     offlineComposition: {

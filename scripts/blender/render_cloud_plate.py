@@ -45,9 +45,25 @@ def cloud_volume_material(
     tree.nodes.clear()
     output = tree.nodes.new("ShaderNodeOutputMaterial")
     volume = tree.nodes.new("ShaderNodeVolumeCoefficients")
-    volume.phase = "HENYEY_GREENSTEIN"
     volume.inputs[0].default_value = 1.0
-    volume.inputs[3].default_value = 0.867
+    phase_model = os.environ.get(
+        "CLOUD_PLATE_PHASE_FUNCTION", "HENYEY_GREENSTEIN"
+    )
+    if phase_model == "MIE":
+        volume.phase = "MIE"
+        # Effective diameter in micrometres for a mature liquid cloud droplet
+        # population.  Blender's Mie phase evaluates the angular distribution;
+        # the density grid still controls macroscopic extinction.
+        volume.inputs[7].default_value = 20.0
+    elif phase_model == "DRAINE":
+        volume.phase = "DRAINE"
+        volume.inputs[3].default_value = 0.82
+        volume.inputs[6].default_value = 0.55
+    elif phase_model == "HENYEY_GREENSTEIN":
+        volume.phase = "HENYEY_GREENSTEIN"
+        volume.inputs[3].default_value = 0.867
+    else:
+        raise RuntimeError(f"Unsupported cloud phase function: {phase_model}")
     attribute = tree.nodes.new("ShaderNodeAttribute")
     attribute.attribute_name = "density"
     density_source = attribute.outputs["Fac"]
@@ -418,8 +434,23 @@ def configure_scene(config, scene_definition):
     world = bpy.data.worlds.new("cloud lighting world")
     world.use_nodes = True
     background = world.node_tree.nodes.get("Background")
-    world_color = lighting.get("worldColor", [0.52, 0.66, 0.94])
-    background.inputs["Color"].default_value = (*world_color, 1.0)
+    world_model = os.environ.get("CLOUD_PLATE_WORLD_MODEL", "FLAT")
+    if world_model == "NISHITA":
+        sky = world.node_tree.nodes.new("ShaderNodeTexSky")
+        sky.sky_type = "MULTIPLE_SCATTERING"
+        sky.sun_disc = False
+        sky.sun_elevation = math.radians(24.0)
+        sky.sun_rotation = math.radians(224.0)
+        sky.altitude = 0.35
+        sky.air_density = 1.0
+        sky.aerosol_density = 0.45
+        sky.ozone_density = 1.0
+        world.node_tree.links.new(sky.outputs["Color"], background.inputs["Color"])
+    elif world_model == "FLAT":
+        world_color = lighting.get("worldColor", [0.52, 0.66, 0.94])
+        background.inputs["Color"].default_value = (*world_color, 1.0)
+    else:
+        raise RuntimeError(f"Unsupported cloud world model: {world_model}")
     background.inputs["Strength"].default_value = lighting.get(
         "worldStrength", 0.08
     )
@@ -454,6 +485,20 @@ def configure_scene(config, scene_definition):
     # tied to the acceptance residual can plateau at that same noise level and
     # make sample doubling meaningless.
     scene.cycles.use_adaptive_sampling = False
+    path_guiding = os.environ.get("CLOUD_PLATE_PATH_GUIDING", "NONE")
+    if path_guiding not in ("NONE", "VOLUME"):
+        raise RuntimeError(f"Unsupported path-guiding mode: {path_guiding}")
+    scene.cycles.use_guiding = path_guiding == "VOLUME"
+    if scene.cycles.use_guiding:
+        scene.cycles.use_deterministic_guiding = True
+        scene.cycles.use_surface_guiding = False
+        scene.cycles.use_volume_guiding = True
+        scene.cycles.guiding_training_samples = min(
+            512, max(128, config["samples"] // 8)
+        )
+        scene.cycles.volume_guiding_probability = 0.5
+        scene.cycles.use_guiding_direct_light = True
+        scene.cycles.use_guiding_mis_weights = True
     # Static transport plates can afford a production denoise pass. It removes
     # the low-frequency volume crawl that becomes conspicuous when a canary
     # plate is enlarged in the live compositor; alpha remains the exact Cycles
@@ -562,6 +607,16 @@ def main():
     os.makedirs(config["output"], exist_ok=True)
     with open(config["scene"], "r", encoding="utf-8") as handle:
         scene_definition = json.load(handle)
+    render_contract = scene_definition.get("render", {})
+    os.environ.setdefault(
+        "CLOUD_PLATE_PHASE_FUNCTION",
+        render_contract.get("phaseFunction", "henyey-greenstein")
+            .upper().replace("-", "_"),
+    )
+    os.environ.setdefault(
+        "CLOUD_PLATE_WORLD_MODEL",
+        render_contract.get("worldModel", "flat").upper(),
+    )
     if scene_definition["fixedCamera"]["perspectiveId"] != "oblique-natural":
         raise RuntimeError("Only the oblique-natural production camera is supported")
     config["radiance_scale"] = scene_definition["offlineComposition"][
@@ -594,6 +649,13 @@ def main():
         "denoiser": (
             "OpenImageDenoise" if scene.cycles.use_denoising else "none"
         ),
+        "pathGuiding": "volume" if scene.cycles.use_guiding else "none",
+        "phaseFunction": os.environ.get(
+            "CLOUD_PLATE_PHASE_FUNCTION", "HENYEY_GREENSTEIN"
+        ).lower().replace("_", "-"),
+        "worldModel": os.environ.get(
+            "CLOUD_PLATE_WORLD_MODEL", "FLAT"
+        ).lower(),
         "radianceCalibration": config["radiance_scale"],
         "convergenceDelta": None,
         "renderSeconds": time.time() - started,

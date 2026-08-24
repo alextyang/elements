@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "source": "Elements continuous OpenVDB author",
   "generator": "scripts/openvdb/cloud_vdb_author.cpp",
-  "generatorSourceSha256": "c568c0ca921084bcd866ee4480176f8c692c3e1e8e735c016b1e11c054d7914d",
+  "generatorSourceSha256": "ebaa043ac390e8ee11e2f3e88b0e51583f4bb457000862db1b36fc7b1285b2d1",
   "license": "project-generated",
   "assets": [
     {
@@ -41,7 +41,7 @@
       "id": "authored-cumulonimbus-capillatus-incus",
       "quality": "review",
       "entry": "cumulonimbus-capillatus-incus-review.vdb",
-      "vdbSha256": "e6b19f84e6fa4bd9f496867609ae03b5e15383b1e7542bcbcaace5bc1a0e0404",
+      "vdbSha256": "66c0c05b73c9a01c2526624eeda30bc8daed564652a5392724ff8c994d9a977e",
       "authoring": {
         "genus": "cumulonimbus",
         "species": "cumulonimbus-capillatus-incus",

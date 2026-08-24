@@ -13,9 +13,11 @@ field families:
 - sheared fibrous and cellular fields for the upper genera.
 
 Macrostructure is evaluated before scale-separated domain warp, erosion, and
-edge detail. This follows the production ordering documented by SideFX: make a
-coherent source volume, convert it to a fog VDB, then add multiple billowy and
-wispy detail scales. A genus profile is only the authoring foundation; a plate
+edge detail. Convective fields use attenuated fBm plus domain-warped Worley F1
+at two element sizes; ice outflow uses a separate anisotropic fibre field.
+This follows the production ordering documented by SideFX: make a coherent
+source volume, convert it to a fog VDB, then add multiple billowy and wispy
+detail scales. A genus profile is only the authoring foundation; a plate
 scene must still specify species, group continuity, phase, weather accessories,
 lighting, and the fixed production camera.
 

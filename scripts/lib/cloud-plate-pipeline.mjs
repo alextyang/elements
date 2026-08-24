@@ -77,7 +77,11 @@ export const validateCloudPlateScene = (scene) => {
     if (render.backend === "blender-cycles-metal" &&
         (!Number.isInteger(render.minimumVolumeBounces) ||
             render.minimumVolumeBounces < 1 ||
-            !["none", "open-image-denoise"].includes(render.denoiser))) {
+            !["none", "open-image-denoise"].includes(render.denoiser) ||
+            !["none", "volume"].includes(render.pathGuiding) ||
+            !["henyey-greenstein", "draine", "mie"].includes(
+                render.phaseFunction) ||
+            !["flat", "nishita"].includes(render.worldModel))) {
         failures.push("invalid-offline-quality-contract");
     }
     if (!Array.isArray(scene?.groups) || scene.groups.length === 0) {
@@ -458,12 +462,26 @@ export const renderCloudPlateScene = async ({
     const productionDenoiser = scene.render.denoiser === "none"
         ? "NONE" : "OPENIMAGEDENOISE";
     const denoiser = process.env.CLOUD_PLATE_DENOISER ?? productionDenoiser;
+    const productionPathGuiding = scene.render.pathGuiding === "volume"
+        ? "VOLUME" : "NONE";
+    const pathGuiding = process.env.CLOUD_PLATE_PATH_GUIDING ??
+        productionPathGuiding;
+    const productionPhaseFunction = scene.render.phaseFunction
+        .toUpperCase().replaceAll("-", "_");
+    const phaseFunction = process.env.CLOUD_PLATE_PHASE_FUNCTION ??
+        productionPhaseFunction;
+    const productionWorldModel = scene.render.worldModel.toUpperCase();
+    const worldModel = process.env.CLOUD_PLATE_WORLD_MODEL ??
+        productionWorldModel;
     if (!Number.isSafeInteger(samples) || samples < 64 ||
         !Number.isSafeInteger(width) || width < 64 ||
         !Number.isSafeInteger(height) || height < 64 ||
         !(convergenceTarget > 0) || convergenceTarget > 1 ||
         !Number.isSafeInteger(volumeBounces) || volumeBounces < 1 ||
-        !["NONE", "OPENIMAGEDENOISE"].includes(denoiser)) {
+        !["NONE", "OPENIMAGEDENOISE"].includes(denoiser) ||
+        !["NONE", "VOLUME"].includes(pathGuiding) ||
+        !["HENYEY_GREENSTEIN", "DRAINE", "MIE"].includes(phaseFunction) ||
+        !["FLAT", "NISHITA"].includes(worldModel)) {
         throw new Error("Samples and output dimensions are invalid.");
     }
     const blenderExecutable = scene.render.backend === "blender-cycles-metal"
@@ -517,6 +535,9 @@ export const renderCloudPlateScene = async ({
         `storm-source:${sourceIds.join(",")}\0`,
         `volume-bounces:${volumeBounces}\0`,
         `denoiser:${denoiser}\0`,
+        `path-guiding:${pathGuiding}\0`,
+        `phase-function:${phaseFunction}\0`,
+        `world-model:${worldModel}\0`,
     ]);
     const identity = createCloudPlateBuildIdentity({
         scene, rendererHash, samples, width, height, convergenceTarget,
@@ -526,7 +547,10 @@ export const renderCloudPlateScene = async ({
         width >= scene.render.width && height >= scene.render.height &&
         convergenceTarget <= scene.render.convergenceTarget &&
         volumeBounces >= scene.render.minimumVolumeBounces &&
-        denoiser === productionDenoiser;
+        denoiser === productionDenoiser &&
+        pathGuiding === productionPathGuiding &&
+        phaseFunction === productionPhaseFunction &&
+        worldModel === productionWorldModel;
     const totalFrames = cloudPlateFrameCount(scene.timeline);
     const frameIndices = requestedFrames?.length
         ? [...new Set(requestedFrames)].sort((a, b) => a - b)
@@ -582,7 +606,8 @@ export const renderCloudPlateScene = async ({
         groups: scene.groups,
         render: {
             width, height, minimumTransportSamples: samples,
-            convergenceTarget, volumeBounces, denoiser,
+            convergenceTarget, volumeBounces, denoiser, pathGuiding,
+            phaseFunction, worldModel,
             radianceCalibration:
                 scene.offlineComposition?.radianceCalibration,
         },
@@ -665,6 +690,9 @@ export const renderCloudPlateScene = async ({
                             ),
                             CLOUD_PLATE_VOLUME_BOUNCES: String(volumeBounces),
                             CLOUD_PLATE_DENOISER: denoiser,
+                            CLOUD_PLATE_PATH_GUIDING: pathGuiding,
+                            CLOUD_PLATE_PHASE_FUNCTION: phaseFunction,
+                            CLOUD_PLATE_WORLD_MODEL: worldModel,
                         },
                     });
                 } else {
