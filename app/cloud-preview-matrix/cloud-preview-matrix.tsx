@@ -7,10 +7,6 @@ import {
     type WeatherImplementationStatus,
 } from "@/components/backgrounds/sky/weather-qualification-matrix";
 import {
-    DEFAULT_PRODUCTION_PERSPECTIVE_ID,
-} from "@/components/backgrounds/sky/weather-cloud-photograph-benchmark";
-
-import {
     previewDefinitions,
     titleCase,
     type MatrixGroup,
@@ -101,12 +97,7 @@ export function CloudPreviewMatrix() {
         };
     }, [refreshManifest]);
 
-    const productionPerspective = manifest?.productionPerspective ??
-        DEFAULT_PRODUCTION_PERSPECTIVE_ID;
-    const previews = useMemo(
-        () => previewDefinitions(productionPerspective),
-        [productionPerspective],
-    );
+    const previews = useMemo(() => previewDefinitions(), []);
     const previewById = useMemo(
         () => new Map(previews.map((preview) => [preview.id, preview])),
         [previews],
@@ -115,7 +106,13 @@ export function CloudPreviewMatrix() {
         manifest?.entries.flatMap((entry) => {
             const preview = previewById.get(entry.id);
             return preview && preview.caseId === entry.caseId &&
-                preview.captureParameter === entry.captureParameter
+                preview.captureParameter === entry.captureParameter &&
+                preview.productionPerspective === entry.productionPerspective &&
+                preview.productionCameraSignature ===
+                    entry.productionCameraSignature &&
+                preview.photographicAcceptance ===
+                    entry.photographicAcceptance &&
+                preview.imageQualificationProfile === entry.qualification.profile
                 ? [[entry.id, entry] as const] : [];
         }) ?? [],
     ), [manifest, previewById]);
@@ -159,7 +156,7 @@ export function CloudPreviewMatrix() {
             className={styles.page}
             data-cloud-preview-matrix
             data-preview-source="static-manifest"
-            data-production-perspective={productionPerspective}
+            data-production-perspective="oblique-natural"
             data-manifest-status={manifest?.status ?? "unavailable"}
             data-live-capture-count="0"
         >
@@ -170,12 +167,12 @@ export function CloudPreviewMatrix() {
                     <p className={styles.introduction}>
                         {scope === "canonical"
                             ? "Canonical 60: 32 WMO base forms and 28 varieties, features, upper-atmosphere states, and exterior systems."
-                            : `Complete production matrix: ${WEATHER_QUALIFICATION_SUMMARY.targets} WMO/weather targets; ${WEATHER_QUALIFICATION_SUMMARY.cases.toLocaleString()} valid qualification combinations remain catalogued.`} This page only displays completed image files from the background preview command. It never creates a cloud renderer or GPU device. Every image uses the single production perspective recorded in the manifest.
+                            : `Complete production matrix: ${WEATHER_QUALIFICATION_SUMMARY.targets} WMO/weather targets; ${WEATHER_QUALIFICATION_SUMMARY.cases.toLocaleString()} valid qualification combinations remain catalogued.`} This page only displays image-qualified, completed files from the background preview command. It never creates a cloud renderer or GPU device. Every target uses the single oblique-natural production camera.
                     </p>
                 </div>
                 <div className={styles.progress} aria-live="polite">
                     <strong>{readyCount} / {scopeDefinitions.length}</strong>
-                    <span>{manifest?.completed ?? 0} / {manifest?.total ?? previews.length} full-grid images generated</span>
+                    <span>{manifest?.completed ?? 0} / {manifest?.total ?? previews.length} full-grid images generated and image-qualified</span>
                     <div className={styles.progressTrack}><i style={{
                         width: `${scopeDefinitions.length
                             ? readyCount / scopeDefinitions.length * 100 : 0}%`,
@@ -191,9 +188,7 @@ export function CloudPreviewMatrix() {
                             manifest?.status === "partial" ? "Generating" :
                                 "Awaiting manifest"}
                     </span>
-                    <span>Production perspective: <strong>{titleCase(
-                        productionPerspective,
-                    )}</strong></span>
+                    <span>Perspectives: <strong>Catalogue native</strong></span>
                     <span>Capture backend: <strong>{titleCase(
                         manifest?.captureMode ?? "awaiting-manifest",
                     )}</strong></span>
@@ -286,11 +281,15 @@ export function CloudPreviewMatrix() {
                             </div>
                             <p>{titleCase(preview.genus)} · {titleCase(preview.group)} · {preview.permutationCount} valid permutations</p>
                             {preview.implementation && <p className={styles.evidence}>
-                                {titleCase(preview.implementation)} · {preview.photographicEvidence}
+                                {titleCase(preview.implementation)} · photographic {titleCase(
+                                    preview.photographicAcceptance,
+                                )}
                             </p>}
                             {entry && <p>Generated {new Date(
                                 entry.generatedAt,
-                            ).toLocaleString()} · {entry.width}×{entry.height}</p>}
+                            ).toLocaleString()} · {entry.width}×{entry.height} · {titleCase(
+                                entry.productionPerspective,
+                            )} · image gate accepted</p>}
                         </div>
                     </article>;
                 })}

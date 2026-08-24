@@ -67,49 +67,19 @@ const loadedRuntimeAtlas = {
     volumes: new Map(manifest.volumes.map((volume) => [volume.id, volume])),
 };
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const PROTECTED_CU_SURFACE_BASELINE = Object.freeze({
-    "cu-humilis": Object.freeze({
-        normalSamples: 2626,
-        axisDominant: 0.1370906321401371,
-        latticeCrease: 0.11043412033511044,
-        sharpCrease: 0.15325994919559696,
-    }),
-    "cu-mediocris": Object.freeze({
-        normalSamples: 6559,
-        axisDominant: 0.16420186003964019,
-        latticeCrease: 0.10535142552218325,
-        sharpCrease: 0.10630951717992983,
-    }),
-    "cu-congestus": Object.freeze({
-        normalSamples: 10895,
-        axisDominant: 0.1372189077558513,
-        latticeCrease: 0.12042221202386416,
-        sharpCrease: 0.14284281271943022,
-    }),
-    "cu-congestus-turreted": Object.freeze({
-        normalSamples: 8742,
-        axisDominant: 0.15305422100205904,
-        latticeCrease: 0.1222832303820636,
-        sharpCrease: 0.1310988367227383,
-    }),
-    "cu-congestus-multicell": Object.freeze({
-        normalSamples: 14663,
-        axisDominant: 0.1599263452226693,
-        latticeCrease: 0.1081634044874855,
-        sharpCrease: 0.14427356344575215,
-    }),
-});
-const CONVECTIVE_BASELINE_BLOCKS = Object.freeze({
-    "cu-humilis": ["2a866404ef5ce5a674d0f67ff1d243aaf6741f4c29a193c04d85ca2f09cfee28", "eca89bc6e8d8eaa6a8780eb71e7d4bc460aef970d11c3d27749e52c5b33b399a"],
-    "cu-mediocris": ["3f514fbea9ecd82bd75970a733e1be9a00e172e3c0c64e07778cd73d10b990c4", "a0be6d934878f1624791d50a54fd0891415b481543fbf5c31c0be0997b8672db"],
-    "cu-congestus": ["84be5c336109dc8265c4e5d2ef18be724cfd8ac9cb9eb08b5129607b3fe6d032", "0f7774aea43e83beba4c2ebb424e27b89ba62f9eb3c1077c3bc526e118a77ea6"],
+const CUMULUS_SOURCE_FILES = Object.freeze([
+    "cgheven-cumulus-06-r8-96.bin",
+    "cgheven-cumulus-15-r8-96.bin",
+    "cgheven-cumulus-26-r8-96.bin",
+    "cgheven-congestus-21-r8-96.bin",
+    "cgheven-congestus-25-r8-96.bin",
+    "cgheven-congestus-23-r8-96.bin",
+]);
+const CUMULONIMBUS_BASELINE_BLOCKS = Object.freeze({
     "cb-calvus": ["9efac500b55b68ca1b4392deae1f233ec333398c1d9d3ac42f6ab6e22bb5c907", "8dc0a44823af7097e4ded8813d0aeb0289c9debc4fddc15017c39b8182b49d9f"],
     "cb-capillatus": ["ce03dfdf9387080d3ecaca15b804da069922bd572ab8a8f708a9dd89a820280f", "e3c6454e8feb767ea67fc24de35b2c4b613a8884ed606b31bdd1ba646807c70a"],
     "cb-capillatus-incus": ["e69230fabd7179eae0e9386914d03c0cc877f004a67ca3816a9eda8e6ee8c02d", "276cf0a17d6a99f6b31e48b54369ac357ff899912d1bb8eb3924f320bc51cd84"],
     "cb-dissipating": ["c39d8ef244b9cf507f52a3eb080f10847668da911d8390af0949295e6da7ba33", "04db8cdf383eea6cffb28ee9f972bf17075a7651be7a8391dc6d126a722e258e"],
-    "cu-fractus": ["0e605400979b8d226e47f61fbdab65a1cb18ec727b452ada7bb3c3b5da4847f5", "7e88beebf0477369c0e42820a1ec46d08752a99813a4fec6db66dc0549d8ed95"],
-    "cu-congestus-turreted": ["82c777c2ef6790c80102e7631ed222b46a5e000ae6688c51c252efa3f1687efe", "ea6b64596e82bd7ebf8ca0487d59683aff4b43b2c8d393198f88b649f996c8d4"],
-    "cu-congestus-multicell": ["e10d29c68e1fa038d7b290625e13ca753c77f61c84f60d9677f7412ee3ea8191", "35e3bf84e48838a4f698d2dec204a67f8db2736542d0f49b532e45cba8e43d20"],
     "cb-calvus-multicell": ["18caf654adb5f8b29013b577cafb7261b6745d7c6e4732a934151170ef111f2c", "5dc32533c6b1efa7f22b0ca4b9b25ae27782bf1afa21ba069580d821f237a05a"],
     "cb-capillatus-sheared": ["079738510b2e8a928474d5102fb4fdc6988accd1f8d89be5c1cd270395ba447f", "3a5eb8d9e7688789776ca38ce80f122975a9461dfcf894819ef41b9258986f2a"],
     "cb-capillatus-incus-back-sheared": ["50f19f67540eb2f69e77d656193dc9b2d5eff20e19e225a5482fd3b5e1e1b036", "590e67ab2a35331c7f052d132cec9801e0e6b09eaa3339c5ab20d9e81d3d96c9"],
@@ -219,34 +189,42 @@ const potentialDensityAt = (volume, x, y, z) => {
         : 0;
 };
 
-const extractCanonicalAtlasBlock = (volume) => {
-    const resolution = manifest.atlas.volumeResolution;
-    const padding = manifest.atlas.paddingZ;
+const extractCanonicalAtlasBlock = (
+    volume,
+    sourceManifest = manifest,
+    sourceAtlas = atlas,
+) => {
+    const resolution = sourceManifest.atlas.volumeResolution;
+    const padding = sourceManifest.atlas.paddingZ;
     const depth = resolution + padding * 2;
     const bytes = new Uint8Array(resolution * resolution * depth * 4);
-    const { width, height } = manifest.atlas.dimensions;
+    const { width, height } = sourceManifest.atlas.dimensions;
     for (let localZ = -padding; localZ < resolution + padding; localZ += 1) {
         for (let y = 0; y < resolution; y += 1) {
             const source = (((volume.zOffset + localZ) * height +
                 volume.yOffset + y) * width + volume.xOffset) * 4;
             const target = (((localZ + padding) * resolution + y) *
                 resolution) * 4;
-            bytes.set(atlas.subarray(source, source + resolution * 4), target);
+            bytes.set(sourceAtlas.subarray(source, source + resolution * 4), target);
         }
     }
     return bytes;
 };
 
-const extractCanonicalMajorantBlock = (volume) => {
-    const grid = manifest.majorants.gridSize;
-    const { width, height } = manifest.majorants.dimensions;
+const extractCanonicalMajorantBlock = (
+    volume,
+    sourceManifest = manifest,
+    sourceMajorants = majorants,
+) => {
+    const grid = sourceManifest.majorants.gridSize;
+    const { width, height } = sourceManifest.majorants.dimensions;
     const bytes = new Uint8Array(grid ** 3);
     for (let z = 0; z < grid; z += 1) {
         for (let y = 0; y < grid; y += 1) {
             const source = (((volume.majorantZOffset + z) * height +
                 volume.majorantYOffset + y) * width + volume.majorantXOffset);
             const target = (z * grid + y) * grid;
-            bytes.set(majorants.subarray(source, source + grid), target);
+            bytes.set(sourceMajorants.subarray(source, source + grid), target);
         }
     }
     return bytes;
@@ -964,17 +942,15 @@ test("every macro family exposes conservative support and a genuinely occupied c
     }
 });
 
-test("every Cu/Cb byte block and majorant matches its versioned reconstruction", () => {
+test("every Cb byte block and majorant matches its versioned reconstruction", () => {
     assert.deepEqual(
-        Object.keys(CONVECTIVE_BASELINE_BLOCKS),
+        Object.keys(CUMULONIMBUS_BASELINE_BLOCKS),
         manifest.volumes
-            .filter((volume) => ["cumulus", "cumulonimbus"].includes(
-                volume.classification.genus,
-            ))
+            .filter((volume) => volume.classification.genus === "cumulonimbus")
             .map((volume) => volume.id),
     );
     for (const [id, [atlasHash, majorantHash]] of Object.entries(
-        CONVECTIVE_BASELINE_BLOCKS,
+        CUMULONIMBUS_BASELINE_BLOCKS,
     )) {
         const volume = manifest.volumes.find((candidate) => candidate.id === id);
         assert.ok(volume, `${id} must retain its canonical slot`);
@@ -989,6 +965,26 @@ test("every Cu/Cb byte block and majorant matches its versioned reconstruction",
             `${id} majorants diverged from its versioned reconstruction`,
         );
     }
+});
+
+test("Cumulus sources are distinct documented CC0 96-cubed density volumes", () => {
+    const sourceReadme = readFileSync(new URL(
+        "./assets/clouds/README.md",
+        import.meta.url,
+    ), "utf8");
+    assert.match(sourceReadme, /CC0 1\.0 Universal/);
+    const sourceChecksums = new Set();
+    for (const file of CUMULUS_SOURCE_FILES) {
+        const bytes = readFileSync(new URL(`./assets/clouds/${file}`, import.meta.url));
+        assert.equal(bytes.byteLength, 96 ** 3,
+            `${file} must remain an uncompressed 96^3 R8 density field`);
+        assert.ok(bytes.some((value) => value > 0),
+            `${file} must contain authored condensate`);
+        assert.match(sourceReadme, new RegExp(file.replaceAll(".", "\\.")));
+        sourceChecksums.add(sha256(bytes));
+    }
+    assert.equal(sourceChecksums.size, CUMULUS_SOURCE_FILES.length,
+        "each Cumulus morphology must use distinct source density anatomy");
 });
 
 test("2x reduction preserves every fine support sample and optical block means", () => {
@@ -1108,7 +1104,7 @@ test("high-ice reduction never requests more mass than authored positive childre
     assert.equal(reduced.diagnostics.massCapacityRemovedBytes, 1);
 });
 
-test("protected Cu uses bounded 96^3 reconstruction without support loss or ABI growth", () => {
+test("connected Cumulus uses bounded 96^3 source reconstruction without support loss or ABI growth", () => {
     assert.equal(CLOUD_PROTECTED_CU_RECONSTRUCTION_SCALE, 2);
     assert.deepEqual(
         manifest.offlineSourceReconstruction.protectedVolumeIds,
@@ -1122,9 +1118,15 @@ test("protected Cu uses bounded 96^3 reconstruction without support loss or ABI 
     });
     assert.equal(manifest.atlas.byteLength, 100 * 48 * 1250 * 4);
     for (const id of CLOUD_PROTECTED_CU_RECONSTRUCTION_IDS) {
-        const statistics = manifest.volumes.find(
+        const volume = manifest.volumes.find(
             (volume) => volume.id === id,
-        ).statistics;
+        );
+        const statistics = volume.statistics;
+        assert.equal(
+            volume.formation.boundaryModel,
+            "source-authored-volumetric-condensate",
+            `${id} must reconstruct the authored density rather than an analytic macro model`,
+        );
         assert.equal(statistics.reconstructionScale, 2, id);
         assert.equal(statistics.reconstructionSourceResolution, 96, id);
         assert.equal(statistics.reconstructionLostSourceSupportVoxels, 0, id);
@@ -1155,29 +1157,22 @@ test("protected Cu uses bounded 96^3 reconstruction without support loss or ABI 
     }
 });
 
-test("protected Cu reconstruction reduces axis and lattice crease concentrations", () => {
-    const analyticIds = new Set(["cu-humilis", "cu-mediocris"]);
+test("source-authored Cumulus reconstruction avoids lattice-shaped silhouettes", () => {
     for (const id of CLOUD_PROTECTED_CU_RECONSTRUCTION_IDS) {
         const statistics = manifest.volumes.find(
             (volume) => volume.id === id,
         ).statistics;
-        const baseline = PROTECTED_CU_SURFACE_BASELINE[id];
-        // Axis-dominant normals are legitimate on flat cloud bases and tall
-        // convective flanks. Lattice and sharp-crease concentrations are the
-        // actual reconstruction artifacts; keep only a broad axis sanity cap.
         assert.ok(
             statistics.signedDistanceAxisDominantNormalFraction < 0.22,
-            `${id} reconstructed surface became predominantly axis-aligned`,
+            `${id} source silhouette became predominantly axis-aligned`,
         );
         assert.ok(
-            statistics.signedDistanceLatticeCreaseNormalFraction <
-                (analyticIds.has(id) ? baseline.latticeCrease * 0.40 : 0.05),
-            `${id} retained its 48^3 lattice-crease concentration`,
+            statistics.signedDistanceLatticeCreaseNormalFraction < 0.025,
+            `${id} source silhouette exposes its reconstruction lattice`,
         );
         assert.ok(
-            statistics.signedDistanceSharpNormalCreaseFraction <
-                (analyticIds.has(id) ? baseline.sharpCrease : 0.08),
-            `${id} retained its 48^3 sharp normal creases`,
+            statistics.signedDistanceSharpNormalCreaseFraction < 0.14,
+            `${id} source silhouette contains excessive sharp creases`,
         );
     }
 });
@@ -1189,13 +1184,49 @@ test("deterministic generator reproduces every byte and reconstruction hash", ()
     assert.deepEqual(first.atlas, second.atlas);
     assert.deepEqual(first.majorants, second.majorants);
     assert.deepEqual(first.manifest, second.manifest);
+    const firstById = new Map(first.manifest.volumes.map((volume) => [volume.id, volume]));
+    const secondById = new Map(second.manifest.volumes.map((volume) => [volume.id, volume]));
+    const cumulusBlockChecksums = new Set();
+    for (const volume of first.manifest.volumes.filter(
+        (candidate) => candidate.classification.genus === "cumulus",
+    )) {
+        const secondVolume = secondById.get(volume.id);
+        const firstAtlasHash = sha256(extractCanonicalAtlasBlock(
+            volume,
+            first.manifest,
+            first.atlas,
+        ));
+        const secondAtlasHash = sha256(extractCanonicalAtlasBlock(
+            secondVolume,
+            second.manifest,
+            second.atlas,
+        ));
+        assert.equal(firstAtlasHash, secondAtlasHash,
+            `${volume.id} source sampling must be deterministic`);
+        assert.equal(
+            sha256(extractCanonicalMajorantBlock(
+                volume,
+                first.manifest,
+                first.majorants,
+            )),
+            sha256(extractCanonicalMajorantBlock(
+                secondVolume,
+                second.manifest,
+                second.majorants,
+            )),
+            `${volume.id} source-derived majorants must be deterministic`,
+        );
+        cumulusBlockChecksums.add(firstAtlasHash);
+    }
+    assert.equal(cumulusBlockChecksums.size, 6,
+        "the six Cumulus species/variants must retain distinct sampled density blocks");
     for (const id of CLOUD_PROTECTED_CU_RECONSTRUCTION_IDS) {
-        const firstStatistics = first.manifest.volumes.find(
-            (volume) => volume.id === id,
-        ).statistics;
-        const secondStatistics = second.manifest.volumes.find(
-            (volume) => volume.id === id,
-        ).statistics;
+        const firstStatistics = firstById.get(id).statistics;
+        const secondStatistics = secondById.get(id).statistics;
+        assert.match(firstStatistics.reconstructionSourceSupportChecksum,
+            /^[0-9a-f]{64}$/);
+        assert.match(firstStatistics.reconstructionSourceDensityChecksum,
+            /^[0-9a-f]{64}$/);
         assert.equal(
             firstStatistics.reconstructionSourceSupportChecksum,
             secondStatistics.reconstructionSourceSupportChecksum,
@@ -1763,10 +1794,9 @@ test("boundary classes, protected bases, and connected deep cores follow formati
         "cu-congestus", "cu-congestus-turreted", "cu-congestus-multicell",
     ]) {
         const core = byId.get(id).formation.protectedConnectedCore;
-        assert.deepEqual(core.roles, ["root", "thermal-mass"]);
-        assert.match(core.authoredSelection, /first dominant thermal head/);
-        assert.doesNotMatch(core.authoredSelection, /junction/i,
-            `${id} cannot advertise a hard-protected connector union`);
+        assert.equal(core.material, "lower-liquid-updraft");
+        assert.match(core.authoredSelection, /source-authored lower updraft/);
+        assert.equal(core.maximumIceFraction, 0.42);
     }
     for (const id of [
         "cu-humilis", "cu-mediocris", "cb-dissipating",
@@ -2019,13 +2049,22 @@ test("formation families retain their meteorological topology invariants", () =>
         assert.ok(volume.statistics.projectedPrincipalAspectRatio > 3,
             `${id} must not become a capsule-like cloudlet`);
     }
-    for (const id of ["st-fractus", "cu-fractus"]) {
-        const volume = byId.get(id);
-        assert.equal(volume.formation.topologyPolicy, "fragmented-population");
-        assert.ok(volume.statistics.connectedComponentCount >= 8);
-        assert.ok(volume.statistics.largestComponentFraction < 0.35);
-        assert.ok(volume.statistics.surfaceVoxelFraction > 0.58);
-    }
+    const stratusFractus = byId.get("st-fractus");
+    assert.equal(stratusFractus.formation.topologyPolicy, "fragmented-population");
+    assert.ok(stratusFractus.statistics.connectedComponentCount >= 8);
+    assert.ok(stratusFractus.statistics.largestComponentFraction < 0.35);
+    assert.ok(stratusFractus.statistics.surfaceVoxelFraction > 0.58);
+
+    const cumulusFractus = byId.get("cu-fractus");
+    assert.equal(cumulusFractus.formation.boundaryModel,
+        "source-authored-volumetric-condensate");
+    assert.equal(cumulusFractus.formation.topologyPolicy, "fragmented-population");
+    assert.ok(cumulusFractus.statistics.connectedComponentCount >= 3,
+        "Cumulus fractus must retain multiple authored condensate shreds");
+    assert.ok(cumulusFractus.statistics.surfaceVoxelFraction > 0.46,
+        "Cumulus fractus needs an eroded high-surface-area boundary");
+    assert.ok(cumulusFractus.statistics.verticalSilhouetteMirrorSimilarity < 0.55,
+        "Cumulus fractus cannot read as a symmetric fair-weather cloud stamp");
 });
 
 test("conservative brick majorants bound displaced exterior support and interpolation halos", () => {
@@ -2064,12 +2103,11 @@ test("conservative brick majorants bound displaced exterior support and interpol
     }
 });
 
-test("lifecycle morphology grows vertically and glaciates into a broad anvil", () => {
+test("source-authored Cumulus preserves 3-D bodies and glaciates into a broad anvil", () => {
     const byId = new Map(manifest.volumes.map((volume) => [volume.id, volume]));
     const extent = (volume, axis) =>
         volume.statistics.occupiedBounds.maximum[axis] -
         volume.statistics.occupiedBounds.minimum[axis];
-    assert.ok(extent(byId.get("cu-mediocris"), 1) > extent(byId.get("cu-humilis"), 1));
     assert.ok(extent(byId.get("cu-congestus"), 1) > extent(byId.get("cu-mediocris"), 1));
     assert.ok(
         extent(byId.get("cb-capillatus-incus"), 2) > extent(byId.get("cb-capillatus"), 2),
@@ -2085,8 +2123,6 @@ test("lifecycle morphology grows vertically and glaciates into a broad anvil", (
         byId.get("cb-dissipating").statistics.meanDetailType >
             byId.get("cb-capillatus").statistics.meanDetailType,
     );
-    assert.ok(byId.get("cu-humilis").statistics.cumulusNestedPulseCount >= 5,
-        "humilis needs a restrained attached thermal hierarchy rather than a smooth oval");
     const congestusIds = [
         "cu-congestus", "cu-congestus-turreted", "cu-congestus-multicell",
     ];
@@ -2107,47 +2143,56 @@ test("lifecycle morphology grows vertically and glaciates into a broad anvil", (
     };
     const humilis = byId.get("cu-humilis");
     const mediocris = byId.get("cu-mediocris");
-    assert.ok(aspect(humilis) <= 0.85, "humilis must retain small, flattened vertical extent");
-    assert.ok(aspect(mediocris) >= 1.1 && aspect(mediocris) <= 1.6,
-        "mediocris must have moderate—not towering—vertical development");
-    assert.ok(aspect(mediocris) > aspect(humilis) + 0.3,
-        "humilis and mediocris cannot differ by scale alone");
-    assert.equal(humilis.statistics.upperThirdMassFraction, 0);
+    const fractus = byId.get("cu-fractus");
+    for (const volume of [humilis, mediocris, fractus, ...congestusVolumes]) {
+        assert.equal(volume.formation.boundaryModel,
+            "source-authored-volumetric-condensate");
+    }
+    assert.equal(humilis.formation.topologyPolicy, "single-connected");
+    assert.equal(mediocris.formation.topologyPolicy, "single-connected");
+    assert.equal(fractus.formation.topologyPolicy, "fragmented-population");
+    for (const volume of congestusVolumes) {
+        assert.equal(volume.formation.topologyPolicy, "single-connected");
+    }
+    assert.ok(aspect(humilis) >= 0.80 && aspect(humilis) <= 1.20,
+        "the authored humilis body must remain three-dimensional before its physical layer scales it");
+    assert.ok(aspect(mediocris) >= 1.0 && aspect(mediocris) <= 1.30,
+        "the authored mediocris body must retain moderate vertical development");
+    assert.ok(aspect(mediocris) > aspect(humilis) + 0.10,
+        "humilis and mediocris need distinct source-body proportions");
+    assert.ok(humilis.statistics.upperThirdMassFraction < 0.08);
     assert.ok(mediocris.statistics.upperThirdMassFraction < 0.025 &&
         mediocris.statistics.upperThirdMassFraction <
-            byId.get("cu-congestus").statistics.upperThirdMassFraction * 0.16,
+            byId.get("cu-congestus").statistics.upperThirdMassFraction * 0.20,
     "mediocris may retain moderate domes but not congestus-scale upper mass");
-    assert.equal(humilis.statistics.hierarchyLevelCount, 2);
-    assert.equal(mediocris.statistics.hierarchyLevelCount, 3);
-    assert.ok(humilis.statistics.cumulusNestedPulseCount >= 5);
-    assert.ok(mediocris.statistics.cumulusNestedPulseCount >= 14);
-    assert.ok(mediocris.statistics.cumulusCuspCount >= 4,
-        "mediocris needs small attached summit sproutings");
-    assert.deepEqual([
-        humilis.statistics.cumulusThermalChainCount,
-        mediocris.statistics.cumulusThermalChainCount,
-    ], [2, 3], "fair-weather Cu needs unequal source-connected thermal lineages");
-    assert.deepEqual([
-        humilis.statistics.cumulusDissipatingShoulderCount,
-        mediocris.statistics.cumulusDissipatingShoulderCount,
-    ], [1, 2], "fair-weather Cu needs simultaneous active and aging parcels");
+    const integratedDensity = (volume) =>
+        volume.statistics.occupiedVoxels * volume.statistics.meanDensity;
+    assert.ok(integratedDensity(mediocris) > integratedDensity(humilis) * 1.02,
+        "mediocris needs materially greater condensate mass than humilis");
+    assert.ok(humilis.statistics.surfaceVoxelFraction >=
+        mediocris.statistics.surfaceVoxelFraction * 0.90,
+    "the shallower humilis body must retain comparable visible boundary relief");
+    assert.ok(humilis.statistics.cumulusCrownProminentPeakCount <=
+        mediocris.statistics.cumulusCrownProminentPeakCount,
+    "humilis cannot have a more developed crown than mediocris");
+    assert.ok(mediocris.statistics.cumulusCrownProminentPeakCount >= 2,
+        "mediocris needs a more developed multi-dome crown than humilis");
     for (const volume of [humilis, mediocris]) {
         const statistics = volume.statistics;
         assert.equal(statistics.connectedComponentCount, 1,
-            `${volume.id} must not retain detached buds or base voxels`);
+            `${volume.id} must remain one photographic cloud body`);
         assert.equal(statistics.largestComponentFraction, 1);
-        assert.ok(statistics.centralLclBaseRangeVoxels <= 4,
-            `${volume.id} needs a coherent central lifting-condensation level; ` +
-                `one conservative partial-coverage texel may retain 96^3 support`);
-        assert.ok(statistics.centralLclBaseStdDevVoxels < 0.8,
-            `${volume.id} central LCL cannot become a ragged shelf`);
         assert.ok(statistics.removedDetachedVoxelFraction < 0.01,
-            `${volume.id} authoring cannot rely on removing a material fragment`);
+            `${volume.id} source cannot rely on removing a material fragment`);
+        assert.equal(statistics.verticalSilhouetteComponentCount, 1);
+        assert.equal(statistics.verticalSilhouetteLargestComponentFraction, 1);
+        assert.ok(statistics.cumulusMaximumStraightSideFraction < 0.70,
+            `${volume.id} silhouette cannot become rectilinear`);
     }
     assert.ok(humilis.statistics.projectedGridAutocorrelationScore < 0.35,
         "humilis anisotropy must not become a repeated axial pattern");
     assert.ok(mediocris.statistics.projectedGridAutocorrelationScore < 0.175,
-        "mediocris must not expose repeated primitive spacing");
+        "mediocris must not expose repeated source-pattern spacing");
     const congestusProportionContracts = {
         balanced: {
             maximumPlanFootprintAspect: 2.70,
@@ -2195,17 +2240,12 @@ test("lifecycle morphology grows vertically and glaciates into a broad anvil", (
             : morphology === "turreted" ? 1.55 : 1.45;
         assert.ok(aspect(volume) > minimumAspect,
             `${volume.id} needs morphology-relative great vertical extent`);
+        assert.ok(extent(volume, 1) > extent(mediocris, 1) * 1.15,
+            `${volume.id} must retain a taller authored body than mediocris before physical depth scaling`);
         assert.ok(statistics.projectedPrincipalAspectRatio <=
             proportionContract.maximumPlanFootprintAspect,
         `${volume.id} plan footprint cannot collapse into an elongated row`);
 
-        // Native VDB density owns the complete macro anatomy. Analytic
-        // primitive counts and genealogy metrics would describe a model that
-        // is not rendered, so the source-backed record must remain empty.
-        assert.equal(statistics.primitiveCount, 0);
-        assert.equal(statistics.entrainmentCavityCount, 0);
-        assert.equal(statistics.formationGroupCount, 1);
-        assert.equal(statistics.hierarchyLevelCount, 4);
         assert.equal(statistics.connectedComponentCount, 1,
             `${volume.id} must be one source-connected cloud body`);
         assert.equal(statistics.largestComponentFraction, 1);
@@ -2230,7 +2270,7 @@ test("lifecycle morphology grows vertically and glaciates into a broad anvil", (
             statistics.cumulusVerticalBodyWidthVariation < 0.14,
         `${volume.id} needs natural source-scale width evolution`);
         assert.ok(statistics.cumulusMaximumStraightSideFraction < 0.68,
-            `${volume.id} cannot retain a long analytic pillar edge`);
+            `${volume.id} cannot retain a long rectilinear pillar edge`);
         assert.ok(statistics.cumulusLclFootprintFillFraction > 0.60 &&
             statistics.cumulusLclFootprintFillFraction < 0.78,
         `${volume.id} needs a finite irregular condensation footprint`);
@@ -2287,7 +2327,7 @@ test("lifecycle morphology grows vertically and glaciates into a broad anvil", (
         volume.statistics.cumulusVerticalBodyWidthVariation);
     assert.ok(Math.max(...congestusWidthVariations) -
             Math.min(...congestusWidthVariations) > 0.035,
-    "congestus owners need a distinct source-scale pulse-width spectrum");
+    "congestus owners need distinct source-authored vertical width profiles");
     for (let left = 0; left < congestusVolumes.length; left += 1) {
         for (let right = left + 1; right < congestusVolumes.length; right += 1) {
             for (const axis of [0, 2]) {
@@ -2302,9 +2342,6 @@ test("lifecycle morphology grows vertically and glaciates into a broad anvil", (
             }
         }
     }
-    assert.ok(byId.get("cu-humilis").statistics.lowerThirdMassFraction > byId.get("cu-mediocris").statistics.lowerThirdMassFraction);
-    assert.ok(byId.get("cu-mediocris").statistics.lowerThirdMassFraction > byId.get("cu-congestus").statistics.lowerThirdMassFraction);
-
     const calvus = byId.get("cb-calvus").statistics;
     const capillatus = byId.get("cb-capillatus").statistics;
     assert.ok(calvus.meanDetailType < capillatus.meanDetailType, "calvus needs a smoother transitional summit than capillatus");

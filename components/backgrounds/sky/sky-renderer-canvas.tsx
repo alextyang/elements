@@ -160,6 +160,12 @@ import {
     rotateDirectionByCameraYaw,
 } from "./camera-contract";
 import {
+    validateCloudPlateAssetManifest,
+    type CloudPlateAssetFrame,
+    type CloudPlateAssetManifest,
+    type CloudPlateBinaryPlane,
+} from "./cloud-plate-scene";
+import {
     WEBGPU_ATMOSPHERE_SHADER,
     WEBGPU_CLOUD_INTERVAL_SHADER,
     WEBGPU_CLOUD_COUPLING_SHADER,
@@ -274,6 +280,39 @@ interface SkyRendererCanvasProps {
 interface WebGpuCanvasProps extends SkyRendererCanvasProps {
     options: SkyRendererOptions;
     onFailure: (message: string) => void;
+}
+
+interface CloudPlateCaptureRequest {
+    sceneId: string;
+    frame: number;
+    token: string;
+    endpoint?: string;
+}
+
+interface CloudPlateCaptureResult {
+    width: number;
+    height: number;
+    planes: readonly {
+        channel: "radiance" | "transmittance";
+        sha256: string;
+        byteLength: number;
+        stagingPath: string;
+    }[];
+}
+
+type CloudPlateCaptureCanvas = HTMLCanvasElement & {
+    __elementsCloudPlateCapture?: (
+        request: CloudPlateCaptureRequest,
+    ) => Promise<CloudPlateCaptureResult>;
+};
+
+interface CloudPlatePlaybackState {
+    url: string;
+    manifest: CloudPlateAssetManifest;
+    startedAtSeconds: number;
+    loadedPair: string;
+    pendingPair: string;
+    serial: number;
 }
 
 // Exact no-cloud sky shipped in the longest-running Elements deployment
@@ -651,6 +690,9 @@ const createParameterData = (
     transportDeltaSeconds: number,
     newTransportSample: boolean,
     strictRadiometricQualification: boolean,
+    offlineCloudPlateAccumulation: boolean,
+    cloudPlatePlayback: boolean,
+    cloudPlateBlend: number,
 ) => {
     const data = new Float32Array(54 * 4);
     const cameraYaw = cameraYawRadiansFromViewAzimuth(radiance.viewAzimuth);
@@ -831,7 +873,7 @@ const createParameterData = (
     ]);
     setVector(data, 34, [
         ...rotateDirectionByCameraYaw(radiance.moonDirection, cameraYaw),
-        0,
+        Math.min(1, Math.max(0, cloudPlateBlend)),
     ]);
     const night = celestial.naturalNight;
     setVector(data, 35, [
@@ -919,12 +961,14 @@ const createParameterData = (
     ]);
     // p[31]/p[32] retain their historical FOV/pitch/mode four-tuples.  The
     // append-only lane carries heading for both temporal camera snapshots so
-    // a yaw-only move cannot be mistaken for an immutable capture epoch.
+    // a yaw-only move cannot be mistaken for an immutable capture epoch. The
+    // third component opts a local asset worker into an unbounded logarithmic
+    // per-pixel sample counter; ordinary paused captures keep the live ABI.
     setVector(data, 53, [
         currentTransportYawRadians,
         previousTransportYawRadians,
-        0,
-        0,
+        offlineCloudPlateAccumulation ? 1 : 0,
+        cloudPlatePlayback ? 1 : 0,
     ]);
     return data;
 };
@@ -2339,6 +2383,9 @@ function WebGpuSkyCanvas({
         const captureInitializationTelemetry =
             new URLSearchParams(window.location.search).get("captureSession") ===
                 "persistent";
+        const offlineCloudPlateAccumulation =
+            new URLSearchParams(window.location.search).get("cloudPlateCapture") ===
+                "1";
         const initializationStarted = performance.now();
         let lastCaptureTransportMilestone = -1;
         let lastCaptureLightState = "";
@@ -3369,6 +3416,12 @@ function WebGpuSkyCanvas({
                 addressModeU: "repeat",
                 addressModeV: "clamp-to-edge",
             });
+            const cloudPlateSampler = device.createSampler({
+                magFilter: "linear",
+                minFilter: "linear",
+                addressModeU: "clamp-to-edge",
+                addressModeV: "clamp-to-edge",
+            });
             const volumeSampler = device.createSampler({
                 magFilter: "linear",
                 minFilter: "linear",
@@ -3666,6 +3719,240 @@ function WebGpuSkyCanvas({
             let temporalPrevious: any;
             let resolvedCloudCurrent: any;
             let resolvedCloudPrevious: any;
+            const createNeutralCloudPlateTexture = () => {
+                const texture = device.createTexture({
+                    label: "neutral streamed cloud plate",
+                    size: [1, 1, 2],
+                    format: "rgba16float",
+                    usage: TEXTURE.TEXTURE_BINDING | TEXTURE.COPY_DST,
+                });
+                device.queue.writeTexture(
+                    { texture, origin: { x: 0, y: 0, z: 0 } },
+                    new Uint16Array([0, 0, 0, 0]),
+                    {},
+                    { width: 1, height: 1, depthOrArrayLayers: 1 },
+                );
+                device.queue.writeTexture(
+                    { texture, origin: { x: 0, y: 0, z: 1 } },
+                    new Uint16Array([0x3c00, 0x3c00, 0x3c00, 0]),
+                    {},
+                    { width: 1, height: 1, depthOrArrayLayers: 1 },
+                );
+                return texture;
+            };
+            let cloudPlateFirstTexture = createNeutralCloudPlateTexture();
+            let cloudPlateSecondTexture = createNeutralCloudPlateTexture();
+            let cloudPlatePlaybackState: CloudPlatePlaybackState | null = null;
+            let cloudPlateRequestedUrl = "";
+            let cloudPlateRequestSerial = 0;
+            let cloudPlatePlaybackActive = false;
+            let cloudPlateBlend = 0;
+
+            const sha256Hex = async (bytes: ArrayBuffer) => Array.from(
+                new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+                (value) => value.toString(16).padStart(2, "0"),
+            ).join("");
+            const loadCloudPlatePlane = async (plane: CloudPlateBinaryPlane) => {
+                if (plane.format !== "rgba16float-le" ||
+                    plane.byteLength !== plane.width * plane.height * 8) {
+                    throw new Error(`Invalid cloud plate ${plane.channel} layout.`);
+                }
+                const response = await fetch(plane.url, { cache: "force-cache" });
+                if (!response.ok) {
+                    throw new Error(
+                        `Cloud plate ${plane.channel} fetch failed: ${response.status}.`,
+                    );
+                }
+                const bytes = await response.arrayBuffer();
+                if (bytes.byteLength !== plane.byteLength ||
+                    await sha256Hex(bytes) !== plane.sha256) {
+                    throw new Error(
+                        `Cloud plate ${plane.channel} failed content verification.`,
+                    );
+                }
+                return new Uint8Array(bytes);
+            };
+            const uploadCloudPlatePlane = ({
+                texture,
+                layer,
+                bytes,
+                width: planeWidth,
+                height: planeHeight,
+            }: {
+                texture: any;
+                layer: number;
+                bytes: Uint8Array;
+                width: number;
+                height: number;
+            }) => {
+                const tightBytesPerRow = planeWidth * 8;
+                const bytesPerRow = Math.ceil(tightBytesPerRow / 256) * 256;
+                let upload = bytes;
+                if (bytesPerRow !== tightBytesPerRow) {
+                    upload = new Uint8Array(bytesPerRow * planeHeight);
+                    for (let row = 0; row < planeHeight; row += 1) {
+                        upload.set(bytes.subarray(
+                            row * tightBytesPerRow,
+                            (row + 1) * tightBytesPerRow,
+                        ), row * bytesPerRow);
+                    }
+                }
+                device.queue.writeTexture(
+                    { texture, origin: { x: 0, y: 0, z: layer } },
+                    upload,
+                    { bytesPerRow, rowsPerImage: planeHeight },
+                    {
+                        width: planeWidth,
+                        height: planeHeight,
+                        depthOrArrayLayers: 1,
+                    },
+                );
+            };
+            const loadCloudPlatePair = async (
+                state: CloudPlatePlaybackState,
+                first: CloudPlateAssetFrame,
+                second: CloudPlateAssetFrame,
+            ) => {
+                const key = `${first.index}:${second.index}`;
+                if (state.loadedPair === key || state.pendingPair === key) return;
+                state.pendingPair = key;
+                const serial = ++cloudPlateRequestSerial;
+                state.serial = serial;
+                try {
+                    const firstOperator = first.operators[0];
+                    const secondOperator = second.operators[0];
+                    if (!firstOperator || !secondOperator ||
+                        first.operators.length !== 1 || second.operators.length !== 1) {
+                        throw new Error(
+                            "Cloud plate playback currently requires one continuous group.",
+                        );
+                    }
+                    const planes = await Promise.all([
+                        loadCloudPlatePlane(firstOperator.radiance),
+                        loadCloudPlatePlane(firstOperator.transmittance),
+                        loadCloudPlatePlane(secondOperator.radiance),
+                        loadCloudPlatePlane(secondOperator.transmittance),
+                    ]);
+                    if (disposed || cloudPlatePlaybackState !== state ||
+                        state.serial !== serial) return;
+                    const { width: plateWidth, height: plateHeight } =
+                        state.manifest.render;
+                    const nextFirst = device.createTexture({
+                        label: `cloud plate ${first.index}`,
+                        size: [plateWidth, plateHeight, 2],
+                        format: "rgba16float",
+                        usage: TEXTURE.TEXTURE_BINDING | TEXTURE.COPY_DST,
+                    });
+                    const nextSecond = device.createTexture({
+                        label: `cloud plate ${second.index}`,
+                        size: [plateWidth, plateHeight, 2],
+                        format: "rgba16float",
+                        usage: TEXTURE.TEXTURE_BINDING | TEXTURE.COPY_DST,
+                    });
+                    [
+                        [nextFirst, 0, planes[0]],
+                        [nextFirst, 1, planes[1]],
+                        [nextSecond, 0, planes[2]],
+                        [nextSecond, 1, planes[3]],
+                    ].forEach(([texture, layer, bytes]) => uploadCloudPlatePlane({
+                        texture,
+                        layer,
+                        bytes,
+                        width: plateWidth,
+                        height: plateHeight,
+                    } as {
+                        texture: any;
+                        layer: number;
+                        bytes: Uint8Array;
+                        width: number;
+                        height: number;
+                    }));
+                    const retiredFirst = cloudPlateFirstTexture;
+                    const retiredSecond = cloudPlateSecondTexture;
+                    cloudPlateFirstTexture = nextFirst;
+                    cloudPlateSecondTexture = nextSecond;
+                    state.loadedPair = key;
+                    state.pendingPair = "";
+                    cloudPlatePlaybackActive = true;
+                    canvas.dataset.cloudPlatePlayback = "ready";
+                    canvas.dataset.cloudPlateScene = state.manifest.sceneId;
+                    canvas.dataset.cloudPlateSceneHash = state.manifest.sceneHash;
+                    canvas.dataset.cloudPlateExtent =
+                        `${plateWidth}x${plateHeight}`;
+                    wakeRef.current?.();
+                    void device.queue.onSubmittedWorkDone().then(() => {
+                        retiredFirst.destroy();
+                        retiredSecond.destroy();
+                    });
+                } catch (error) {
+                    if (cloudPlatePlaybackState === state && state.serial === serial) {
+                        state.pendingPair = "";
+                        canvas.dataset.cloudPlatePlayback = "failed";
+                        console.warn("Cloud plate pair load failed", error);
+                    }
+                }
+            };
+            const requestCloudPlateManifest = async (
+                url: string,
+                nowSeconds: number,
+            ) => {
+                const serial = ++cloudPlateRequestSerial;
+                canvas.dataset.cloudPlatePlayback = "loading";
+                delete canvas.dataset.cloudPlateScene;
+                delete canvas.dataset.cloudPlateSceneHash;
+                delete canvas.dataset.cloudPlateExtent;
+                try {
+                    // The stable alias is intentionally mutable. Some browsers
+                    // can satisfy a no-cache revalidation from a stale 304 even
+                    // after an atomic manifest replacement, so bypass storage
+                    // for the tiny manifest. Content-addressed plane URLs remain
+                    // immutable and force-cached below.
+                    const manifestRequestUrl = new URL(url, window.location.href);
+                    manifestRequestUrl.searchParams.set(
+                        "cloudPlateRequest", `${Date.now()}-${serial}`,
+                    );
+                    const response = await fetch(
+                        manifestRequestUrl, { cache: "no-store" },
+                    );
+                    if (!response.ok) {
+                        throw new Error(`Cloud plate manifest fetch failed: ${response.status}.`);
+                    }
+                    const manifest = await response.json() as CloudPlateAssetManifest;
+                    const failures = validateCloudPlateAssetManifest(manifest);
+                    if (failures.length ||
+                        manifest.fixedCamera.perspectiveId !== "oblique-natural" ||
+                        manifest.frames.length === 0) {
+                        throw new Error(
+                            `Cloud plate manifest rejected: ${failures.join(", ") ||
+                                "no playable frames"}.`,
+                        );
+                    }
+                    if (disposed || serial !== cloudPlateRequestSerial) return;
+                    const state: CloudPlatePlaybackState = {
+                        url,
+                        manifest,
+                        startedAtSeconds: nowSeconds,
+                        loadedPair: "",
+                        pendingPair: "",
+                        serial,
+                    };
+                    cloudPlatePlaybackState = state;
+                    const frames = [...manifest.frames].sort(
+                        (left, right) => left.index - right.index,
+                    );
+                    await loadCloudPlatePair(state, frames[0], frames[1] ?? frames[0]);
+                } catch (error) {
+                    if (serial === cloudPlateRequestSerial) {
+                        cloudPlatePlaybackState = null;
+                        cloudPlatePlaybackActive = false;
+                        canvas.dataset.cloudPlatePlayback = "failed";
+                        delete canvas.dataset.cloudPlateScene;
+                        delete canvas.dataset.cloudPlateSceneHash;
+                        delete canvas.dataset.cloudPlateExtent;
+                        console.warn("Cloud plate manifest load failed", error);
+                    }
+                }
+            };
             let intervalLowMiddle: any;
             let intervalHighMask: any;
             let cloudLayerRadianceFirstDepth: any;
@@ -3683,6 +3970,91 @@ function WebGpuSkyCanvas({
             let glowQuarterB: any;
             let glowEighthA: any;
             let glowEighthB: any;
+            const captureCanvas = canvas as CloudPlateCaptureCanvas;
+            const readResolvedCloudPlane = async (arrayLayer: number) => {
+                if (!resolvedCloudCurrent || width < 1 || height < 1) {
+                    throw new Error("Resolved cloud transport is unavailable.");
+                }
+                await device.queue.onSubmittedWorkDone();
+                const bytesPerPixel = 8;
+                const tightBytesPerRow = width * bytesPerPixel;
+                const bytesPerRow = Math.ceil(tightBytesPerRow / 256) * 256;
+                const readBuffer = device.createBuffer({
+                    label: "offline cloud plate rgba16float readback",
+                    size: bytesPerRow * height,
+                    usage: BUFFER.COPY_DST | BUFFER.MAP_READ,
+                });
+                const encoder = device.createCommandEncoder({
+                    label: "offline cloud plate readback",
+                });
+                encoder.copyTextureToBuffer(
+                    {
+                        texture: resolvedCloudCurrent,
+                        origin: { x: 0, y: 0, z: arrayLayer },
+                    },
+                    {
+                        buffer: readBuffer,
+                        bytesPerRow,
+                        rowsPerImage: height,
+                    },
+                    { width, height, depthOrArrayLayers: 1 },
+                );
+                device.queue.submit([encoder.finish()]);
+                await readBuffer.mapAsync(MAP_MODE.READ);
+                const padded = new Uint8Array(readBuffer.getMappedRange());
+                const tight = new Uint8Array(tightBytesPerRow * height);
+                for (let row = 0; row < height; row += 1) {
+                    tight.set(padded.subarray(
+                        row * bytesPerRow,
+                        row * bytesPerRow + tightBytesPerRow,
+                    ), row * tightBytesPerRow);
+                }
+                readBuffer.unmap();
+                readBuffer.destroy();
+                return tight;
+            };
+            captureCanvas.__elementsCloudPlateCapture = async (request) => {
+                if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.sceneId) ||
+                    !Number.isInteger(request.frame) || request.frame < 0 ||
+                    !request.token) {
+                    throw new Error("Invalid cloud plate capture request.");
+                }
+                const endpoint = request.endpoint ??
+                    "/api/cloud-plates/capture-plane";
+                const planeResults: CloudPlateCaptureResult["planes"][number][] = [];
+                for (const [channel, layer] of [
+                    ["radiance", 0],
+                    ["transmittance", 1],
+                ] as const) {
+                    const bytes = await readResolvedCloudPlane(layer);
+                    const query = new URLSearchParams({
+                        scene: request.sceneId,
+                        frame: String(request.frame),
+                        channel,
+                        width: String(width),
+                        height: String(height),
+                    });
+                    const response = await fetch(`${endpoint}?${query}`, {
+                        method: "POST",
+                        headers: {
+                            "content-type": "application/octet-stream",
+                            "x-cloud-plate-capture-token": request.token,
+                        },
+                        body: bytes,
+                    });
+                    if (!response.ok) {
+                        throw new Error(
+                            `Cloud plate ${channel} upload failed: ` +
+                            `${response.status} ${await response.text()}`,
+                        );
+                    }
+                    const result = await response.json() as
+                        CloudPlateCaptureResult["planes"][number];
+                    planeResults.push(result);
+                }
+                return { width, height, planes: planeResults };
+            };
+            captureCanvas.dataset.cloudPlateExport = "available";
             let frame = 0;
             let transportUpdates = 0;
             let activeViewSteps = 0;
@@ -4143,7 +4515,8 @@ function WebGpuSkyCanvas({
                 canvas.width = width;
                 canvas.height = height;
                 destroyTargets();
-                const renderUsage = TEXTURE.RENDER_ATTACHMENT | TEXTURE.TEXTURE_BINDING;
+                const renderUsage = TEXTURE.RENDER_ATTACHMENT |
+                    TEXTURE.TEXTURE_BINDING | TEXTURE.COPY_SRC;
                 backgroundTexture = createWebGpuTexture(device, width, height, "rgba16float", renderUsage);
                 cloudCurrent = createWebGpuTexture(
                     device, cloudWidth, cloudHeight, "rgba16float", renderUsage, 2);
@@ -5468,6 +5841,75 @@ function WebGpuSkyCanvas({
                 }
 
                 const seconds = timestamp / 1000;
+                const requestedCloudPlateUrl =
+                    current.options.cloudPlateManifestUrl?.trim() ?? "";
+                if (requestedCloudPlateUrl !== cloudPlateRequestedUrl) {
+                    cloudPlateRequestedUrl = requestedCloudPlateUrl;
+                    cloudPlatePlaybackState = null;
+                    cloudPlatePlaybackActive = false;
+                    cloudPlateBlend = 0;
+                    cloudPlateRequestSerial += 1;
+                    if (requestedCloudPlateUrl) {
+                        // Plate playback owns cloud transport. Abandon any
+                        // amortized light-volume generation from the retired
+                        // live marcher instead of spending GPU work on hidden
+                        // circle/blob geometry while assets stream.
+                        cloudLightRefreshWork = null;
+                        void requestCloudPlateManifest(
+                            requestedCloudPlateUrl,
+                            seconds,
+                        );
+                    } else {
+                        delete canvas.dataset.cloudPlatePlayback;
+                    }
+                }
+                const plateState = cloudPlatePlaybackState;
+                if (plateState) {
+                    const plateFrames = [...plateState.manifest.frames].sort(
+                        (left, right) => left.index - right.index,
+                    );
+                    const interval = Math.max(
+                        0.001,
+                        plateState.manifest.timeline.frameIntervalSeconds,
+                    );
+                    const elapsed = Math.max(
+                        0,
+                        seconds - plateState.startedAtSeconds,
+                    );
+                    const unboundedPosition = Math.floor(elapsed / interval);
+                    const firstPosition = plateState.manifest.timeline.loop
+                        ? unboundedPosition % plateFrames.length
+                        : Math.min(plateFrames.length - 1, unboundedPosition);
+                    const secondPosition = plateState.manifest.timeline.loop
+                        ? (firstPosition + 1) % plateFrames.length
+                        : Math.min(plateFrames.length - 1, firstPosition + 1);
+                    const firstPlateFrame = plateFrames[firstPosition];
+                    const secondPlateFrame = plateFrames[secondPosition];
+                    const pairKey = `${firstPlateFrame.index}:${secondPlateFrame.index}`;
+                    if (plateState.loadedPair !== pairKey) {
+                        void loadCloudPlatePair(
+                            plateState,
+                            firstPlateFrame,
+                            secondPlateFrame,
+                        );
+                        // Preserve the last fully verified pair while the next
+                        // sparse asset packet streams; its second frame is the
+                        // continuity boundary shared with the incoming pair.
+                        cloudPlateBlend = cloudPlatePlaybackActive ? 1 : 0;
+                    } else {
+                        const localTime = elapsed - unboundedPosition * interval;
+                        const crossfade = Math.min(
+                            interval,
+                            Math.max(0,
+                                plateState.manifest.timeline.crossfadeSeconds),
+                        );
+                        const crossfadeStart = interval - crossfade;
+                        cloudPlateBlend = crossfade <= 1e-6
+                            ? 0
+                            : Math.min(1, Math.max(0,
+                                (localTime - crossfadeStart) / crossfade));
+                    }
+                }
                 // Cadence adaptation must govern the expensive transport pass,
                 // not only the lightweight presentation scheduler. Keeping the
                 // raw requested interval here allowed the 2 Hz presentation
@@ -5489,14 +5931,14 @@ function WebGpuSkyCanvas({
                     authoredWeather?.auroraCurtains?.length ||
                     authoredWeather?.blowingBoundaryMedia?.length,
                 );
-                const hasVolumetricContent =
+                const hasVolumetricContent = !requestedCloudPlateUrl && (
                     current.radiance.cloudScene.layers.some(
                         (layer) => layer.present && layer.coverage > 0.0005,
                     ) ||
                     current.radiance.cloudScene.fog > 0.0005 ||
                     current.radiance.cloudScene.noctilucent > 0.0005 ||
                     hasUpperAtmosphericCloud ||
-                    hasFiniteWeatherPhenomena;
+                    hasFiniteWeatherPhenomena);
                 const cloudClock = resolveCloudRenderClock({
                     paused: current.paused,
                     requestedSnapshotSeconds:
@@ -5517,14 +5959,15 @@ function WebGpuSkyCanvas({
                     reportCaptureStage(`draw-${captureDrawOrdinal}-runtime-ready`);
                 }
                 const missingScenePipelines: Promise<void>[] = [];
-                if (!hydrometeorLayerPipeline && requiresHydrometeorTransport(
+                if (!requestedCloudPlateUrl && !hydrometeorLayerPipeline &&
+                    requiresHydrometeorTransport(
                     current.radiance,
                     cloudRuntime.systems,
                 )) {
                     missingScenePipelines.push(
                         ensureHydrometeorLayerPipeline());
                 }
-                if (!upperAtmosphereLayerPipeline &&
+                if (!requestedCloudPlateUrl && !upperAtmosphereLayerPipeline &&
                     requiresUpperAtmosphereTransport(current.radiance)) {
                     missingScenePipelines.push(
                         ensureUpperAtmosphereLayerPipeline());
@@ -5541,15 +5984,16 @@ function WebGpuSkyCanvas({
                     `${morphologySignature}:${cloudLightLightingSignature}`;
                 const requestedCloudLightAdvectionEpoch = Math.floor(
                     cloudClock / CLOUD_LIGHT_VOLUME_ADVECTION_EPOCH_SECONDS);
-                const structuralInvalidation = nextCloudLightStructuralKey !==
-                    cloudLightStructuralKey;
+                const structuralInvalidation = !requestedCloudPlateUrl &&
+                    nextCloudLightStructuralKey !== cloudLightStructuralKey;
                 // A long exact solve may miss several two-second epochs. Do
                 // not immediately replace its newly published bank: first
                 // prove that at least one camera transport using that bank has
                 // completed, then advance directly to the latest requested
                 // epoch. Paused qualification remains on one immutable clock
                 // and therefore never enters this live coalescing path.
-                const timeInvalidation = shouldInvalidateCloudLightForTime({
+                const timeInvalidation = !requestedCloudPlateUrl &&
+                    shouldInvalidateCloudLightForTime({
                     lightVolumeState: cloudLightState,
                     requestedEpoch: requestedCloudLightAdvectionEpoch,
                     activeEpoch: cloudLightAdvectionEpoch,
@@ -5743,6 +6187,9 @@ function WebGpuSkyCanvas({
                     activeTransportDeltaSeconds,
                     updateCloud,
                     current.paused,
+                    offlineCloudPlateAccumulation,
+                    cloudPlatePlaybackActive,
+                    cloudPlateBlend,
                 );
                 const parameters = strictCloudTransportTransaction
                     ? strictCloudTransportTransaction.frozenParameters
@@ -7117,6 +7564,15 @@ function WebGpuSkyCanvas({
                             binding: 14,
                             resource: transportArrayView(resolvedCloudPrevious),
                         },
+                        {
+                            binding: 15,
+                            resource: transportArrayView(cloudPlateFirstTexture),
+                        },
+                        {
+                            binding: 16,
+                            resource: transportArrayView(cloudPlateSecondTexture),
+                        },
+                        { binding: 17, resource: cloudPlateSampler },
                     ],
                 });
                 const compositePass = encoder.beginRenderPass({
@@ -8027,6 +8483,12 @@ function WebGpuSkyCanvas({
                 if (resizeTimer !== undefined) window.clearTimeout(resizeTimer);
                 if (animationFrame !== undefined) window.cancelAnimationFrame(animationFrame);
                 cancelStrictCloudTransport();
+                delete captureCanvas.__elementsCloudPlateCapture;
+                delete captureCanvas.dataset.cloudPlateExport;
+                delete captureCanvas.dataset.cloudPlatePlayback;
+                cloudPlateRequestSerial += 1;
+                cloudPlateFirstTexture.destroy();
+                cloudPlateSecondTexture.destroy();
                 destroyTargets();
                 lunarTexture.destroy();
                 baseVolume.destroy();
@@ -8153,6 +8615,7 @@ export function SkyRendererCanvas({
             requestedOptions?.cloudComposition,
             requestedOptions?.cloudPerspective,
             requestedOptions?.cloudEditorialRegime,
+            requestedOptions?.cloudPlateManifestUrl,
         ],
     );
     const [backend, setBackend] = useState<SkyRendererBackend>("fallback");

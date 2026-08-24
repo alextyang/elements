@@ -167,6 +167,36 @@ test("the lazy matrix covers every WMO identity and orthogonal appearance axis",
         target.implementation === "not-representable").length, 0);
 });
 
+test("convective lifecycle catalogue targets compile to their exact runtime stages", () => {
+    const lifecycleTargets = matrix.WEATHER_QUALIFICATION_TARGETS.filter(
+        (target) => target.axis === "convective-lifecycle",
+    );
+    assert.deepEqual(
+        lifecycleTargets.map(({ lifecycleStage }) => lifecycleStage),
+        ["incipient", "growing", "mature", "glaciating", "precipitating", "decaying"],
+    );
+    const compiledStages = lifecycleTargets.map((target) => {
+        const qualificationCase = firstQualificationCase(target.id);
+        assert.ok(qualificationCase, target.id);
+        const resolved = matrix.resolveWeatherQualificationCase(
+            qualificationCase,
+        );
+        const cloudRuntime = runtime.createCloudSystemRuntime(
+            resolved.cloudScene,
+        );
+        assert.deepEqual(cloudRuntime.diagnostics, [], target.id);
+        assert.ok(cloudRuntime.systems.length > 0, target.id);
+        return [
+            target.id,
+            [...new Set(cloudRuntime.systems.map(
+                ({ compiled }) => compiled.lifecycle.stage,
+            ))],
+        ];
+    });
+    assert.deepEqual(compiledStages, lifecycleTargets.map((target) =>
+        [target.id, [target.lifecycleStage]]));
+});
+
 test("the complete WMO mother-cloud table is represented and enforced", () => {
     const targets = matrix.WEATHER_QUALIFICATION_TARGETS.filter(
         (target) => target.axis === "mother-cloud",

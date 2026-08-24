@@ -23,6 +23,20 @@ export interface CloudPreviewManifestEntry {
     height: number;
     contentHash: string;
     imageContentHash: string;
+    productionPerspective: string;
+    productionCameraSignature: string;
+    photographicAcceptance: "accepted" | "not-accepted";
+    qualification: {
+        schemaVersion: 1;
+        gate: "artifact-texture";
+        profile: "artifact-and-texture" | "artifact-only";
+        state: "accepted";
+        cloudMaskUsed: boolean;
+        radialArtifact: boolean;
+        scaleSeparatedStructureReady: boolean;
+        cloudLocalStructureReady: boolean;
+        metrics: Record<string, number | boolean>;
+    };
     generatedAt: string;
 }
 
@@ -34,10 +48,10 @@ export interface CloudPreviewAssetChecksums {
 }
 
 export interface CloudPreviewManifest {
-    schemaVersion: 1;
+    schemaVersion: 2;
     rendererHash: string;
     assetChecksums: CloudPreviewAssetChecksums;
-    productionPerspective: string;
+    perspectiveMode: "single-camera";
     captureMode: "native-metal" | "headless";
     generatedAt: string;
     status: "complete" | "partial";
@@ -59,14 +73,48 @@ const isAssetChecksums = (
     typeof value.exteriorBoundary === "string" &&
     CLOUD_PREVIEW_HASH.test(value.exteriorBoundary);
 
+const REQUIRED_IMAGE_METRICS = [
+    "fineRms", "broadBandRms", "fineTextureFraction", "fineToBroadRatio",
+    "radialExplainedVariance", "radialExplainedCoverage", "cloudMaskUsed",
+    "cloudSupportFraction",
+] as const;
+const REQUIRED_STRUCTURED_IMAGE_METRICS = [
+    "cloudCoreSupportFraction", "cloudCoreFraction", "cloudEdgeFraction",
+    "cloudEdgeFineFraction", "cloudInteriorFineRms",
+    "cloudInteriorBroadRms", "cloudInteriorFineToBroadRatio",
+    "cloudInteriorTextureFraction", "cloudMaskResidualRms",
+    "cloudMaskResidualFineToBroadRatio", "cloudMaskResidualTextureFraction",
+    "cloudMaskEdgeProjection",
+] as const;
+
+const isQualification = (value: unknown) => {
+    if (!isRecord(value) || value.schemaVersion !== 1 ||
+        value.gate !== "artifact-texture" ||
+        (value.profile !== "artifact-and-texture" &&
+            value.profile !== "artifact-only") ||
+        value.state !== "accepted" || typeof value.cloudMaskUsed !== "boolean" ||
+        typeof value.radialArtifact !== "boolean" ||
+        typeof value.scaleSeparatedStructureReady !== "boolean" ||
+        typeof value.cloudLocalStructureReady !== "boolean" ||
+        !isRecord(value.metrics)) return false;
+    const metrics = value.metrics;
+    if (!REQUIRED_IMAGE_METRICS.every((key) => key in metrics) ||
+        (value.profile === "artifact-and-texture" &&
+            !REQUIRED_STRUCTURED_IMAGE_METRICS.every((key) =>
+                key in metrics))) return false;
+    return Object.values(metrics).every((metric) =>
+        typeof metric === "boolean" ||
+        (typeof metric === "number" && Number.isFinite(metric)));
+};
+
 export const parseCloudPreviewManifest = (
     value: unknown,
 ): CloudPreviewManifest | undefined => {
-    if (!isRecord(value) || value.schemaVersion !== 1 ||
+    if (!isRecord(value) || value.schemaVersion !== 2 ||
         typeof value.rendererHash !== "string" ||
         !CLOUD_PREVIEW_HASH.test(value.rendererHash) ||
         !isAssetChecksums(value.assetChecksums) ||
-        value.productionPerspective !== "oblique-natural" ||
+        value.perspectiveMode !== "single-camera" ||
         (value.captureMode !== "native-metal" && value.captureMode !== "headless") ||
         typeof value.generatedAt !== "string" ||
         (value.status !== "complete" && value.status !== "partial") ||
@@ -94,7 +142,18 @@ export const parseCloudPreviewManifest = (
             !candidate.imageUrl.endsWith(
                 `-${candidate.imageContentHash.slice(0, 12)}.png`,
             ) ||
+            typeof candidate.productionPerspective !== "string" ||
+            !candidate.productionPerspective ||
+            typeof candidate.productionCameraSignature !== "string" ||
+            !candidate.productionCameraSignature ||
+            (candidate.photographicAcceptance !== "accepted" &&
+                candidate.photographicAcceptance !== "not-accepted") ||
+            !isQualification(candidate.qualification) ||
             typeof candidate.generatedAt !== "string") return undefined;
+        if ((candidate.qualification as Record<string, unknown>).profile ===
+                "artifact-and-texture" &&
+            (candidate.qualification as Record<string, unknown>).cloudMaskUsed !==
+                true) return undefined;
         ids.add(candidate.id);
         entries.push(candidate as unknown as CloudPreviewManifestEntry);
     }

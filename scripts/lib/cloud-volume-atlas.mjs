@@ -481,6 +481,31 @@ const ridgedFbm3 = (x, y, z, seed) => {
     return value / normalization;
 };
 
+// Cirriform IWC observations are scale-invariant over the resolved inertial
+// range.  3DCLOUD constrains the one-dimensional power spectrum near -5/3;
+// amplitudes therefore decay as frequency^(-5/6).  Keep this field separate
+// from the legacy shape fBm so the Cirrostratus source has an explicit,
+// research-backed spectrum rather than an arbitrary texture octave stack.
+const cirriformIwcFbm3 = (x, y, z, seed) => {
+    let value = 0;
+    let normalization = 0;
+    let amplitude = 1;
+    let frequency = 1;
+    const amplitudeDecay = Math.pow(2, -5 / 6);
+    for (let octave = 0; octave < 5; octave += 1) {
+        value += valueNoise3(
+            x * frequency,
+            y * frequency,
+            z * frequency,
+            seed + octave * 173,
+        ) * amplitude;
+        normalization += amplitude;
+        frequency *= 2;
+        amplitude *= amplitudeDecay;
+    }
+    return value / normalization;
+};
+
 // The coarse atlas owns the macro silhouette. A small, divergence-like domain
 // warp is therefore applied before primitive evaluation rather than relying on
 // detail noise to disguise smooth ellipsoids after the fact. The amplitudes are
@@ -1065,7 +1090,7 @@ const VOLUME_CONFIGS = [
         lifecycle: "mature",
         builder: "sheet",
         variant: "cirrostratus",
-        formationMechanism: "frontal-ascent-sheet",
+        formationMechanism: "stochastic-ice-veil",
         materialModel: "fibrous-ice",
         topologyPolicy: "continuous-sheet",
         densityScale: 0.42,
@@ -1342,7 +1367,7 @@ const VOLUME_CONFIGS = [
         genus: "cumulus",
         species: "fractus",
         lifecycle: "decaying",
-        builder: "fragment",
+        builder: "cumulus",
         variant: "cumulus",
         formationMechanism: "boundary-layer-fragmentation",
         materialModel: "liquid-convective",
@@ -1432,7 +1457,7 @@ const VOLUME_CONFIGS = [
         lifecycle: "mature",
         builder: "sheet",
         variant: "cirrostratus-fibratus",
-        formationMechanism: "frontal-ascent-sheet",
+        formationMechanism: "stochastic-ice-veil",
         materialModel: "fibrous-ice",
         topologyPolicy: "continuous-sheet",
         densityScale: 0.46,
@@ -1824,9 +1849,12 @@ const protectedBaseForConfig = (config, connectivity, resolution) => {
     const normalizedAltitude = config.builder === "cumulus"
         ? 7 / 47
         : connectivity.occupiedBounds?.minimum?.[1] ?? 0;
-    if (config.genus === "cumulonimbus" && config.dissipating) {
+    if ((config.genus === "cumulus" && config.species === "fractus") ||
+        (config.genus === "cumulonimbus" && config.dissipating)) {
         return {
-            mode: "unprotected-eroding-convective-remnant",
+            mode: config.species === "fractus"
+                ? "unprotected-ragged-boundary"
+                : "unprotected-eroding-convective-remnant",
             normalizedAltitude,
             featherVoxels: 0,
             downwardDisplacementScale: 1,
@@ -2385,509 +2413,19 @@ const buildShapeModel = (config, seed) => {
 };
 
 /**
- * Congestus uses source-authored density volumes instead of analytic macro
- * primitives. The renderer samples those volumes in evaluateAuthoredCongestus;
- * this record supplies only the shared atlas bookkeeping contract.
+ * Every Cumulus species uses a source-authored density volume. This record
+ * supplies only atlas bookkeeping; the sampled condensate owns the silhouette.
  */
-const buildCongestusModel = () => ({
+const buildAuthoredCumulusModel = (config) => ({
     shapes: [],
     cavities: [],
     baseY: 0.145,
     ownerPoints: [[0.5, 0.5]],
-    groupCount: 1,
-    hierarchyLevelCount: 4,
+    groupCount: config.species === "fractus" ? 2 : 1,
+    hierarchyLevelCount: config.species === "congestus" ? 4
+        : config.species === "mediocris" ? 3 : 2,
+    boundaryModel: "source-authored-volumetric-condensate",
 });
-
-/**
- * Fair-weather Cumulus needs a different macro vocabulary from deep mixed-
- * phase convection. The previous shared branch builder filled five broad
- * roots with dozens of weak, near-equal bubbles; at display scale that reduced
- * every species to rounded blocks. This builder keeps one source-connected
- * parcel tree, then adds successively smaller attached vortex-shell pulses.
- * The LCL remains horizontally coherent through the centre while dry-air
- * bites are confined to its perimeter.
- */
-const buildCumulusModel = (config, seed) => {
-    if (config.species === "congestus") {
-        return buildCongestusModel();
-    }
-    const random = makeRandom(seed);
-    const shapes = [];
-    const cavities = [];
-    const baseY = 0.145;
-    const mediocris = config.species === "mediocris";
-    const rootDefinitions = mediocris
-        ? [
-            [0.49, 0.50, 0.50, 0.43, 0.68],
-            [0.38, 0.51, 0.34, 0.34, 0.51],
-            [0.61, 0.46, 0.31, 0.37, 0.47],
-            [0.51, 0.38, 0.27, 0.30, 0.42],
-        ]
-        : [
-            [0.49, 0.50, 0.50, 0.36, 0.69],
-            [0.40, 0.51, 0.35, 0.31, 0.49],
-            [0.59, 0.47, 0.31, 0.34, 0.45],
-        ];
-    const rootCenters = [];
-    for (const [x, z, widthScale, heightScale, depthScale] of rootDefinitions) {
-        const rootJitter = 0.026;
-        const verticalRadius = config.radius * heightScale;
-        const center = [
-            x + (random() - 0.5) * rootJitter,
-            baseY + verticalRadius + (random() - 0.5) * 0.004,
-            z + (random() - 0.5) * rootJitter,
-        ];
-        const radii = [
-            config.baseWidth * widthScale,
-            verticalRadius,
-            config.baseDepth * depthScale,
-        ];
-        addEllipsoid(shapes, center, radii, {
-            density: mix(0.91, 1, random()),
-            detail: config.detailBase,
-            rotation: mix(-0.34, 0.34, random()),
-            role: "root",
-        });
-        rootCenters.push(center);
-    }
-    for (let index = 1; index < rootCenters.length; index += 1) {
-        const center = rootCenters[index];
-        const root = rootCenters[0];
-        addEllipsoid(shapes, [
-            mix(root[0], center[0], 0.52),
-            baseY + 0.027,
-            mix(root[2], center[2], 0.52),
-        ], [
-            Math.max(0.035, Math.abs(root[0] - center[0]) * 0.62),
-            0.027,
-            Math.max(0.035, Math.abs(root[2] - center[2]) * 0.62),
-        ], {
-            density: 0.98,
-            detail: config.detailBase,
-            rotation: Math.atan2(center[2] - root[2], center[0] - root[0]),
-            role: "root-bridge",
-        });
-    }
-
-    // Perimeter-only entrainment leaves a credible flat central LCL instead
-    // of either a rectangular slab or globally ragged underside.
-    const baseBiteCount = mediocris ? 6 : 4;
-    for (let index = 0; index < baseBiteCount; index += 1) {
-        const angle = index * 2.399963229728653 + random() * 0.42;
-        const radial = mix(0.125, 0.185, random());
-        const radius = mix(0.022, 0.037, random());
-        cavities.push({
-            center: [
-                0.50 + Math.cos(angle) * radial,
-                baseY + radius * mix(0.34, 0.74, random()),
-                0.49 + Math.sin(angle) * radial * 0.78,
-            ],
-            radii: [radius * mix(0.85, 1.25, random()), radius * 0.72,
-                radius * mix(0.82, 1.18, random())],
-            rotation: angle,
-            strength: mix(0.58, 0.86, random()),
-            role: "perimeter-entrainment-bite",
-        });
-    }
-
-    const levels = mediocris ? 7 : 4;
-    const driftScale = mediocris ? 0.68 : 0.42;
-    const driftSign = 0.62;
-    // A rising cloud is a sequence of buoyant thermal events, not a stack of
-    // evenly spaced horizontal slices. Equal-height samples and a periodic
-    // radius function survived 48^3 voxelization as repeated terraces. Draw
-    // positive, bounded event intervals and normalize their cumulative sum so
-    // the graph still reaches the authored top without acquiring a lattice.
-    const eventIntervals = Array.from({ length: Math.max(1, levels - 1) },
-        (_, index) => {
-            const correlated = 0.82 + random() * 0.46;
-            const alternatingBias = index % 3 === 0 ? 0.83
-                : index % 3 === 1 ? 1.13 : 1.01;
-            return correlated * alternatingBias;
-        });
-    const totalEventInterval = eventIntervals.reduce((sum, value) => sum + value, 0);
-    const eventTimes = [0];
-    for (const interval of eventIntervals) {
-        eventTimes.push(eventTimes.at(-1) + interval / totalEventInterval);
-    }
-    const meanEventInterval = 1 / Math.max(1, levels - 1);
-    const eventIntervalVariation = Math.sqrt(eventIntervals.reduce((sum, interval) => {
-        const normalized = interval / totalEventInterval;
-        return sum + (normalized - meanEventInterval) ** 2;
-    }, 0) / Math.max(1, eventIntervals.length)) / meanEventInterval;
-
-    // The centreline follows an integrated, correlated lateral velocity. A
-    // This trajectory remains smooth and connected but never becomes bilateral
-    // or periodically repeated.
-    let trajectoryX = 0.49;
-    let trajectoryZ = 0.49;
-    let trajectoryVelocityX = driftSign * mix(0.004, 0.011, random());
-    let trajectoryVelocityZ = mix(-0.005, 0.005, random());
-    let thermalGrowthState = mix(-0.08, 0.08, random());
-    const mainCenters = [];
-    const mainRadii = [];
-    let nestedPulseCount = 0;
-    let cuspCount = 0;
-    let mergedBodyLobeCount = 0;
-    let crownLobeCount = 0;
-    const pulseWidths = [];
-    for (let level = 0; level < levels; level += 1) {
-        const t = eventTimes[level];
-        thermalGrowthState = clamp(
-            thermalGrowthState * mix(0.38, 0.58, random()) +
-                (random() - 0.5) * (mediocris ? 0.32 : 0.22),
-            -0.18,
-            0.20,
-        );
-        const fairWeatherPulseMotif = mediocris
-            ? [1.08, 0.77, 1.16, 0.84, 1.04, 0.72, 1.12]
-            : [1.10, 0.82, 1.04, 0.74];
-        const pulse = fairWeatherPulseMotif[level] + thermalGrowthState *
-            (mediocris ? 0.46 : 0.34);
-        // The protected trunk narrows between buoyant events and expands into
-        // its crown. Keeping one nearly constant radius through twelve close
-        // samples made the reconstructed owner a rectangular pillar even
-        // though its source ellipsoids varied numerically.
-        const horizontalRadius = config.radius * pulse;
-        // Growing liquid thermal heads are close to spherical or vertically
-        // elongated. The old 0.68--0.82 scale authored flat spheroids, so an
-        // oblique view literally exposed each successive one as a shelf.
-        let verticalRadius = horizontalRadius * (mediocris
-            ? mix(0.78, 0.96, t) * mix(0.96, 1.05, random())
-            : mix(0.64, 0.80, t) * mix(0.96, 1.05, random()));
-        if (level > 0) {
-            const eventInterval = eventTimes[level] - eventTimes[level - 1];
-            trajectoryVelocityX = trajectoryVelocityX * 0.62 +
-                driftSign * mix(0.001, 0.004, random()) +
-                (random() - 0.5) * mix(0.007, 0.014, t);
-            trajectoryVelocityZ = trajectoryVelocityZ * 0.58 +
-                (random() - 0.5) * mix(0.007, 0.015, t);
-            trajectoryX += trajectoryVelocityX * driftScale *
-                eventInterval / meanEventInterval;
-            trajectoryZ += trajectoryVelocityZ * driftScale *
-                eventInterval / meanEventInterval;
-        }
-        const center = [
-            trajectoryX + driftSign * driftScale *
-                0.042 * t * t,
-            mix(baseY + (mediocris ? 0.066 : 0.058),
-                config.topY,
-                Math.pow(t, 1.03)),
-            trajectoryZ - driftScale * 0.017 * t * t,
-        ];
-        // The first source-connected head must meet, but not punch through,
-        // the central lifting-condensation surface.  Upper heads keep their
-        // round aspect; only the still-forming lower pulse is truncated by the
-        // common condensation base represented by the root population.
-        if (t < 0.26) {
-            verticalRadius = Math.min(
-                verticalRadius,
-                Math.max(horizontalRadius * 0.52, center[1] - baseY - 0.006),
-            );
-        }
-        addEllipsoid(shapes, center, [
-            horizontalRadius * mix(0.94, 1.08, random()),
-            verticalRadius,
-            horizontalRadius * mix(0.88, 1.05, random()),
-        ], {
-            density: mix(0.96, 1.04, random()),
-            detail: config.detailBase,
-            role: "thermal",
-        });
-        mainCenters.push(center);
-        mainRadii.push(horizontalRadius);
-        pulseWidths.push(horizontalRadius);
-        mergedBodyLobeCount += 1;
-
-        if (level > 0) {
-            const previous = mainCenters[level - 1];
-            const bridgeRadius = Math.min(mainRadii[level - 1], horizontalRadius) *
-                0.56;
-            const verticalGap = Math.abs(center[1] - previous[1]);
-            addEllipsoid(shapes, [
-                mix(previous[0], center[0], 0.50),
-                mix(previous[1], center[1], 0.50),
-                mix(previous[2], center[2], 0.50),
-            ], [bridgeRadius * 0.82,
-                Math.max(
-                    bridgeRadius * 1.08,
-                    verticalGap * 0.62,
-                ),
-                bridgeRadius * 0.90], {
-                density: 0.97,
-                detail: config.detailBase,
-                role: "thermal",
-            });
-            mergedBodyLobeCount += 1;
-        }
-
-        if (level === 0) continue;
-        const crown = t > 0.72;
-        const daughterCount = mediocris ? (crown ? 4 : 2) : (crown ? 3 : 1);
-        const shellPhase = random() * Math.PI * 2;
-        for (let daughter = 0; daughter < daughterCount; daughter += 1) {
-            const azimuth = shellPhase + daughter * 2.399963229728653 +
-                (random() - 0.5) * (mediocris ? 1.35 : 1.05);
-            const daughterRadius = Math.max(
-                mediocris ? 0.027 : 0.024,
-                horizontalRadius * mix(0.34, 0.50, random()),
-            );
-            // Couple displacement to radius so every visible daughter both
-            // protrudes as a hard cusp and overlaps its parent substantially.
-            const offset = horizontalRadius * mix(0.58, 0.69, random()) +
-                daughterRadius * mix(0.16, 0.28, random());
-            const daughterCenter = [
-                center[0] + Math.cos(azimuth) * offset,
-                center[1] + daughterRadius * mix(crown ? -0.12 : -0.34,
-                    crown ? 0.76 : 0.62, random()),
-                center[2] + Math.sin(azimuth) * offset * mix(0.78, 1.02, random()),
-            ];
-            daughterCenter[1] = Math.min(
-                daughterCenter[1],
-                config.topY - daughterRadius * 0.50,
-            );
-            addEllipsoid(shapes, daughterCenter, [
-                daughterRadius * mix(0.90, 1.12, random()),
-                daughterRadius * mix(0.90, 1.10, random()),
-                daughterRadius * mix(0.88, 1.10, random()),
-            ], {
-                density: mix(0.91, 0.99, random()),
-                detail: config.detailBase,
-                rotation: azimuth,
-                role: "thermal-shell-pulse",
-            });
-            const shellBridgeRadius = Math.max(0.019, daughterRadius * 0.47);
-            addEllipsoid(shapes, [
-                mix(center[0], daughterCenter[0], 0.53),
-                mix(center[1], daughterCenter[1], 0.53),
-                mix(center[2], daughterCenter[2], 0.53),
-            ], [shellBridgeRadius * 0.92, shellBridgeRadius * 1.14,
-                shellBridgeRadius], {
-                density: 0.97,
-                detail: config.detailBase,
-                rotation: azimuth,
-                role: "thermal-shell-bridge",
-            });
-            mergedBodyLobeCount += 1;
-            nestedPulseCount += 1;
-            if (crown) crownLobeCount += 1;
-
-            const addCusp = mediocris ? crown && daughter % 2 === 0
-                : crown && daughter === 0;
-            if (!addCusp) continue;
-            const cuspRadius = daughterRadius * mix(0.48, 0.64, random());
-            const cuspAngle = azimuth + mix(0.42, 0.92, random());
-            addEllipsoid(shapes, [
-                daughterCenter[0] + Math.cos(cuspAngle) * daughterRadius * 0.56,
-                daughterCenter[1] + daughterRadius * mix(0.40, 0.64, random()),
-                daughterCenter[2] + Math.sin(cuspAngle) * daughterRadius * 0.50,
-            ], [cuspRadius * 1.04, cuspRadius, cuspRadius * 0.96], {
-                density: 0.91,
-                detail: config.detailBase,
-                rotation: cuspAngle,
-                role: "thermal-cusp",
-            });
-            const cuspCenter = shapes.at(-1).center;
-            const cuspBridgeRadius = Math.max(0.018, cuspRadius * 0.58);
-            addEllipsoid(shapes, [
-                mix(daughterCenter[0], cuspCenter[0], 0.54),
-                mix(daughterCenter[1], cuspCenter[1], 0.54),
-                mix(daughterCenter[2], cuspCenter[2], 0.54),
-            ], [cuspBridgeRadius, cuspBridgeRadius, cuspBridgeRadius], {
-                density: 0.95,
-                detail: config.detailBase,
-                role: "thermal-cusp-bridge",
-            });
-            mergedBodyLobeCount += 1;
-            cuspCount += 1;
-            if (crown) crownLobeCount += 1;
-        }
-    }
-
-    let crownBranchCount = 0;
-
-    // Unequal feeder thermals merge below the dominant trajectory. They add
-    // asymmetry and depth without producing several equal detached towers.
-    const feederCount = mediocris ? 2 : 1;
-    for (let feeder = 0; feeder < feederCount; feeder += 1) {
-        const root = rootCenters[(feeder + 1) % rootCenters.length];
-        const side = feeder % 2 === 0 ? -1 : 1;
-        const feederTopT = mediocris ? 0.48 : 0.32;
-        const steps = 3;
-        for (let step = 0; step < steps; step += 1) {
-            const t = (step + 1) / steps;
-            const mainIndex = Math.min(levels - 1, Math.round(feederTopT * t * (levels - 1)));
-            const main = mainCenters[mainIndex];
-            const center = [
-                mix(root[0], main[0] + side * config.radius * 0.32, t),
-                mix(baseY + 0.070, main[1], t),
-                mix(root[2], main[2] - side * config.radius * 0.16, t),
-            ];
-            const radius = config.radius * mix(0.66, 0.48, t);
-            addEllipsoid(shapes, center, [radius,
-                radius * mix(0.94, 1.10, random()), radius * 0.92], {
-                density: 0.94,
-                detail: config.detailBase,
-                rotation: side * 0.35,
-                role: "feeder-thermal",
-            });
-            mergedBodyLobeCount += 1;
-        }
-    }
-
-    // Fair-weather Cu is still a population of successive thermals. Humilis
-    // carries one low, aging shoulder beside its restrained active dome;
-    // Mediocris carries two unequal remnants around a newer central pulse.
-    // These connected lifecycle cues prevent the single canonical atlas from
-    // reading as a cloned smooth oval when a field contains many owners.
-    const fairWeatherShoulders = mediocris
-        ? [
-            [2, -0.082, 0.056, 0.48, 0.70, 0.67],
-            [4, 0.074, -0.066, 0.39, 0.64, 0.58],
-        ]
-        : [
-            [1, -0.070, 0.044, 0.46, 0.58, 0.64],
-        ];
-    for (const [anchorIndex, dx, dz, radiusScale, verticalScale,
-        densityScale] of fairWeatherShoulders) {
-        const anchor = mainCenters[Math.min(anchorIndex, mainCenters.length - 1)];
-        const radius = config.radius * radiusScale;
-        const shoulder = [
-            anchor[0] + dx,
-            anchor[1] - radius * 0.20,
-            anchor[2] + dz,
-        ];
-        const bridgeRadius = Math.max(0.020, radius * 0.46);
-        addEllipsoid(shapes, [
-            mix(anchor[0], shoulder[0], 0.52),
-            mix(anchor[1], shoulder[1], 0.52),
-            mix(anchor[2], shoulder[2], 0.52),
-        ], [
-            bridgeRadius + Math.abs(dx) * 0.22,
-            bridgeRadius * 0.82,
-            bridgeRadius + Math.abs(dz) * 0.22,
-        ], {
-            density: 0.90,
-            detail: config.detailBase,
-            rotation: Math.atan2(dz, dx),
-            role: "fair-weather-shoulder-neck",
-        });
-        addEllipsoid(shapes, shoulder, [
-            radius * 1.14,
-            radius * verticalScale,
-            radius,
-        ], {
-            density: densityScale,
-            detail: mix(config.detailBase, 0.30, 0.58),
-            rotation: Math.atan2(dz, dx),
-            role: "fair-weather-detraining-shoulder",
-        });
-        cavities.push({
-            center: [
-                shoulder[0] + dx * 0.20,
-                shoulder[1] - radius * 0.16,
-                shoulder[2] + dz * 0.20,
-            ],
-            radii: [radius * 0.38, radius * 0.52, radius * 0.42],
-            rotation: Math.atan2(dz, dx),
-            strength: 0.76,
-            role: "fair-weather-entrainment-wake",
-        });
-        mergedBodyLobeCount += 2;
-        nestedPulseCount += 1;
-        cuspCount += 1;
-    }
-
-    const cavityAnchors = shapes.filter((shape) =>
-        (shape.role === "thermal-shell-pulse" || shape.role === "thermal-cusp") &&
-        shape.center[1] > baseY + 0.10 && shape.center[1] < config.topY - 0.025);
-    const evaporatingFlankCount = mediocris ? 5 : 0;
-    for (let index = 0; index < evaporatingFlankCount; index += 1) {
-        const anchor = cavityAnchors[(index * 5 + 2) % Math.max(1, cavityAnchors.length)];
-        if (!anchor) break;
-        let outwardX = anchor.center[0] - 0.50;
-        let outwardZ = anchor.center[2] - 0.49;
-        const length = Math.max(0.02, Math.hypot(outwardX, outwardZ));
-        outwardX /= length;
-        outwardZ /= length;
-        const anchorRadius = Math.max(anchor.radii[0], anchor.radii[2]);
-        const width = Math.max(0.024, anchorRadius * mix(0.38, 0.52, random()));
-        addEllipsoid(shapes, [
-            anchor.center[0] + outwardX * anchorRadius * mix(0.48, 0.64, random()),
-            anchor.center[1] - width * mix(0.06, 0.32, random()),
-            anchor.center[2] + outwardZ * anchorRadius * mix(0.48, 0.64, random()),
-        ], [width * 0.92, width * 0.58, width * 1.12], {
-            density: mix(0.48, 0.62, random()),
-            detail: mix(0.24, 0.40, random()),
-            rotation: Math.atan2(outwardZ, outwardX),
-            role: "evaporating-flank",
-        });
-    }
-    // Resolved negative clefts represent toroidal-vortex entrainment below and
-    // around growing heads. They are attached to exterior shell pulses and
-    // cannot sever the protected source/updraft core in evaluateModel.
-    const flankCavityCount = mediocris ? 6 : 2;
-    for (let index = 0; index < flankCavityCount; index += 1) {
-        const anchor = cavityAnchors[index % Math.max(1, cavityAnchors.length)];
-        if (!anchor) break;
-        let outwardX = anchor.center[0] - 0.50;
-        let outwardZ = anchor.center[2] - 0.49;
-        const length = Math.max(0.02, Math.hypot(outwardX, outwardZ));
-        outwardX /= length;
-        outwardZ /= length;
-        const radius = mix(0.018, 0.030, random());
-        cavities.push({
-            center: [anchor.center[0] + outwardX * radius * mix(0.32, 0.74, random()),
-                anchor.center[1] - radius * mix(0.08, 0.54, random()),
-                anchor.center[2] + outwardZ * radius * mix(0.32, 0.74, random())],
-            radii: [radius * mix(0.82, 1.18, random()),
-                radius * mix(0.86, 1.38, random()),
-                radius * mix(0.82, 1.16, random())],
-            rotation: random() * Math.PI,
-            strength: mix(0.48, 0.78, random()),
-            role: "flank-entrainment-cavity",
-        });
-    }
-
-    const meanWidth = pulseWidths.reduce((sum, value) => sum + value, 0) /
-        Math.max(1, pulseWidths.length);
-    const widthVariation = Math.sqrt(pulseWidths.reduce((sum, value) =>
-        sum + (value - meanWidth) ** 2, 0) / Math.max(1, pulseWidths.length)) /
-        Math.max(1e-6, meanWidth);
-    return {
-        shapes,
-        cavities,
-        baseY,
-        ownerPoints: rootCenters.map((center) => [center[0], center[2]]),
-        baseLobeCount: rootDefinitions.length,
-        crownLobeCount,
-        mergedBodyLobeCount,
-        evaporatingFlankCount,
-        secondaryLobeCount: nestedPulseCount + cuspCount,
-        hierarchyLevelCount: mediocris ? 3 : 2,
-        branchSpread: rootCenters.reduce((maximum, center) => Math.max(maximum,
-            Math.hypot(center[0] - 0.5, center[2] - 0.49) * 2), 0),
-        cumulusNestedPulseCount: nestedPulseCount,
-        cumulusCuspCount: cuspCount,
-        cumulusCrownBranchCount: crownBranchCount,
-        cumulusThermalChainCount: 1 + feederCount,
-        cumulusDissipatingShoulderCount: fairWeatherShoulders.length,
-        cumulusCrownTopHeightVariation: mediocris ? 0.08 : 0.035,
-        cumulusDominantTrajectoryDrift: Math.hypot(
-            mainCenters.at(-1)[0] - mainCenters[0][0],
-            mainCenters.at(-1)[2] - mainCenters[0][2],
-        ),
-        cumulusTowerWidthVariation: widthVariation,
-        cumulusThermalEventSpacingVariation: eventIntervalVariation,
-        cumulusMeanThermalVerticalAspect: mainRadii.reduce((sum, radius, index) => {
-            const shape = shapes.find((candidate) =>
-                candidate.center === mainCenters[index]);
-            return sum + (shape
-                ? shape.radii[1] / Math.max(shape.radii[0], shape.radii[2])
-                : 0);
-        }, 0) / Math.max(1, mainRadii.length),
-    };
-};
 
 const ellipsoidField = (x, y, z, shape) => {
     const dx = x - shape.center[0];
@@ -2909,36 +2447,84 @@ const authoredShapeField = (x, y, z, shape) => shape.kind === "capsule"
     ? capsuleField(x, y, z, shape)
     : ellipsoidField(x, y, z, shape);
 
-const AUTHORED_CONGESTUS_SOURCE_RESOLUTION = 96;
-const AUTHORED_CONGESTUS_SOURCE_FILES = Object.freeze({
-    balanced: "cgheven-congestus-21-r8-96.bin",
-    turreted: "cgheven-congestus-25-r8-96.bin",
-    multicell: "cgheven-congestus-23-r8-96.bin",
+const AUTHORED_CUMULUS_SOURCE_RESOLUTION = 96;
+const AUTHORED_CUMULUS_SOURCES = Object.freeze({
+    humilis: {
+        file: "cgheven-cumulus-06-r8-96.bin",
+        // Humilis is broad and flattened, but still has a rounded convective
+        // crown above its common LCL base. Preserve the source's dome while
+        // widening only the finite physical owner; the production camera is
+        // shared with every other cloud species.
+        scale: [0.72, 0.72, 0.50],
+        center: [0.50, 0.455, 0.50],
+        densityExponent: 0.92,
+        densityGain: 0.98,
+    },
+    mediocris: {
+        file: "cgheven-cumulus-15-r8-96.bin",
+        scale: [0.58, 0.68, 0.46],
+        center: [0.50, 0.424, 0.50],
+        densityExponent: 0.88,
+        densityGain: 1.27,
+    },
+    fractus: {
+        file: "cgheven-cumulus-26-r8-96.bin",
+        scale: [0.60, 0.68, 0.56],
+        center: [0.50, 0.403, 0.50],
+        densityExponent: 1.02,
+        densityGain: 1.12,
+    },
+    congestus: {
+        file: "cgheven-congestus-21-r8-96.bin",
+        scale: [0.50, 0.86, 0.55],
+        densityExponent: 0.86,
+        densityGain: 1.30,
+    },
+    "congestus-turreted": {
+        file: "cgheven-congestus-25-r8-96.bin",
+        scale: [0.47, 0.86, 0.51],
+        densityExponent: 0.86,
+        densityGain: 1.30,
+    },
+    "congestus-multicell": {
+        file: "cgheven-congestus-23-r8-96.bin",
+        scale: [0.62, 0.86, 0.66],
+        densityExponent: 0.86,
+        densityGain: 1.30,
+    },
 });
-const authoredCongestusSourceCache = new Map();
+const authoredCumulusSourceCache = new Map();
 
-const loadAuthoredCongestusSource = (sourceId) => {
-    const file = AUTHORED_CONGESTUS_SOURCE_FILES[sourceId] ??
-        AUTHORED_CONGESTUS_SOURCE_FILES.balanced;
-    if (!authoredCongestusSourceCache.has(file)) {
+const authoredCumulusSourceId = (config) => config.species === "congestus"
+    ? `congestus${config.morphologyVariant === "balanced"
+        ? "" : `-${config.morphologyVariant}`}`
+    : config.species;
+
+const loadAuthoredCumulusSource = (sourceId) => {
+    const descriptor = AUTHORED_CUMULUS_SOURCES[sourceId];
+    if (!descriptor) {
+        throw new Error(`No authored Cumulus source for ${sourceId}`);
+    }
+    const { file } = descriptor;
+    if (!authoredCumulusSourceCache.has(file)) {
         const bytes = new Uint8Array(readFileSync(new URL(
             `../assets/clouds/${file}`,
             import.meta.url,
         )));
-        if (bytes.length !== AUTHORED_CONGESTUS_SOURCE_RESOLUTION ** 3) {
+        if (bytes.length !== AUTHORED_CUMULUS_SOURCE_RESOLUTION ** 3) {
             throw new Error(
-                `authored Congestus source ${file} has ${bytes.length} bytes; ` +
-                `expected ${AUTHORED_CONGESTUS_SOURCE_RESOLUTION ** 3}`,
+                `authored Cumulus source ${file} has ${bytes.length} bytes; ` +
+                `expected ${AUTHORED_CUMULUS_SOURCE_RESOLUTION ** 3}`,
             );
         }
-        authoredCongestusSourceCache.set(file, bytes);
+        authoredCumulusSourceCache.set(file, bytes);
     }
-    return authoredCongestusSourceCache.get(file);
+    return authoredCumulusSourceCache.get(file);
 };
 
-const sampleAuthoredCongestusSource = (source, x, y, z) => {
+const sampleAuthoredCumulusSource = (source, x, y, z) => {
     if (x < 0 || x > 1 || y < 0 || y > 1 || z < 0 || z > 1) return 0;
-    const resolution = AUTHORED_CONGESTUS_SOURCE_RESOLUTION;
+    const resolution = AUTHORED_CUMULUS_SOURCE_RESOLUTION;
     const fx = x * (resolution - 1);
     const fy = y * (resolution - 1);
     const fz = z * (resolution - 1);
@@ -2965,21 +2551,21 @@ const sampleAuthoredCongestusSource = (source, x, y, z) => {
     );
 };
 
-const evaluateAuthoredCongestus = (config, x, y, z) => {
-    const morphology = config.morphologyVariant ?? "balanced";
-    const horizontalScale = morphology === "multicell" ? 0.62
-        : morphology === "turreted" ? 0.47 : 0.50;
-    const depthScale = morphology === "multicell" ? 0.66
-        : morphology === "turreted" ? 0.51 : 0.55;
-    const verticalScale = 0.86;
-    const authoredDensity = sampleAuthoredCongestusSource(
-        loadAuthoredCongestusSource(morphology),
-        (x - 0.5) / horizontalScale + 0.5,
-        (y - 0.5) / verticalScale + 0.5,
-        (z - 0.5) / depthScale + 0.5,
+const evaluateAuthoredCumulus = (config, x, y, z) => {
+    const sourceId = authoredCumulusSourceId(config);
+    const descriptor = AUTHORED_CUMULUS_SOURCES[sourceId];
+    if (!descriptor) return null;
+    const [horizontalScale, verticalScale, depthScale] = descriptor.scale;
+    const [centerX, centerY, centerZ] = descriptor.center ?? [0.5, 0.5, 0.5];
+    const authoredDensity = sampleAuthoredCumulusSource(
+        loadAuthoredCumulusSource(sourceId),
+        (x - centerX) / horizontalScale + 0.5,
+        (y - centerY) / verticalScale + 0.5,
+        (z - centerZ) / depthScale + 0.5,
     );
     const density = clamp(
-        Math.pow(authoredDensity, 0.86) * 1.30 * config.densityScale,
+        Math.pow(authoredDensity, descriptor.densityExponent) *
+            descriptor.densityGain * config.densityScale,
     );
     return {
         density,
@@ -2990,9 +2576,10 @@ const evaluateAuthoredCongestus = (config, x, y, z) => {
 };
 
 const evaluateModel = (model, config, x, y, z, seed) => {
-    if (config.species === "congestus") {
-        return evaluateAuthoredCongestus(config, x, y, z);
-    }
+    const authoredCumulus = config.genus === "cumulus"
+        ? evaluateAuthoredCumulus(config, x, y, z)
+        : null;
+    if (authoredCumulus) return authoredCumulus;
     const convectiveWarp = config.storm ? 0.040 : 0.030;
     const [warpedX, warpedY, warpedZ] = warpPoint3(
         x,
@@ -3616,8 +3203,7 @@ const evaluateSpissatusStochasticField = (x, y, z, primitive, seed = 0) => {
         normalizedZ,
     );
     // A finite humidity envelope is a prior, not a visible ellipse. Low-pass
-    // displacements shear and corrugate it while `Math.min(raw, warped)`
-    // preserves conservative finite support at the original owner boundary.
+    // displacements shear and corrugate several unequal generating masses.
     const envelopeWarpScale = primitive.envelopeWarpScale ?? 1;
     const envelopeWarpX = (fbm3(
         normalizedX * 1.20 + 1.7,
@@ -3637,19 +3223,75 @@ const evaluateSpissatusStochasticField = (x, y, z, primitive, seed = 0) => {
         normalizedZ * 1.28 + 4.4,
         seed + 3079,
     ) - 0.5) * 0.20 * envelopeWarpScale;
-    const warpedEnvelopeRadius = Math.hypot(
-        normalizedX + normalizedY * 0.14 + envelopeWarpX,
-        normalizedY + envelopeWarpY,
-        normalizedZ - normalizedY * 0.10 + envelopeWarpZ,
+    const lobeRelief = Math.sin(
+        normalizedX * 2.3 + normalizedZ * 2.9 +
+        normalizedY * 1.1 + seed * 0.000017,
+    ) * 0.065 * envelopeWarpScale + Math.sin(
+        normalizedX * 4.1 - normalizedZ * 1.7 +
+        normalizedY * 1.9 - seed * 0.000011,
+    ) * 0.038 * envelopeWarpScale;
+    const lobeA = 1 - Math.hypot(
+        (normalizedX + 0.34 + envelopeWarpX * 0.42) / 0.82,
+        (normalizedY + 0.06 + envelopeWarpY * 0.36) / 0.86,
+        (normalizedZ + 0.14 + envelopeWarpZ * 0.38) / 0.76,
     );
-    // The warped prior owns the visible finite boundary.  A larger smooth
-    // guard only prevents that prior from escaping the conservative owner
-    // bounds; retaining the raw ellipsoid as a second minimum would imprint a
-    // mirrored radial shell and defeat the low-pass shear/corrugation.
+    const lobeB = 1 - Math.hypot(
+        (normalizedX - 0.26 + envelopeWarpX * 0.48) / 0.78,
+        (normalizedY - 0.14 + envelopeWarpY * 0.40) / 0.80,
+        (normalizedZ - 0.08 + envelopeWarpZ * 0.44) / 0.84,
+    );
+    const lobeC = 1 - Math.hypot(
+        (normalizedX + 0.02 + envelopeWarpX * 0.40) / 0.62,
+        (normalizedY + 0.30 + envelopeWarpY * 0.44) / 0.68,
+        (normalizedZ - 0.42 + envelopeWarpZ * 0.36) / 0.58,
+    );
+    const segmentField = (start, end, radius) => {
+        const axis = [
+            end[0] - start[0],
+            end[1] - start[1],
+            end[2] - start[2],
+        ];
+        const denominator = Math.max(1e-8,
+            axis[0] ** 2 + axis[1] ** 2 + axis[2] ** 2);
+        const amount = clamp((
+            (normalizedX - start[0]) * axis[0] +
+            (normalizedY - start[1]) * axis[1] +
+            (normalizedZ - start[2]) * axis[2]
+        ) / denominator);
+        return radius - Math.hypot(
+            normalizedX - mix(start[0], end[0], amount),
+            normalizedY - mix(start[1], end[1], amount),
+            normalizedZ - mix(start[2], end[2], amount),
+        );
+    };
+    const sedimentingTailA = segmentField(
+        [-0.58, -0.08, -0.18], [-0.92, -0.70, 0.44], 0.15);
+    const sedimentingTailB = segmentField(
+        [0.26, 0.08, 0.10], [0.62, -0.76, 0.70], 0.13);
+    const sedimentingTailC = segmentField(
+        [-0.04, -0.24, 0.38], [-0.38, -0.88, 0.86], 0.11);
+    // The lobed prior owns the visible finite boundary. A larger smooth guard
+    // only prevents it from escaping the conservative owner bounds.
     const ownerGuardRadius = rawEnvelopeRadius / 1.22;
-    const envelope = Math.min(
-        1 - warpedEnvelopeRadius,
+    let envelope = Math.min(
+        Math.max(
+            Math.max(lobeA, lobeB, lobeC) + lobeRelief,
+            sedimentingTailA,
+            sedimentingTailB,
+            sedimentingTailC,
+        ),
         1 - ownerGuardRadius,
+    );
+    // A compact off-axis dry pocket supplies natural negative space without
+    // cutting the whole source into a ring or horseshoe.
+    const dryIntrusion = Math.hypot(
+        (normalizedX + 0.06) / 0.16,
+        (normalizedY - 0.04) / 0.30,
+        (normalizedZ + 0.10) / 0.18,
+    ) - 1;
+    envelope = Math.min(
+        envelope,
+        dryIntrusion * 0.13,
     );
     const envelopeScale = primitive.envelopeScale ?? 0.23;
     // Keep all field evaluation bounded around the finite source. This also
@@ -3754,12 +3396,13 @@ const evaluateSpissatusStochasticField = (x, y, z, primitive, seed = 0) => {
     // remain in the optical IWC and density modulation, but cannot pepper the
     // binary support with isolated one-voxel islands before 2x reduction.
     const rawSupportGaussian =
-        0.50 * (broad - 0.5) +
-        0.39 * (mesoscale - 0.5) +
+        0.42 * (broad - 0.5) +
+        0.34 * (mesoscale - 0.5) +
         0.07 * (layer.coherence - 0.5) +
         0.04 * (sourceSiteSignal - 0.42) +
-        0.08 * (coherentFallstreak - 0.5) *
-            settling * (layer.fallstreakWeight ?? 0.5);
+        0.14 * (coherentFallstreak - 0.5) *
+            settling * (layer.fallstreakWeight ?? 0.5) +
+        0.09 * (fibrous - 0.5);
     const supportGaussian = (
         rawSupportGaussian - (primitive.supportMeanOffset ?? 0)
     ) * (primitive.supportVarianceScale ?? 1);
@@ -5816,9 +5459,9 @@ const buildIceStreamerModel = (config, seed) => {
             0.50 + mix(-0.018, 0.018, random()),
         ];
         const radii = [
-            0.425 * mix(0.96, 1.04, random()),
-            0.285 * mix(0.95, 1.06, random()),
-            0.355 * mix(0.95, 1.05, random()),
+            0.400 * mix(0.96, 1.04, random()),
+            0.360 * mix(0.95, 1.06, random()),
+            0.370 * mix(0.95, 1.05, random()),
         ];
         const rotation = mix(-0.48, 0.48, random());
         const shear = [
@@ -7454,21 +7097,26 @@ const buildUpperMiddleCellularModel = (config, seed) => {
             // independent per-grain jitter would destroy wave causality,
             // whereas a domain phase shift breaks the residual two-axis lag
             // signature while preserving locally coherent crests.
-            const domainPhaseShift = dispersive ? (
+            const domainPhaseShift = (
                 hashInteger(seed ^ Math.imul(site.domainIndex + 1, 0x45d9f3b)) /
                     4294967296 - 0.5
-            ) * 0.036 : 0;
+            ) * (dispersive ? 0.036 : 0.045);
+            const domainNormalShift = (
+                hashInteger(seed ^ Math.imul(site.domainIndex + 1, 0x27d4eb2d)) /
+                    4294967296 - 0.5
+            ) * (dispersive ? 0 : 0.040);
             const redistributedX = domainX +
                 (localX - domainX) * alongScale + domainPhaseShift;
+            const redistributedZ = localZ + domainNormalShift;
             centerX = clamp(
                 0.5 + wave.tangent[0] * redistributedX +
-                    wave.normal[0] * localZ,
+                    wave.normal[0] * redistributedZ,
                 0.065,
                 0.935,
             );
             centerY = clamp(
                 0.5 + wave.tangent[1] * redistributedX +
-                    wave.normal[1] * localZ,
+                    wave.normal[1] * redistributedZ,
                 0.065,
                 0.935,
             );
@@ -7558,14 +7206,18 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                         mix(0.80, 1.16, random()) * stageScale;
             const heading = high
                 ? wave.heading + mix(
-                    dispersive ? -0.30 : -0.17,
-                    dispersive ? 0.30 : 0.17,
+                    dispersive ? -0.30 : -0.55,
+                    dispersive ? 0.30 : 0.55,
                     random(),
                 )
                 : moistureEnvelope[0].rotation + mix(-0.72, 0.72, random());
             const tangent = [Math.cos(heading), Math.sin(heading)];
             const normal = [-tangent[1], tangent[0]];
-            const relief = high ? radius * mix(0.35, 0.72, random())
+            const relief = high ? radius * mix(
+                dispersive ? 0.35 : 0.50,
+                dispersive ? 0.72 : 0.95,
+                random(),
+            )
                 : radius * mix(0.32, 0.68, random());
             const domainAltitude = high
                 ? (
@@ -7589,8 +7241,8 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                     seed + 4409) - 0.5) * relief);
             const halfLength = radius * (high
                 ? mix(
-                    dispersive ? 1.05 : 0.95,
-                    dispersive ? 1.82 : 1.60,
+                    dispersive ? 1.05 : 0.72,
+                    dispersive ? 1.82 : 1.35,
                     random(),
                 ) : mix(0.72, 1.28, random()));
             const root = [
@@ -7616,17 +7268,17 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                 source,
                 sink,
             ], [
-                radius * (high ? dispersive ? 0.52 : 0.34 : 0.38),
-                radius * 0.78,
+                radius * (high ? dispersive ? 0.52 : 0.58 : 0.38),
+                radius * (high && !dispersive ? 0.86 : 0.78),
                 radius,
-                radius * (high ? dispersive ? 0.44 : 0.30 : 0.42),
+                radius * (high ? dispersive ? 0.44 : 0.55 : 0.42),
             ], {
                 density: mix(0.84, 1, random()),
                 detail: high ? 0.76 : 0.34,
                 phase: config.phaseBase,
                 verticalScale: high ? mix(
-                    dispersive ? 0.78 : 0.72,
-                    dispersive ? 1.05 : 0.98,
+                    dispersive ? 0.78 : 0.85,
+                    dispersive ? 1.05 : 1.18,
                     random(),
                 )
                     : mix(0.52, 0.76, random()),
@@ -7730,61 +7382,60 @@ const buildUpperMiddleCellularModel = (config, seed) => {
         const orderedSites = [...sites].sort((left, right) =>
             (left.centerX - 0.5) * axis[0] + (left.centerY - 0.5) * axis[1] -
             ((right.centerX - 0.5) * axis[0] + (right.centerY - 0.5) * axis[1]));
-        const middleRenewalWeights = middle
+        const renewalWeights = middle || high
             ? (() => {
                 const weights = [];
-                let logInterval = mix(-0.62, 0.62, random());
+                let logInterval = mix(high ? -0.78 : -0.62,
+                    high ? 0.78 : 0.62, random());
                 for (let index = 0; index + 1 < orderedSites.length; index += 1) {
-                    logInterval = logInterval * 0.24 +
-                        mix(-1.08, 1.08, random()) * 0.76;
+                    logInterval = logInterval * (high ? 0.38 : 0.24) +
+                        mix(high ? -1.34 : -1.08, high ? 1.34 : 1.08,
+                            random()) * (high ? 0.62 : 0.76);
                     weights.push(Math.exp(logInterval + Math.sin(
                         (index + 0.31) * 2.399963229728653,
-                    ) * 0.22));
+                    ) * (high ? 0.31 : 0.22)));
                 }
                 return weights;
             })()
             : null;
-        const middleRenewalTotal = middleRenewalWeights?.reduce(
+        const renewalTotal = renewalWeights?.reduce(
             (sum, value) => sum + value,
             0,
         ) ?? 1;
-        let middleRenewalCumulative = 0;
-        const middleBasePhase = random() * Math.PI * 2;
+        let renewalCumulative = 0;
+        const renewalBasePhase = random() * Math.PI * 2;
         const basePoints = orderedSites.map((site, index) => {
-            if (high) return [
-                site.centerX,
-                baseY +
-                    Math.sin(index * 1.27 + seed * 1e-6) * 0.012 +
-                    Math.sin(
-                        site.centerX * Math.PI * 1.37 +
-                        site.centerY * Math.PI * 0.83,
-                    ) * 0.008,
-                site.centerY,
-            ];
             const amount = index === 0 ? 0 :
-                middleRenewalCumulative / middleRenewalTotal;
-            if (index < middleRenewalWeights.length) {
-                middleRenewalCumulative += middleRenewalWeights[index];
+                renewalCumulative / renewalTotal;
+            if (index < renewalWeights.length) {
+                renewalCumulative += renewalWeights[index];
             }
-            const along = mix(-0.39, 0.39, amount);
+            const along = mix(high ? -0.37 : -0.39,
+                high ? 0.37 : 0.39, amount);
             // A correlated renewal spectrum controls tower births. Two
             // incommensurate low-amplitude modes curve the physical source
             // through its moisture domains without turning it into a row or
             // letting best-candidate repulsion equalize every interval.
             const crossOffset = Math.sin(
-                amount * Math.PI * 2 * 0.83 + middleBasePhase,
-            ) * 0.048 + Math.sin(
-                amount * Math.PI * 2 * 1.71 + middleBasePhase * 0.63,
-            ) * 0.021 + (amount - 0.43) ** 2 * mix(-0.08, 0.08, random());
+                amount * Math.PI * 2 * 0.83 + renewalBasePhase,
+            ) * (high ? 0.036 : 0.048) + Math.sin(
+                amount * Math.PI * 2 * 1.71 + renewalBasePhase * 0.63,
+            ) * (high ? 0.016 : 0.021) +
+                (amount - 0.43) ** 2 * mix(
+                    high ? -0.055 : -0.08,
+                    high ? 0.055 : 0.08,
+                    random(),
+                );
             const normal = [-axis[1], axis[0]];
             return [
                 0.5 + axis[0] * along + normal[0] * crossOffset,
-                baseY + Math.sin(index * 1.27 + seed * 1e-6) * 0.010,
+                baseY + Math.sin(index * 1.27 + seed * 1e-6) *
+                    (high ? 0.012 : 0.010),
                 0.5 + axis[1] * along + normal[1] * crossOffset,
             ];
         });
         const commonBaseSupport = addSweep(basePoints, basePoints.map((_, index) =>
-            0.056 * mix(high ? 0.88 : 0.78, 1.16,
+            (high ? 0.101 : 0.056) * mix(high ? 0.88 : 0.78, 1.16,
                 (hashInteger(seed + index * 271) % 1000) / 1000)), {
             density: high ? 0.94 : 0.86,
             detail: high ? 0.72 : 0.28,
@@ -7804,9 +7455,9 @@ const buildUpperMiddleCellularModel = (config, seed) => {
             const base = basePoints[index];
             const radius = high
                 ? clamp(
-                    0.047 * site.localScale * mix(0.82, 1.16, random()),
-                    0.044,
-                    0.068,
+                    0.087 * site.localScale * mix(0.82, 1.16, random()),
+                    0.078,
+                    0.118,
                 )
                 : 0.050 * site.localScale * mix(0.76, 1.18, random());
             const stageHeight = site.lifecycleStage === "growing" ? 1.06
@@ -7857,9 +7508,9 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                     midpoint,
                     base,
                 ], [
-                    Math.max(0.044, attachment.radius * 0.84),
-                    Math.max(0.043, radius * 0.78),
-                    Math.max(0.042, radius * 0.72),
+                    Math.max(0.075, attachment.radius * 0.84),
+                    Math.max(0.073, radius * 0.78),
+                    Math.max(0.070, radius * 0.72),
                 ], {
                     density: 0.92,
                     detail: 0.74,
@@ -9974,11 +9625,178 @@ const evaluateRollModel = (model, config, x, y, z, seed) => {
     };
 };
 
+const buildCirrostratusModel = (config, seed) => {
+    const random = makeRandom(seed);
+    const fibratus = config.variant === "cirrostratus-fibratus";
+    return {
+        kind: "cirrostratus-iwc",
+        fibratus,
+        orientation: mix(-0.48, 0.48, random()),
+        centerAlong: mix(-0.035, 0.035, random()),
+        centerAcross: mix(-0.025, 0.025, random()),
+        halfLength: fibratus ? 0.47 : 0.49,
+        halfWidth: fibratus ? 0.38 : 0.43,
+        verticalCenter: mix(0.48, 0.52, random()),
+        verticalHalfDepth: fibratus ? 0.22 : 0.25,
+        shearAlong: fibratus
+            ? mix(0.14, 0.24, random())
+            : mix(0.035, 0.075, random()),
+        shearAcross: fibratus
+            ? mix(-0.11, 0.11, random())
+            : mix(-0.035, 0.035, random()),
+        heterogeneitySigma: fibratus ? 0.48 : 0.18,
+        outerScale: fibratus ? 1.18 : 0.72,
+        filamentContrast: fibratus ? 0.58 : 0,
+        spectrumSlope: -5 / 3,
+        iwcDistribution: "bounded-lognormal",
+        verticalProfile: "rounded-isosceles-trapezoid",
+        boundaryModel: fibratus
+            ? "finite-sheared-stochastic-iwc-veil-with-sedimentation-filaments"
+            : "finite-stochastic-iwc-nebulous-veil",
+    };
+};
+
+const evaluateCirrostratusModel = (model, config, x, y, z, seed) => {
+    const dx = x - 0.5;
+    const dz = z - 0.5;
+    const cosine = Math.cos(model.orientation);
+    const sine = Math.sin(model.orientation);
+    const along = dx * cosine + dz * sine - model.centerAlong;
+    const across = -dx * sine + dz * cosine - model.centerAcross;
+    const normalizedAlong = along / model.halfLength;
+    const normalizedAcross = across / model.halfWidth;
+
+    // A finite frontal moisture domain. Its independently sampled advancing
+    // and trailing margins replace the removed radial stamp and sinusoidal
+    // sheet surfaces. The envelope is broad enough for a seven/eight-okta
+    // veil but remains a bounded weather system in owner space.
+    const edgeField = cirriformIwcFbm3(
+        normalizedAlong * 0.74 + 2.7,
+        0.31,
+        normalizedAcross * 0.66 - 5.1,
+        seed + 2819,
+    ) - 0.5;
+    const alongField = cirriformIwcFbm3(
+        normalizedAlong * 1.17 - 3.9,
+        1.13,
+        normalizedAcross * 0.47 + 1.8,
+        seed + 2833,
+    ) - 0.5;
+    const alongSupport = 1 - Math.abs(normalizedAlong) + alongField * 0.16;
+    const frontSupport = 1 - normalizedAcross + edgeField * 0.28;
+    const rearSupport = 1 + normalizedAcross +
+        (cirriformIwcFbm3(
+            normalizedAlong * 0.83 + 6.4,
+            0.79,
+            normalizedAcross * 0.71 + 3.2,
+            seed + 2851,
+        ) - 0.5) * 0.24;
+    const planSupport = Math.min(alongSupport, frontSupport, rearSupport);
+
+    // Wind varies continuously through the layer. Sedimenting ice therefore
+    // samples a sheared 3-D moisture field instead of a stack of horizontal
+    // slices or a set of parallel curves.
+    const verticalOffset = y - model.verticalCenter;
+    const shearedAlong = normalizedAlong +
+        verticalOffset * model.shearAlong;
+    const shearedAcross = normalizedAcross +
+        verticalOffset * model.shearAcross;
+    const depthField = cirriformIwcFbm3(
+        shearedAlong * 0.68 - 1.2,
+        y * 0.91 + 4.6,
+        shearedAcross * 0.63 + 7.4,
+        seed + 2861,
+    ) - 0.5;
+    const localHalfDepth = model.verticalHalfDepth * clamp(
+        1 + depthField * (model.fibratus ? 0.24 : 0.13),
+        0.72,
+        1.28,
+    );
+    const normalizedDepth = Math.abs(verticalOffset) /
+        Math.max(0.001, localHalfDepth);
+    const verticalProfile = 1 - smoothstep(0.68, 1, normalizedDepth);
+
+    const stochasticIwc = cirriformIwcFbm3(
+        shearedAlong * model.outerScale + 11.3,
+        y * model.outerScale * 1.24 - 8.7,
+        shearedAcross * model.outerScale + 3.9,
+        seed + 2879,
+    );
+    // A sum of independent bounded fields is close to Gaussian; exponentiate
+    // it to obtain the positive, skewed IWC distribution used by stochastic
+    // cirrus generators, then normalize its mean approximately to one.
+    const independentIwc = cirriformIwcFbm3(
+        shearedAlong * model.outerScale * 1.31 - 4.2,
+        y * model.outerScale * 0.93 + 5.7,
+        shearedAcross * model.outerScale * 1.17 - 9.1,
+        seed + 2897,
+    );
+    const latent = ((stochasticIwc + independentIwc) - 1) * 2.45;
+    const heterogeneousIwc = clamp(Math.exp(
+        model.heterogeneitySigma * latent -
+            0.5 * model.heterogeneitySigma ** 2,
+    ), 0.38, 1.72);
+
+    let filamentFactor = 1;
+    if (model.fibratus) {
+        const filamentWarp = (
+            cirriformIwcFbm3(
+                shearedAlong * 0.86 + 2.4,
+                y * 1.37 - 3.8,
+                shearedAcross * 0.92 + 6.1,
+                seed + 2917,
+            ) - 0.5
+        ) * 1.12;
+        const filamentField = cirriformIwcFbm3(
+            shearedAlong * 0.74 - 7.2,
+            y * 2.7 + filamentWarp * 0.44,
+            shearedAcross * 7.6 + filamentWarp,
+            seed + 2939,
+        );
+        const secondaryField = cirriformIwcFbm3(
+            shearedAlong * 1.18 + filamentWarp * 0.31,
+            y * 4.1 - 2.6,
+            shearedAcross * 13.4 - filamentWarp * 1.3,
+            seed + 2953,
+        );
+        const sedimentationFilaments = Math.pow(clamp(
+            filamentField * 0.72 + secondaryField * 0.28,
+        ), 2.15);
+        filamentFactor = mix(
+            1 - model.filamentContrast * 0.46,
+            1 + model.filamentContrast,
+            sedimentationFilaments,
+        );
+    }
+
+    const finiteSupport = Math.min(planSupport, verticalProfile * 0.18);
+    const boundaryMixing = (
+        cirriformIwcFbm3(
+            shearedAlong * 3.2 + 1.7,
+            y * 3.8 - 6.4,
+            shearedAcross * 3.0 + 9.2,
+            seed + 2971,
+        ) - 0.5
+    ) * 0.024;
+    const condensate = smoothstep(
+        -0.018,
+        0.032,
+        finiteSupport + boundaryMixing,
+    ) * (planSupport > 0 && verticalProfile > 0 ? 1 : 0);
+    const density = clamp(
+        condensate * config.densityScale *
+            heterogeneousIwc * filamentFactor,
+    );
+    return {
+        density,
+        detail: model.fibratus ? 0.78 : 0.34,
+        phase: 1,
+        precipitation: 0,
+    };
+};
+
 const buildSheetModel = (config, seed) => {
     const random = makeRandom(seed);
-    const cirrostratus = config.variant === "cirrostratus" ||
-        config.variant === "cirrostratus-fibratus";
-    const cirrostratusFibratus = config.variant === "cirrostratus-fibratus";
     const altostratus = config.variant === "altostratus" ||
         config.variant === "altostratus-translucidus";
     const altostratusTranslucidus = config.variant === "altostratus-translucidus";
@@ -10000,14 +9818,8 @@ const buildSheetModel = (config, seed) => {
             height: mix(0.065, 0.15, random()),
         }))
         : [];
-    const boundarySettings = cirrostratus
+    const boundarySettings = altostratus
         ? {
-            halfLength: 0.395, halfWidth: 0.295, frontAmplitude: 0.043,
-            rearAmplitude: 0.036, intrusionCount: 5, intrusionDepth: [0.030, 0.082],
-            lobeCount: 4,
-        }
-        : altostratus
-            ? {
                 halfLength: 0.44, halfWidth: 0.39, frontAmplitude: 0.064,
                 rearAmplitude: 0.055, intrusionCount: 5, intrusionDepth: [0.045, 0.12],
                 lobeCount: 5,
@@ -10083,74 +9895,8 @@ const buildSheetModel = (config, seed) => {
                             { x: mix(0.018, 0.052, random()), z: mix(-0.052, -0.020, random()), y: -0.055 },
                         ]
                 : [],
-        // The Cirrostratus sheet owns two independent, low-frequency surface
-        // fields plus a separate thickness spectrum. These modes alter the
-        // physical lower/upper condensate boundaries; they are not density
-        // stripes painted on a planar slab.
-        surfaceModes: cirrostratus
-            ? [
-                [0.61, 0.43],
-                [0.93, 1.17],
-                [1.47, 0.79],
-                [2.09, 1.61],
-            ].map(([alongFrequency, acrossFrequency], index) => {
-                const amplitude = (
-                    cirrostratusFibratus ? 0.023 : 0.017
-                ) / Math.pow(index + 1, 0.82) * mix(0.82, 1.18, random());
-                return {
-                    alongFrequency: alongFrequency * mix(0.92, 1.08, random()),
-                    acrossFrequency: acrossFrequency *
-                        mix(0.92, 1.08, random()),
-                    lowerAmplitude: amplitude *
-                        mix(0.72, 1.08, random()),
-                    upperAmplitude: amplitude *
-                        mix(0.62, 1.02, random()),
-                    lowerPhase: random() * Math.PI * 2,
-                    upperPhase: random() * Math.PI * 2,
-                };
-            })
-            : [],
-        thicknessModes: cirrostratus
-            ? [
-                [0.53, 0.81, 0.16],
-                [1.11, 0.57, 0.11],
-                [1.73, 1.39, 0.07],
-            ].map(([alongFrequency, acrossFrequency, amplitude]) => ({
-                alongFrequency: alongFrequency * mix(0.93, 1.07, random()),
-                acrossFrequency: acrossFrequency * mix(0.93, 1.07, random()),
-                amplitude: amplitude * mix(0.76, 1.14, random()),
-                phase: random() * Math.PI * 2,
-            }))
-            : [],
-        fibreBundles: cirrostratusFibratus
-            ? Array.from({ length: 8 }, (_, index) => ({
-                offset: mix(-0.27, 0.27, (index + 0.35 + random() * 0.30) / 8),
-                width: mix(0.012, 0.026, random()),
-                curvature: mix(-0.045, 0.045, random()),
-                frequency: mix(0.72, 1.48, random()),
-                phase: random() * Math.PI * 2,
-                alongCenter: mix(-0.08, 0.08, random()),
-                halfLength: mix(0.24, 0.43, random()),
-                strength: mix(0.58, 1, random()),
-                altitudeOffset: mix(-0.060, 0.060, random()),
-                verticalRadius: mix(0.022, 0.040, random()),
-                altitudeSlope: mix(-0.055, 0.055, random()),
-                altitudeWaveAmplitude: mix(0.006, 0.018, random()),
-                altitudeWaveFrequency: mix(0.72, 1.36, random()),
-                altitudePhase: random() * Math.PI * 2,
-            }))
-            : [],
-        streamlineCount: cirrostratusFibratus ? 8 : 0,
-        sheetSurfaceModeCount: cirrostratus ? 4 : 0,
-        sheetThicknessModeCount: cirrostratus ? 3 : 0,
-        embeddedFibreBundleCount: cirrostratusFibratus ? 8 : 0,
-        fibreAltitudeSpread: cirrostratusFibratus ? 0.12 : 0,
         fibrePhase: random() * Math.PI * 2,
-        boundaryModel: cirrostratusFibratus
-            ? "volumetric-undulating-veil-with-finite-depth-sheared-ice-fibres"
-            : cirrostratus
-                ? "finite-volumetric-undulating-nebulous-ice-front"
-            : altostratusTranslucidus
+        boundaryModel: altostratusTranslucidus
                 ? "finite-ground-glass-mixed-phase-shield"
             : altostratus
                 ? "unequal-superposed-mixed-phase-shield"
@@ -10167,22 +9913,12 @@ const evaluateEdgeHarmonics = (coordinate, harmonics) => harmonics.reduce(
 );
 
 const evaluateSheetModel = (model, config, x, y, z, seed) => {
-    const cirrostratus = config.variant === "cirrostratus" ||
-        config.variant === "cirrostratus-fibratus";
-    const cirrostratusFibratus = config.variant === "cirrostratus-fibratus";
     const altostratus = config.variant === "altostratus" ||
         config.variant === "altostratus-translucidus";
     const altostratusTranslucidus = config.variant === "altostratus-translucidus";
     const stratus = config.variant === "stratus";
-    const settings = cirrostratus
+    const settings = altostratus
         ? {
-            center: 0.64,
-            thickness: cirrostratusFibratus ? 0.132 : 0.116,
-            undulation: 0,
-            detail: cirrostratusFibratus ? 0.84 : 0.48,
-        }
-        : altostratus
-            ? {
                 center: 0.57,
                 thickness: altostratusTranslucidus ? 0.16 : 0.23,
                 undulation: altostratusTranslucidus ? 0.021 : 0.026,
@@ -10223,10 +9959,10 @@ const evaluateSheetModel = (model, config, x, y, z, seed) => {
     );
     const boundaryNoise = fbm3(x * 3.1 + 2, 0.7, z * 3.4 - 5, seed + 2521) - 0.5;
     const frontMeander = evaluateEdgeHarmonics(normalizedAlong, model.frontHarmonics) +
-        boundaryNoise * (cirrostratus ? 0.027 : 0.044);
+        boundaryNoise * 0.044;
     const rearMeander = evaluateEdgeHarmonics(normalizedAlong, model.rearHarmonics) +
         (fbm3(x * 3.7 - 4, 1.3, z * 2.9 + 6, seed + 2543) - 0.5) *
-            (cirrostratus ? 0.024 : 0.039);
+            0.039;
     const centerline =
         model.frontSkew * normalizedAlong +
         model.frontCurvature * (normalizedAlong ** 2 - 0.34) +
@@ -10247,31 +9983,7 @@ const evaluateSheetModel = (model, config, x, y, z, seed) => {
     const frontSupport = centerline + frontWidth - across;
     const rearSupport = across - (centerline - rearWidth);
     const planSupport = Math.min(alongSupport, frontSupport, rearSupport);
-    const normalizedAcross = across / Math.max(0.001, model.halfWidth);
-    let lowerSurfaceDisplacement = 0;
-    let upperSurfaceDisplacement = 0;
-    for (const mode of model.surfaceModes ?? []) {
-        lowerSurfaceDisplacement += Math.sin(
-            normalizedAlong * Math.PI * mode.alongFrequency +
-            normalizedAcross * Math.PI * mode.acrossFrequency +
-            mode.lowerPhase,
-        ) * mode.lowerAmplitude;
-        upperSurfaceDisplacement += Math.sin(
-            normalizedAlong * Math.PI * mode.alongFrequency * 0.91 -
-            normalizedAcross * Math.PI * mode.acrossFrequency * 1.07 +
-            mode.upperPhase,
-        ) * mode.upperAmplitude;
-    }
-    let sheetThicknessScale = 1;
-    for (const mode of model.thicknessModes ?? []) {
-        sheetThicknessScale += Math.sin(
-            normalizedAlong * Math.PI * mode.alongFrequency -
-            normalizedAcross * Math.PI * mode.acrossFrequency +
-            mode.phase,
-        ) * mode.amplitude;
-    }
-    sheetThicknessScale = clamp(sheetThicknessScale, 0.68, 1.36);
-    const longWave = cirrostratus ? 0 : (
+    const longWave = (
         Math.sin(x * Math.PI * 2.1 + z * 1.4 + model.fibrePhase) * 0.44 +
         Math.sin(z * Math.PI * 1.65 - x * 0.9 - model.fibrePhase * 0.4) * 0.26 +
         (fbm3(x * 4.0, 0.2, z * 4.0, seed + 2591) - 0.5) * 0.60
@@ -10294,81 +10006,13 @@ const evaluateSheetModel = (model, config, x, y, z, seed) => {
         generatingCellThickening += (1 - smoothstep(0, 1, metric)) * cell.height;
     }
     const lowDeck = config.nsParentAnatomy === "thickened-low-deck";
-    const localSheetThickness = settings.thickness *
-        (cirrostratus ? sheetThicknessScale : 1);
-    let lower = settings.center - localSheetThickness * 0.5 + longWave -
+    const lower = settings.center - settings.thickness * 0.5 + longWave -
         localThickening * (config.variant === "nimbostratus"
             ? lowDeck ? 1.55 : 1.05 : 0.6);
-    let upper = settings.center + localSheetThickness * 0.5 + longWave * 0.44 +
+    const upper = settings.center + settings.thickness * 0.5 + longWave * 0.44 +
         localThickening * (lowDeck ? 0.20 : 0.45) + generatingCellThickening;
-    if (cirrostratus) {
-        lower += lowerSurfaceDisplacement;
-        upper += upperSurfaceDisplacement;
-        const minimumDepth = cirrostratusFibratus ? 0.074 : 0.066;
-        if (upper - lower < minimumDepth) {
-            const center = (lower + upper) * 0.5;
-            lower = center - minimumDepth * 0.5;
-            upper = center + minimumDepth * 0.5;
-        }
-    }
     const verticalSupport = Math.min(y - lower, upper - y);
-    let embeddedFibreSupport = -Infinity;
-    let coherentFibreWeight = 0;
-    for (const fibre of model.fibreBundles ?? []) {
-        const localAlong = along - fibre.alongCenter;
-        const finiteEnvelope = smoothstep(
-            0,
-            0.16,
-            1 - Math.abs(localAlong) / fibre.halfLength,
-        );
-        const centre = fibre.offset +
-            Math.sin(
-                localAlong * Math.PI * fibre.frequency + fibre.phase,
-            ) * fibre.curvature +
-            localAlong * localAlong * fibre.curvature * 0.75;
-        const normalizedDistance = (across - centre) / fibre.width;
-        const altitude = settings.center + fibre.altitudeOffset +
-            localAlong * fibre.altitudeSlope +
-            Math.sin(
-                localAlong * Math.PI * fibre.altitudeWaveFrequency +
-                fibre.altitudePhase,
-            ) * fibre.altitudeWaveAmplitude;
-        const verticalRadius = fibre.verticalRadius *
-            mix(0.58, 1, finiteEnvelope);
-        const longitudinalSupport = (
-            fibre.halfLength - Math.abs(localAlong)
-        ) * 0.62;
-        const lateralSupport = fibre.width * 1.65 -
-            Math.abs(across - centre);
-        const fibrePlanSupport = Math.min(
-            longitudinalSupport,
-            lateralSupport,
-            planSupport + 0.012,
-        );
-        const fibreVerticalSupport = verticalRadius -
-            Math.abs(y - altitude);
-        embeddedFibreSupport = Math.max(
-            embeddedFibreSupport,
-            smoothMinimumC2(
-                fibrePlanSupport,
-                fibreVerticalSupport,
-                0.0012,
-            ),
-        );
-        coherentFibreWeight = Math.max(
-            coherentFibreWeight,
-            Math.exp(-normalizedDistance * normalizedDistance * 0.5) *
-                Math.exp(-(
-                    (
-                        (y - altitude) /
-                        Math.max(0.002, verticalRadius)
-                    ) ** 2
-                ) * 0.5) *
-                finiteEnvelope * fibre.strength,
-        );
-    }
-    const sheetSupport = Math.min(planSupport, verticalSupport);
-    const support = Math.max(sheetSupport, embeddedFibreSupport);
+    const support = Math.min(planSupport, verticalSupport);
     // R is condensate owned by the parent shield only. Virga, rain, and snow
     // are emitted by parent-linked hydrometeor domains and never unioned into
     // this density field.
@@ -10377,42 +10021,10 @@ const evaluateSheetModel = (model, config, x, y, z, seed) => {
     const micro = (
         fbm3(x * 8.1 + 3, y * 7.4 - 2, z * 8.5 + 6, seed + 2671) - 0.5
     ) * mix(
-        cirrostratus ? 0.0015 : 0.002,
-        config.variant === "stratus" ? 0.013 : cirrostratus ? 0.004 : 0.007,
+        0.002,
+        config.variant === "stratus" ? 0.013 : 0.007,
         boundary,
     );
-    const nebulousVariation = clamp(
-        0.97 +
-        Math.sin(
-            normalizedAlong * Math.PI * 0.71 +
-            normalizedAcross * Math.PI * 0.43 +
-            model.fibrePhase,
-        ) * 0.035 +
-        Math.sin(
-            normalizedAlong * Math.PI * 1.19 -
-            normalizedAcross * Math.PI * 0.67 -
-            model.fibrePhase * 0.58,
-        ) * 0.022,
-        0.88,
-        1.05,
-    );
-    const fibrousStriation = cirrostratus
-        ? cirrostratusFibratus
-            ? mix(
-                0.70,
-                1.18,
-                clamp(
-                    coherentFibreWeight * 0.82 +
-                    fbm3(
-                        normalizedAlong * 1.7,
-                        y * 2.2,
-                        normalizedAcross * 1.4,
-                        seed + 2693,
-                    ) * 0.26,
-                ),
-            )
-            : nebulousVariation
-        : 1;
     const shieldVariation = altostratus
         ? mix(0.78, 1.05, fbm3(along * 2.4, y * 2.8, across * 2.1, seed + 2719))
         : config.variant === "nimbostratus"
@@ -10422,9 +10034,9 @@ const evaluateSheetModel = (model, config, x, y, z, seed) => {
                 : 1;
     const density = smoothstep(
         -0.006,
-        cirrostratus ? 0.013 : 0.025,
+        0.025,
         support + micro,
-    ) * config.densityScale * fibrousStriation * shieldVariation *
+    ) * config.densityScale * shieldVariation *
         // Droplet density increases toward the inversion/top of a mature
         // Stratus deck. This profile has unit integral over [0, 1]
         // (0.74 + 0.572 / 2.2 = 1), so it redistributes condensate vertically
@@ -10436,10 +10048,8 @@ const evaluateSheetModel = (model, config, x, y, z, seed) => {
             )
             : 1);
     const normalizedHeight = clamp((y - lower) / Math.max(0.001, upper - lower));
-    const phase = cirrostratus
-        ? 1
-        : altostratus
-            ? mix(0.16, 0.72, smoothstep(0.10, 0.92, normalizedHeight))
+    const phase = altostratus
+        ? mix(0.16, 0.72, smoothstep(0.10, 0.92, normalizedHeight))
             : config.variant === "nimbostratus"
                 ? mix(
                     precipitation > 0.05 ? 0.18 : 0.28,
@@ -10624,7 +10234,7 @@ const buildFoundationFragmentModel = (config, seed) => {
 
 const buildMacroModel = (config, seed) => {
     switch (config.builder) {
-        case "cumulus": return buildCumulusModel(config, seed);
+        case "cumulus": return buildAuthoredCumulusModel(config);
         case "cumulonimbus": return buildCumulonimbusModel(config, seed);
         case "ice-streamer": return buildIceStreamerModel(config, seed);
         case "cellular": return config.foundationProfile
@@ -10634,7 +10244,10 @@ const buildMacroModel = (config, seed) => {
             ? buildFoundationWaveLensModel(config, seed)
             : buildWaveLensModel(config, seed);
         case "roll": return buildRollModel(config, seed);
-        case "sheet": return buildSheetModel(config, seed);
+        case "sheet": return config.variant === "cirrostratus" ||
+            config.variant === "cirrostratus-fibratus"
+            ? buildCirrostratusModel(config, seed)
+            : buildSheetModel(config, seed);
         case "fragment": return config.foundationProfile
             ? buildFoundationFragmentModel(config, seed)
             : buildFragmentModel(config, seed);
@@ -10648,6 +10261,8 @@ const evaluateMacroModel = (model, config, x, y, z, seed) => {
         case "primitive": return evaluatePrimitiveModel(model, config, x, y, z, seed);
         case "wave-lens": return evaluateWaveLensModel(model, config, x, y, z, seed);
         case "roll": return evaluateRollModel(model, config, x, y, z, seed);
+        case "cirrostratus-iwc": return evaluateCirrostratusModel(
+            model, config, x, y, z, seed);
         case "sheet": return evaluateSheetModel(model, config, x, y, z, seed);
         default: return evaluateModel(model, config, x, y, z, seed);
     }
@@ -12319,7 +11934,11 @@ const qualifyAperiodicReconstructibleFamily = (
             statistics.reconstructionScale4ConnectedComponentCount < 3 ||
             statistics.reconstructionScale2LargestComponentFraction > 0.38 ||
             statistics.reconstructionScale4LargestComponentFraction > 0.60) {
-            fail("thin grain packet loses resolved inter-grain clear air under reconstruction");
+            fail("thin grain packet loses resolved inter-grain clear air under reconstruction: " +
+                `components2=${statistics.reconstructionScale2ConnectedComponentCount}, ` +
+                `components4=${statistics.reconstructionScale4ConnectedComponentCount}, ` +
+                `largest2=${statistics.reconstructionScale2LargestComponentFraction}, ` +
+                `largest4=${statistics.reconstructionScale4LargestComponentFraction}`);
         }
         if (statistics.projectedTwoAxisPeriodicScore >= 0.07) {
             fail("thin grain packet contains a two-axis repeated lattice");
@@ -12449,18 +12068,20 @@ const qualifyAperiodicReconstructibleFamily = (
         }
     }
     if (config.id === "cs-veil" || config.id === "cs-fibratus") {
-        if (statistics.cirrostratusSurfaceModeCount !== 4 ||
-            statistics.cirrostratusThicknessModeCount !== 3) {
-            fail("cirrostratus regressed to a planar constant-thickness slab");
+        if (Math.abs(statistics.cirrostratusIwcSpectrumSlope + 5 / 3) > 1e-6 ||
+            statistics.cirrostratusIwcDistribution !== "bounded-lognormal" ||
+            statistics.cirrostratusVerticalProfile !==
+                "rounded-isosceles-trapezoid") {
+            fail("cirrostratus lost its stochastic scale-invariant IWC field");
         }
         if (config.id === "cs-veil" &&
-            statistics.cirrostratusEmbeddedFibreBundleCount !== 0) {
-            fail("the nebulous veil contains authored fibre ribbons");
+            statistics.cirrostratusFilamentContrast !== 0) {
+            fail("the nebulous veil contains sedimentation filaments");
         }
         if (config.id === "cs-fibratus" &&
-            (statistics.cirrostratusEmbeddedFibreBundleCount !== 8 ||
-                statistics.cirrostratusFibreAltitudeSpread < 0.10)) {
-            fail("fibratus lacks finite fibre bundles distributed through sheet depth");
+            (statistics.cirrostratusFilamentContrast < 0.5 ||
+                statistics.cirrostratusShearMagnitude < 0.14)) {
+            fail("fibratus lacks sheared stochastic sedimentation filaments");
         }
     }
     if (config.builder === "ice-streamer" && config.variant === "fibratus") {
@@ -14476,10 +14097,7 @@ export const generateCloudMacroAtlas = ({
                 tetrahedralCongestus: protectedCuReconstructionScale === 1,
             });
             ({ density, detail, phase, precipitation, occupied } = sampled);
-            topologyCleanup = (
-                config.builder === "cumulus" ||
-                (foundationProfile && config.topologyPolicy === "single-connected")
-            )
+            topologyCleanup = config.topologyPolicy === "single-connected"
                 ? retainLargestConnectedComponent(
                     occupied,
                     density,
@@ -14860,14 +14478,18 @@ export const generateCloudMacroAtlas = ({
                 model.cellularTopology?.verticalScaleRange?.[0] ?? 0,
             cellularMaximumVerticalScale:
                 model.cellularTopology?.verticalScaleRange?.[1] ?? 0,
-            cirrostratusSurfaceModeCount:
-                model.sheetSurfaceModeCount ?? 0,
-            cirrostratusThicknessModeCount:
-                model.sheetThicknessModeCount ?? 0,
-            cirrostratusEmbeddedFibreBundleCount:
-                model.embeddedFibreBundleCount ?? 0,
-            cirrostratusFibreAltitudeSpread:
-                model.fibreAltitudeSpread ?? 0,
+            cirrostratusIwcSpectrumSlope:
+                model.kind === "cirrostratus-iwc" ? model.spectrumSlope : 0,
+            cirrostratusIwcDistribution:
+                model.kind === "cirrostratus-iwc" ? model.iwcDistribution : null,
+            cirrostratusVerticalProfile:
+                model.kind === "cirrostratus-iwc" ? model.verticalProfile : null,
+            cirrostratusFilamentContrast:
+                model.kind === "cirrostratus-iwc" ? model.filamentContrast : 0,
+            cirrostratusShearMagnitude:
+                model.kind === "cirrostratus-iwc"
+                    ? Math.hypot(model.shearAlong, model.shearAcross)
+                    : 0,
             stratiformisResolvedCellCount:
                 model.stratiformisResolvedCellCount ?? 0,
             stratiformisNaturalNeighborEdgeCount:
@@ -15028,7 +14650,13 @@ export const generateCloudMacroAtlas = ({
                 lifecycle: config.lifecycle,
             },
             formation: {
-                mechanism: config.formationMechanism ?? (config.storm ? "deep-convective-detrainment" : "parcel-thermal-tree"),
+                mechanism: config.formationMechanism ?? (
+                    config.genus === "cumulus"
+                        ? "source-authored-liquid-convection"
+                        : config.storm
+                            ? "deep-convective-detrainment"
+                            : "parcel-thermal-tree"
+                ),
                 materialModel: config.materialModel ?? (config.storm ? "deep-mixed-phase" : "liquid-convective"),
                 topologyPolicy: policy,
                 boundaryModel: model.boundaryModel ??
@@ -15049,12 +14677,9 @@ export const generateCloudMacroAtlas = ({
                     (config.species === "congestus" || config.genus === "cumulonimbus")
                     ? {
                         material: "lower-liquid-updraft",
-                        roles: config.species === "congestus"
-                            ? ["root", "thermal-mass"]
-                            : ["root", "thermal-mass", "feeder-thermal", "thermal-junction"],
                         ...(config.species === "congestus" ? {
                             authoredSelection:
-                                "source roots plus first dominant thermal head; communicating necks entrain",
+                                "connected source-authored lower updraft",
                         } : {}),
                         maximumIceFraction: 0.42,
                     }

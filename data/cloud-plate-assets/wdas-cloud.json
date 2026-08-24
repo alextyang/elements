@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "source": "Walt Disney Animation Studios Cloud Data Set",
+  "url": "https://assets.disneyanimation.com/wdas_cloud.zip",
+  "archiveByteLength": 2968485941,
+  "archiveSha256": "f7cf130e17b366a08ed038865277ed67dc76f87d1fa6effd21b76aa7294cdccd",
+  "license": "CC-BY-SA-3.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+  "attribution": "Copyright 2017 Disney Enterprises, Inc.; cloud reference by Kevin Udy",
+  "assets": [
+    {
+      "id": "wdas-cloud-eighth",
+      "quality": "canary",
+      "entry": "wdas_cloud/wdas_cloud_eighth.vdb",
+      "byteLength": 10032545,
+      "vdbSha256": "e067404d3775f80a3bd3264f26c93cbe341d3da026cc8f7bfdcd2b23d780df41"
+    },
+    {
+      "id": "wdas-cloud-quarter",
+      "quality": "review",
+      "entry": "wdas_cloud/wdas_cloud_quarter.vdb",
+      "byteLength": 68366243,
+      "vdbSha256": "279efd7566f4f8f3d05a1cb4529b7e903d64a6b4e91c2edce5824b9b5c9f722a"
+    },
+    {
+      "id": "wdas-cloud-half",
+      "quality": "production",
+      "entry": "wdas_cloud/wdas_cloud_half.vdb",
+      "byteLength": 491820521,
+      "vdbSha256": "2e309dee0e0bef7d0c096b72174e3c593ed6cc400c3d3fec47e47878668bcc5f"
+    }
+  ]
+}

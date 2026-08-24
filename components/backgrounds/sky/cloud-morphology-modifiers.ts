@@ -10,7 +10,7 @@ import type {
     UpperParticleComposition,
 } from "./upper-atmospheric-cloud-foundation";
 export const CLOUD_MORPHOLOGY_MODIFIER_MANIFEST_URL =
-    "/assets/sky/cloud-morphology-modifiers-v1.json";
+    "/assets/sky/cloud-morphology-modifiers-v1.json?abi=logical-topology-owner-v2";
 export const CLOUD_MORPHOLOGY_TEXTURE_WIDTH = 256;
 /** 256 rgba32float texels; naturally satisfies WebGPU's 256-byte row alignment. */
 export const CLOUD_MORPHOLOGY_BYTES_PER_ROW =
@@ -1040,22 +1040,30 @@ export function validateCloudMorphologyModifierManifest(
     if (manifest.schema !== "elements-cloud-morphology-modifiers" || manifest.version !== 1) {
         throw new Error(`Unsupported cloud morphology modifiers ${manifest.schema}@${manifest.version}`);
     }
-    if (
-        manifest.modifiers?.length !== CLOUD_MORPHOLOGY_MODIFIER_IDS.length ||
-        manifest.rendererContract === null ||
+    const contractFailures = [
+        manifest.modifiers?.length !== CLOUD_MORPHOLOGY_MODIFIER_IDS.length
+            ? "modifier-count" : "",
+        manifest.rendererContract == null ? "renderer-contract" : "",
         Object.entries(CLOUD_LOGICAL_TOPOLOGY_CONNECTIVITY_CODES).some(
             ([connectivity, code]) =>
                 manifest.logicalTopologyConnectivityCodes?.[
                     connectivity as CloudTopologyConnectivity
                 ] !== code,
-        ) ||
+        ) ? "connectivity-codes" : "",
         manifest.logicalTopologyOwnerWordLayout?.cellularClosure?.[0] !== 27 ||
-        manifest.logicalTopologyOwnerWordLayout?.cellularClosure?.[1] !== 5 ||
-        !/^[0-9a-f]{64}$/.test(manifest.checksums?.payload ?? "") ||
-        manifest.compositionOrder.join(",") !==
+            manifest.logicalTopologyOwnerWordLayout?.cellularClosure?.[1] !== 5
+            ? "owner-word-layout" : "",
+        !/^[0-9a-f]{64}$/.test(manifest.checksums?.payload ?? "")
+            ? "payload-checksum" : "",
+        manifest.compositionOrder?.join(",") !==
             "placement,warp,subtract,smooth-union,reuse,optical"
-    ) {
-        throw new Error("Cloud morphology manifest has an incompatible operator contract");
+            ? "composition-order" : "",
+    ].filter(Boolean);
+    if (contractFailures.length) {
+        throw new Error(
+            `Cloud morphology manifest has an incompatible operator contract: ${
+                contractFailures.join(", ")}`,
+        );
     }
     const expectedIds = new Set<string>(CLOUD_MORPHOLOGY_MODIFIER_IDS);
     const ids = new Set<string>();

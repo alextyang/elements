@@ -23,8 +23,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import sharp from 'sharp';
 
 import {
-  HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT,
-  evaluateHighCloudPreviewImage,
+  CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT,
+  evaluateCloudPreviewImage,
   measureCloudPreviewImage,
 } from './lib/cloud-preview-image-qualification.mjs';
 
@@ -175,8 +175,9 @@ function entryImagePath(entry) {
 }
 
 function accepted(entry) {
-  const status = firstString(entry, ['status', 'acceptance.status', 'qualification.status']);
-  return !status || /^(accepted|complete|completed|published)$/i.test(status);
+  return entry?.qualification?.schemaVersion === 1 &&
+    entry.qualification.gate === 'artifact-texture' &&
+    entry.qualification.state === 'accepted';
 }
 
 function command(command, args, timeout = 30_000) {
@@ -244,6 +245,8 @@ function validateManifest(manifest, atlas, catalogue) {
   addCheck('manifest declares the exact complete catalogue size', manifest.total === CATALOGUE_COUNT, { expected: CATALOGUE_COUNT, actual: manifest.total });
   addCheck('manifest completed count equals published entries', manifest.completed === entries.length, { completed: manifest.completed, entryCount: entries.length });
   addCheck('manifest cannot publish more than its public catalogue', entries.length <= CATALOGUE_COUNT, { entryCount: entries.length, catalogueCount: CATALOGUE_COUNT });
+  addCheck('manifest uses the strict qualified schema', manifest.schemaVersion === 2, { schemaVersion: manifest.schemaVersion });
+  addCheck('manifest declares the single production camera', manifest.perspectiveMode === 'single-camera', { perspectiveMode: manifest.perspectiveMode });
   if (entries.length === CATALOGUE_COUNT) addCheck('complete manifest status is complete', /^(complete|completed)$/i.test(String(manifest.status)), { status: manifest.status });
   else addCheck('partial manifest is not labelled complete', !/^(complete|completed)$/i.test(String(manifest.status)), { status: manifest.status, entryCount: entries.length });
 
@@ -289,10 +292,21 @@ function validateManifest(manifest, atlas, catalogue) {
     addCheck(`entry ${index} has a public catalogue identity`, Boolean(identifier) && listedIds.has(identifier), { ...location, known: Boolean(identifier) && listedIds.has(identifier) });
     addCheck(`entry ${index} is unique`, Boolean(identifier) && !seen.has(identifier), location);
     if (identifier) seen.add(identifier);
+    addCheck(`entry ${index} has explicit image qualification`, accepted(entry), { ...location, qualification: entry.qualification });
+    addCheck(`entry ${index} has explicit photographic acceptance state`,
+      entry.photographicAcceptance === 'accepted' || entry.photographicAcceptance === 'not-accepted',
+      { ...location, photographicAcceptance: entry.photographicAcceptance });
     if (!accepted(entry)) continue;
     addCheck(`accepted entry ${index} is covered by the current renderer header`, isSha256(headerRenderer), { ...location, rendererHash: headerRenderer });
     addCheck(`accepted entry ${index} is covered by the current cloud asset header`, Boolean(hasManifestAssetIdentity), { ...location, assetChecksums: manifestChecksums });
     addCheck(`accepted entry ${index} has the catalogue case identity`, Boolean(caseId) && caseId === catalogueById.get(identifier)?.caseId, { ...location, expectedCaseId: catalogueById.get(identifier)?.caseId });
+    addCheck(`accepted entry ${index} uses the catalogue camera`,
+      entry.productionPerspective === catalogueById.get(identifier)?.productionPerspective &&
+        entry.productionCameraSignature === catalogueById.get(identifier)?.productionCameraSignature,
+      { ...location, productionPerspective: entry.productionPerspective, expectedPerspective: catalogueById.get(identifier)?.productionPerspective });
+    addCheck(`accepted entry ${index} uses the catalogue image profile`,
+      entry.qualification.profile === catalogueById.get(identifier)?.imageQualificationProfile,
+      { ...location, profile: entry.qualification.profile, expectedProfile: catalogueById.get(identifier)?.imageQualificationProfile });
     addCheck(`accepted entry ${index} has a case-input content hash`, isSha256(contentHash), { ...location, contentHash });
     addCheck(`accepted entry ${index} has a full image content hash`, isSha256(imageContentHash), { ...location, imageContentHash });
     addCheck(`accepted entry ${index} uses the public immutable image URL`, imageUrlPath(imageUrl)?.startsWith('/generated/cloud-previews/images/') === true, { ...location });
@@ -370,11 +384,11 @@ async function imageMetrics(path) {
   // beauty pixels: sky, horizon, debug overlays, and overlapping bodies are
   // not separately observable through a public PNG.
   const { data, info } = await sharp(path)
-    .resize({ width: HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT.analysisWidth })
+    .resize({ width: CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT.analysisWidth })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
-  const qualification = evaluateHighCloudPreviewImage(measureCloudPreviewImage({
+  const qualification = evaluateCloudPreviewImage(measureCloudPreviewImage({
     data,
     width: info.width,
     height: info.height,
@@ -384,7 +398,7 @@ async function imageMetrics(path) {
     path,
     sha256: sha256File(path),
     dimensions: { width: info.width, height: info.height },
-    analysisWidth: HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT.analysisWidth,
+    analysisWidth: CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT.analysisWidth,
     ...qualification,
   };
 }

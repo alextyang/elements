@@ -755,6 +755,12 @@ const systemCountFor = (
         // explicit authored owners instead of being inferred from oktas.
         return 1;
     }
+    if (species === "cirrocumulus-stratiformis") {
+        // The atlas source is one complete finite gravity-wave grain packet.
+        // Repeating that packet produces visibly cloned mackerel-sky islands;
+        // coverage belongs to the packet's authored moisture domains.
+        return 1;
+    }
     if (species === "stratocumulus-stratiformis") {
         // One atlas owner is already a complete mesoscale formation. Repeating
         // it to satisfy coverage creates clone grids rather than more weather.
@@ -782,6 +788,13 @@ const systemCountFor = (
         // complete formation. A second Spissatus field must arrive as an
         // explicit authored owner, like a duplicatus veil.
         return 1;
+    }
+    if (species === "cirrocumulus-castellanus") {
+        // One atlas owner is already a complete common-base turret line. A
+        // five-owner correlated packet fills a realistic high-level sector;
+        // the generic nine-owner budget scattered unreadable miniature clones
+        // across the whole dome.
+        return 5;
     }
     if (species === "stratus-fractus") {
         return Math.min(8, 4 + Math.round(amount * 6));
@@ -1176,8 +1189,8 @@ const createSystemPlacements = (
         // ground range at the species' normal 7--9 km altitude: close enough
         // to resolve the common base, but far enough to retain sub-degree
         // elements and a believable ground-view projection.
-        : species === "cirrocumulus-castellanus" ||
-            species === "cirrocumulus-floccus" ? 0.13
+        : species === "cirrocumulus-castellanus" ? 0.13
+        : species === "cirrocumulus-floccus" ? 0.13
         // Complete uncinus and spissatus owners respectively contain a
         // hook/fallstreak family and several dense patches. The generic
         // 3.5%-of-band streamer anchor put either large finite formation almost
@@ -1839,8 +1852,11 @@ export const cloudFrameCompositionContractFor = ({
     const sheet = macroTopology === "layered-veil" ||
         macroTopology === "precipitating-sheet" ||
         macroTopology === "boundary-layer-sheet";
+    const finiteCirrostratusFront = species === "cirrostratus-fibratus" ||
+        species === "cirrostratus-nebulosus";
     const immediateOvercast = lowLayeredPlacement === "immediate-overcast" ||
-        (sheet && coverage >= 0.72 && layerIndex <= 1);
+        (sheet && coverage >= 0.72 && layerIndex <= 1 &&
+            !finiteCirrostratusFront);
     const immediateBroken = lowLayeredPlacement === "immediate-broken-field";
     const attachedFeature = isAttachedOrConvectiveFeature(classification);
     const convective = (species ?? "").startsWith("cumulus-") ||
@@ -1908,6 +1924,8 @@ const extentFor = (
     random: () => number,
     species?: Exclude<CloudSpecies, "generic">,
 ) => {
+    const cirrostratusVeil = species === "cirrostratus-fibratus" ||
+        species === "cirrostratus-nebulosus";
     const scale = compiled.geometry.elementScaleKm;
     let majorRadiusKm = Math.max(0.2, scale * (0.38 + random() * 0.32));
     let minorRadiusKm = Math.max(0.2, majorRadiusKm * (0.38 + random() * 0.34));
@@ -1915,6 +1933,18 @@ const extentFor = (
         case "layered-veil":
         case "precipitating-sheet":
         case "boundary-layer-sheet": {
+            if (cirrostratusVeil) {
+                // One observer-external synoptic swath crosses the fixed
+                // production meridian. The previous 100--170 km ellipse
+                // enclosed the observer, so each altitude slice projected as
+                // a nested dome contour. These radii retain a genuine
+                // 30--90 km frontal formation while exposing one irregular
+                // leading/trailing edge instead of a spherical shell.
+                const fibratus = species === "cirrostratus-fibratus";
+                majorRadiusKm = fibratus ? 34 : 44;
+                minorRadiusKm = fibratus ? 14 : 20;
+                break;
+            }
             const immediateDeck = layer.coverage >= 0.72;
             majorRadiusKm = immediateDeck
                 ? clamp(scale * (1.05 + layer.coverage * 0.72), 55, 320)
@@ -2025,9 +2055,18 @@ const extentFor = (
             minorRadiusKm = Math.max(0.2, majorRadiusKm * (0.30 + random() * 0.34));
             break;
         case "thermal-field":
+            // The authored source owns its normalized 3-D condensate shape;
+            // the real layer depth and finite plan span establish the species
+            // aspect ratio. Fair-weather Cu use smaller formation envelopes
+            // than deepening Congestus so neither axis flattens the source a
+            // second time.
+            const fairWeatherPlanScale = species === "cumulus-humilis"
+                ? 0.68
+                : species === "cumulus-mediocris" ? 0.82 : 1;
             majorRadiusKm = clamp(
                 scale * (0.50 + layer.coverage * 0.58) *
-                    (0.78 + random() * 0.46) * placement.sizeScale,
+                    (0.78 + random() * 0.46) * placement.sizeScale *
+                    fairWeatherPlanScale,
                 0.42,
                 6.8,
             );
@@ -2051,10 +2090,11 @@ const extentFor = (
     const sheet = compiled.macroTopology === "layered-veil" ||
         compiled.macroTopology === "precipitating-sheet" ||
         compiled.macroTopology === "boundary-layer-sheet";
-    const immediateDeck = sheet && layer.coverage >= 0.72;
+    const immediateDeck = sheet && layer.coverage >= 0.72 &&
+        !cirrostratusVeil;
     const highAperiodicField = layerIndex === 2 && !sheet &&
         compiled.macroTopology !== "deep-storm-complex";
-    const sectorAngle = placement.angle;
+    const sectorAngle = cirrostratusVeil ? 0 : placement.angle;
     const orientationJitter = compiled.macroTopology === "ice-streamer-field"
         ? 0.13
         : compiled.macroTopology === "deep-storm-complex"
@@ -2062,8 +2102,12 @@ const extentFor = (
             : compiled.macroTopology === "cellular-cloudlet-field"
                 ? 0.76
                 : compiled.macroTopology === "layered-veil" ? 0.16 : 0.48;
-    const orientation = layer.windDirection +
-        (random() - 0.5) * orientationJitter;
+    const orientation = cirrostratusVeil
+        // The broad front axis crosses the sole production meridian; its
+        // stochastic atlas field and shear, not camera-facing billboarding,
+        // own every local filament and boundary irregularity.
+        ? 0
+        : layer.windDirection + (random() - 0.5) * orientationJitter;
     const boundaryTransitionKm = clamp(
         Math.min(majorRadiusKm, minorRadiusKm) *
             (0.16 + compiled.geometry.supportBandFraction * 0.42),
@@ -2078,7 +2122,11 @@ const extentFor = (
             : layerIndex === 0 && compiled.macroTopology === "fragment-field"
                     ? [0.12, 1.02] as const
             : compiled.macroTopology === "thermal-field"
-                ? [0.62, 1.92] as const
+                ? species === "cumulus-humilis"
+                    ? [0.20, 0.84] as const
+                    : species === "cumulus-mediocris"
+                        ? [0.32, 1.12] as const
+                        : [0.62, 1.92] as const
             : highAperiodicField ? [0.015, 1.82] as const
                 : [0.62, 1.72] as const;
     const minimumClearance = compiled.macroTopology === "thermal-field"
@@ -2113,6 +2161,13 @@ const extentFor = (
                         : majorRadiusKm * 1.2
                 : compiled.macroTopology === "deep-storm-complex"
                     ? majorRadiusKm * 1.18
+                    : cirrostratusVeil
+                        ? orientedEllipseRadialBoundaryKm(
+                            sectorAngle,
+                            majorRadiusKm,
+                            minorRadiusKm,
+                            orientation,
+                        ) + boundaryTransitionKm * 1.08
                     : sheet ? majorRadiusKm * 1.12
                         : majorRadiusKm * 0.95;
     const ordinaryRangeKm = clamp(
@@ -2123,9 +2178,11 @@ const extentFor = (
     // Seven/eight-okta sheets are physically immediate ceilings. Their finite
     // shield contains the observer; partial sheets remain remote banks whose
     // trailing boundary cannot masquerade as overhead cloud.
-    const rangeKm = immediateDeck
-        ? Math.max(0.8, minorRadiusKm * lerp(0.16, 0.52, placement.rangeScale))
-        : ordinaryRangeKm;
+    const rangeKm = cirrostratusVeil
+        ? minorRadiusKm + (species === "cirrostratus-fibratus" ? 7.5 : 4)
+        : immediateDeck
+            ? Math.max(0.8, minorRadiusKm * lerp(0.16, 0.52, placement.rangeScale))
+            : ordinaryRangeKm;
     // This is a fixed Earth-local world bearing, not a camera frustum. Camera
     // orbit therefore reveals and occludes systems naturally.
     const centerEastKm = Math.sin(sectorAngle) * rangeKm;
@@ -3281,9 +3338,9 @@ const buildLayerSystems = (
         // topology exemplar so it remains stable in world space and cannot
         // change with the camera or frame clock.
         const cumulusVerticalPhenotypes = species === "cumulus-humilis"
-            ? [0.72, 0.90, 1.06]
+            ? [0.92, 1.00, 1.08]
             : species === "cumulus-mediocris"
-                ? [0.74, 0.96, 1.18]
+                ? [0.90, 1.00, 1.12]
                 : [1.18, 1.12, 0.82];
         const cumulusHorizontalPhenotypes = species === "cumulus-humilis"
             ? [1.17, 1.03, 0.91]
@@ -3376,8 +3433,10 @@ const buildLayerSystems = (
         const cumulusLifecycleOffsets = species === "cumulus-congestus"
             ? [0, -0.12, 0.12]
             : [-0.12, 0, 0.11];
+        // An authored owner is an exact physical phenotype. Lifecycle age
+        // variation belongs only to runtime-generated populations.
         const unconstrainedLifecycleProgress = layer.lifecycle +
-            (generatedCumulus
+            (authored ? 0 : generatedCumulus
                 ? cumulusLifecycleOffsets[topologyExemplar.ordinal] +
                     (seeds[2] - 0.5) * 0.16
                 : (seeds[2] - 0.5) * 0.12);
@@ -3501,7 +3560,10 @@ const buildLayerSystems = (
                 // retain their independently sampled spans.
                 formationScale: placements[populationIndex].sizeScale,
             } : {}),
-            ...(authored ? { preserveAuthoredManifold: true } : {}),
+            ...(authored || species === "cirrostratus-fibratus" ||
+                species === "cirrostratus-nebulosus"
+                ? { preserveAuthoredManifold: true }
+                : {}),
             ...(morphologyAssignment?.sourceId ? {
                 specialOriginSource: specialOriginSources.get(
                     morphologyAssignment.sourceId,

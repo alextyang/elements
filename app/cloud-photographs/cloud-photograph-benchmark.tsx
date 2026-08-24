@@ -158,6 +158,8 @@ const Render = ({
     benchmark,
     debugView,
     ready,
+    cloudTimeOffset = 0,
+    cloudPlateManifestUrl,
     paused = false,
     onVisualChange,
     onRendererStats,
@@ -165,13 +167,20 @@ const Render = ({
     benchmark: CloudPhotographCase;
     debugView: SkyDebugView;
     ready: boolean;
+    cloudTimeOffset?: number;
+    cloudPlateManifestUrl?: string;
     paused?: boolean;
     onVisualChange?: (snapshot: SkySnapshot) => void;
     onRendererStats?: (stats: SkyRendererStats) => void;
 }) => {
     const preview = useMemo(
-        () => ({ ...benchmark.preview, rendererDebugView: debugView }),
-        [benchmark.preview, debugView],
+        () => ({
+            ...benchmark.preview,
+            rendererDebugView: debugView,
+            cloudTimeOffset,
+            cloudPlateManifestUrl,
+        }),
+        [benchmark.preview, cloudPlateManifestUrl, debugView, cloudTimeOffset],
     );
     return (
         <div
@@ -264,6 +273,11 @@ export function CloudPhotographBenchmark() {
     const matrixGeneration = requestedMatrixGeneration === null
         ? undefined : Number(requestedMatrixGeneration);
     const requestedProductionPerspective = search.get("productionPerspective");
+    const requestedCloudTimeOffset = Number(search.get("cloudTimeOffset") ?? 0);
+    const cloudTimeOffset = Number.isFinite(requestedCloudTimeOffset)
+        ? requestedCloudTimeOffset : 0;
+    const cloudPlateManifestUrl =
+        search.get("cloudPlateManifest")?.trim() || undefined;
     const productionPerspective = approvedProductionPerspectiveId(
         requestedProductionPerspective,
     ) ?? DEFAULT_PRODUCTION_PERSPECTIVE_ID;
@@ -313,6 +327,9 @@ export function CloudPhotographBenchmark() {
     }>();
     const [cloudLightResult, setCloudLightResult] =
         useState<CloudLightVolumeReadiness>();
+    const [cloudPlatePlayback, setCloudPlatePlayback] = useState<
+        "loading" | "ready" | "failed" | undefined
+    >();
     const [captureShutdown, setCaptureShutdown] = useState(false);
     // Reset the parent-owned qualification state before Sky's passive effect
     // publishes the new visual snapshot. A passive reset can run after the
@@ -324,6 +341,7 @@ export function CloudPhotographBenchmark() {
         setVisualResult(undefined);
         setRendererResult(undefined);
         setCloudLightResult(undefined);
+        setCloudPlatePlayback(undefined);
     }, [benchmark.id, matrixGeneration, productionPerspective]);
 
     useEffect(() => {
@@ -352,6 +370,31 @@ export function CloudPhotographBenchmark() {
         }, 0);
         return () => window.clearTimeout(timer);
     }, [captureShutdown, matrixGeneration]);
+
+    useEffect(() => {
+        if (!cloudPlateManifestUrl) {
+            setCloudPlatePlayback(undefined);
+            return;
+        }
+        const readCloudPlatePlayback = () => {
+            const canvas = document.querySelector<HTMLCanvasElement>(
+                '[data-benchmark-render] canvas[data-sky-renderer="webgpu"]',
+            );
+            if (!canvas || canvas.dataset.cloudSceneKey !== benchmark.id) return;
+            const value = canvas.dataset.cloudPlatePlayback;
+            setCloudPlatePlayback(value === "ready" || value === "failed"
+                ? value : "loading");
+        };
+        readCloudPlatePlayback();
+        const observer = new MutationObserver(readCloudPlatePlayback);
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["data-cloud-plate-playback", "data-cloud-scene-key"],
+            childList: true,
+            subtree: true,
+        });
+        return () => observer.disconnect();
+    }, [benchmark.id, cloudPlateManifestUrl]);
 
     useEffect(() => {
         const readCloudLightVolume = () => {
@@ -617,7 +660,7 @@ export function CloudPhotographBenchmark() {
         if (!next.sceneKey) return;
         setRendererResult({ caseId: next.sceneKey, stats: next });
     }, []);
-    const renderReady = Boolean(
+    const liveTransportReady = Boolean(
         snapshot &&
         rendererStats?.backend === "webgpu" &&
         !rendererStats.lastError &&
@@ -637,7 +680,15 @@ export function CloudPhotographBenchmark() {
             rendererStats.occupiedSkyFraction > minimumOccupiedSky
         ))
     );
-    const readinessState = !snapshot
+    const cloudPlateReady = Boolean(
+        snapshot &&
+        rendererStats?.backend === "webgpu" &&
+        !rendererStats.lastError &&
+        cloudPlatePlayback === "ready"
+    );
+    const renderReady = cloudPlateManifestUrl
+        ? cloudPlateReady : liveTransportReady;
+    const liveReadinessState = !snapshot
         ? "scene"
         : !rendererStats
             ? "renderer"
@@ -669,6 +720,16 @@ export function CloudPhotographBenchmark() {
                                                 : !reconstructionMature
                                                     ? "reconstruction"
                                                     : "ready";
+    const readinessState = cloudPlateManifestUrl
+        ? !snapshot
+            ? "scene"
+            : !rendererStats
+                ? "renderer"
+                : rendererStats.backend !== "webgpu" || rendererStats.lastError ||
+                    cloudPlatePlayback === "failed"
+                    ? "failed"
+                    : cloudPlatePlayback === "ready" ? "ready" : "plate-loading"
+        : liveReadinessState;
     const rendererFailure = rendererStats?.lastError;
     useEffect(() => {
         if (mode !== "render" || captureShutdown ||
@@ -792,6 +853,8 @@ export function CloudPhotographBenchmark() {
                     benchmark={benchmark}
                     debugView={debugView}
                     ready={renderReady}
+                    cloudTimeOffset={cloudTimeOffset}
+                    cloudPlateManifestUrl={cloudPlateManifestUrl}
                     paused
                     onVisualChange={handleVisualChange}
                     onRendererStats={handleRendererStats}
@@ -803,6 +866,7 @@ export function CloudPhotographBenchmark() {
                 data-cloud-debug-view={debugView}
                 data-cloud-render-state={readinessState}
                 data-cloud-render-failure={rendererFailure ?? "none"}
+                data-cloud-plate-playback={cloudPlatePlayback ?? "unavailable"}
                 data-cloud-projected-opacity={finiteDataNumber(rendererStats?.projectedOpacity)}
                 data-cloud-occupied-sky={finiteDataNumber(rendererStats?.occupiedSkyFraction)}
                 data-cloud-minimum-occupied-sky={minimumOccupiedSky}
@@ -901,13 +965,13 @@ export function CloudPhotographBenchmark() {
             <section className={styles.viewer}>
                 {mode === "overlay" ? (
                     <div className={styles.overlay}>
-                        <Render benchmark={benchmark} debugView={debugView} ready={renderReady} onVisualChange={handleVisualChange} onRendererStats={handleRendererStats} />
+                        <Render benchmark={benchmark} debugView={debugView} ready={renderReady} cloudPlateManifestUrl={cloudPlateManifestUrl} onVisualChange={handleVisualChange} onRendererStats={handleRendererStats} />
                         <div className={styles.overlayReference} style={{ opacity: overlayOpacity }}><Reference benchmark={benchmark} /></div>
                     </div>
                 ) : (
                     <div className={styles.pair}>
                         <figure><Reference benchmark={benchmark} /><figcaption>WMO photographic morphology target</figcaption></figure>
-                        <figure><Render benchmark={benchmark} debugView={debugView} ready={renderReady} onVisualChange={handleVisualChange} onRendererStats={handleRendererStats} /><figcaption>Labeled renderer qualification state</figcaption></figure>
+                        <figure><Render benchmark={benchmark} debugView={debugView} ready={renderReady} cloudPlateManifestUrl={cloudPlateManifestUrl} onVisualChange={handleVisualChange} onRendererStats={handleRendererStats} /><figcaption>Labeled renderer qualification state</figcaption></figure>
                     </div>
                 )}
             </section>

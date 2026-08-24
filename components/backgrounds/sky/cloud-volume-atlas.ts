@@ -85,7 +85,7 @@ export type CloudMacroGenus =
     | "stratocumulus" | "stratus" | "cumulus" | "cumulonimbus";
 
 export type CloudMacroFormationMechanism =
-    | "parcel-thermal-tree"
+    | "source-authored-liquid-convection"
     | "deep-convective-detrainment"
     | "sheared-ice-sedimentation"
     | "elevated-convective-ice"
@@ -95,11 +95,12 @@ export type CloudMacroFormationMechanism =
     | "orographic-wave-condensation"
     | "horizontal-roll-circulation"
     | "inversion-bounded-deck"
-    | "boundary-layer-fragmentation";
+    | "boundary-layer-fragmentation"
+    | "stochastic-ice-veil";
 
 /** Exhaustive finite ABI shared by manifest validation and GPU packing. */
 export const CLOUD_MACRO_FORMATION_CODE = {
-    "parcel-thermal-tree": 1,
+    "source-authored-liquid-convection": 1,
     "deep-convective-detrainment": 2,
     "sheared-ice-sedimentation": 3,
     "elevated-convective-ice": 4,
@@ -110,6 +111,7 @@ export const CLOUD_MACRO_FORMATION_CODE = {
     "horizontal-roll-circulation": 9,
     "inversion-bounded-deck": 10,
     "boundary-layer-fragmentation": 11,
+    "stochastic-ice-veil": 12,
 } as const satisfies Readonly<Record<CloudMacroFormationMechanism, number>>;
 
 export type CloudMacroTopologyPolicy =
@@ -162,6 +164,7 @@ export interface CloudMacroVolumeEntry {
             | "soliton-envelope"
             | "sheared-fiber-bundles"
             | "finite-envelope-prior-3d-lognormal-fractal-iwc-excursion"
+            | "source-authored-volumetric-condensate"
             | "domain-warped-formation-primitives";
         stratocumulusOrganization?: {
             regime: StratocumulusStratiformisOrganizationRegime;
@@ -169,11 +172,15 @@ export interface CloudMacroVolumeEntry {
             supportConstruction: "generated-material-manifold";
             postDensityMaskWeight: 0;
         };
-        protectedConnectedCore: {
+        protectedConnectedCore: ({
             material: "lower-liquid-updraft";
             roles: ("root" | "thermal-mass" | "feeder-thermal" | "thermal-junction")[];
             maximumIceFraction: number;
-        } | null;
+        } | {
+            material: "lower-liquid-updraft";
+            authoredSelection: "connected source-authored lower updraft";
+            maximumIceFraction: number;
+        }) | null;
     };
     index: number;
     seed: number;

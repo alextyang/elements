@@ -14,13 +14,13 @@ import test from "node:test";
 import sharp from "sharp";
 
 import {
-    HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT,
+    CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT,
     cloudMaskFromCoverage,
-    evaluateHighCloudPreviewImage,
+    evaluateCloudPreviewImage,
     measureCloudPreviewImage,
 } from "./lib/cloud-preview-image-qualification.mjs";
 import {
-    qualifyCloudPreviewPair,
+    qualifyCloudPreviewImage,
     retainRejectedCloudPair,
 } from "./generate-cloud-previews.mjs";
 
@@ -71,7 +71,7 @@ test("screen-wide radial bands fail the final high-cloud image gate", () => {
         const base = 126 + y * 0.35 + band;
         return [base * 0.66, base * 0.84, base];
     });
-    const result = evaluateHighCloudPreviewImage(
+    const result = evaluateCloudPreviewImage(
         measureCloudPreviewImage(pixels));
     assert.ok(result.metrics.radialExplainedCoverage > 0.45);
     assert.equal(result.radialArtifact, true);
@@ -89,7 +89,7 @@ test("localized radial foreground does not impersonate screen-wide bands", () =>
             ? [value, value, value]
             : [value * 0.67, value * 0.84, value];
     });
-    const result = evaluateHighCloudPreviewImage(
+    const result = evaluateCloudPreviewImage(
         measureCloudPreviewImage(pixels));
     assert.ok(result.metrics.radialExplainedVariance > 0.45);
     assert.ok(result.metrics.radialExplainedCoverage < 0.02);
@@ -100,7 +100,7 @@ test("rejected spissatus canary has localized rather than broad radial evidence"
     async () => {
         const metrics = await measureFixture(
             "rejected-ci-spissatus-canary.png");
-        const result = evaluateHighCloudPreviewImage(metrics);
+        const result = evaluateCloudPreviewImage(metrics);
         assert.ok(Math.abs(
             metrics.radialExplainedVariance - 0.24666709486656396,
         ) < 1e-12);
@@ -109,7 +109,7 @@ test("rejected spissatus canary has localized rather than broad radial evidence"
         ) < 1e-12);
         assert.ok(
             metrics.radialExplainedCoverage <
-                HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT
+                CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT
                     .minimumRadialExplainedCoverage,
         );
         assert.equal(result.radialArtifact, false);
@@ -119,7 +119,7 @@ test("real screen-wide spissatus bands retain broad radial evidence",
     async () => {
         const metrics = await measureFixture(
             "banded-ci-spissatus-canary.png");
-        const result = evaluateHighCloudPreviewImage(metrics);
+        const result = evaluateCloudPreviewImage(metrics);
         assert.ok(Math.abs(
             metrics.radialExplainedVariance - 0.26242569881580424,
         ) < 1e-12);
@@ -128,7 +128,7 @@ test("real screen-wide spissatus bands retain broad radial evidence",
         ) < 1e-12);
         assert.ok(
             metrics.radialExplainedCoverage >=
-                HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT
+                CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT
                     .minimumRadialExplainedCoverage,
         );
         assert.equal(result.radialArtifact, true);
@@ -144,11 +144,11 @@ test("a smooth analytic plate without internal detail fails structure", () => {
         const lift = inside ? 48 : 0;
         return [sky * 0.68 + lift, sky * 0.85 + lift, sky + lift];
     });
-    const result = evaluateHighCloudPreviewImage(
+    const result = evaluateCloudPreviewImage(
         measureCloudPreviewImage(pixels));
     assert.equal(result.scaleSeparatedStructureReady, false);
     assert.equal(result.ready, false);
-    assert.equal(evaluateHighCloudPreviewImage(
+    assert.equal(evaluateCloudPreviewImage(
         measureCloudPreviewImage(pixels), {
             requireScaleSeparatedStructure: false,
         }).ready, true, "the explicit smooth-veil profile bypasses texture only");
@@ -167,7 +167,7 @@ test("smooth atmosphere with localized multiscale cloud detail is admitted", () 
             9 * Math.sin(x * 0.27 + y * 0.39));
         return [sky * 0.68 + detail, sky * 0.85 + detail, sky + detail];
     });
-    const result = evaluateHighCloudPreviewImage(
+    const result = evaluateCloudPreviewImage(
         measureCloudPreviewImage(pixels));
     assert.equal(result.radialArtifact, false);
     assert.equal(result.ready, true);
@@ -274,7 +274,7 @@ const thinFibrousFixture = () => {
 
 test("renderer matte removes radial sky evidence while preserving detailed cloud evidence", () => {
     const fixture = cloudLocalFixture({ detailed: true });
-    const result = evaluateHighCloudPreviewImage(
+    const result = evaluateCloudPreviewImage(
         measureCloudPreviewImage(fixture),
         { requireCloudMask: true },
     );
@@ -285,7 +285,7 @@ test("renderer matte removes radial sky evidence while preserving detailed cloud
 
 test("smooth radial cloud fails over a benign sky when matte localizes it", () => {
     const fixture = cloudLocalFixture({ detailed: false });
-    const result = evaluateHighCloudPreviewImage(
+    const result = evaluateCloudPreviewImage(
         measureCloudPreviewImage(fixture),
         { requireCloudMask: true },
     );
@@ -297,15 +297,15 @@ test("smooth radial cloud fails over a benign sky when matte localizes it", () =
 test("sparse smooth patches cannot pass from silhouette-only fine energy", () => {
     const fixture = sparseSmoothPatchFixture();
     const metrics = measureCloudPreviewImage(fixture);
-    const result = evaluateHighCloudPreviewImage(metrics, {
+    const result = evaluateCloudPreviewImage(metrics, {
         requireCloudMask: true,
     });
     assert.ok(metrics.cloudSupportFraction < 0.08);
     assert.ok(metrics.fineTextureFraction >=
-        HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT.minimumFineTextureFraction);
+        CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT.minimumFineTextureFraction);
     assert.ok(metrics.cloudEdgeFraction > 0.2);
     assert.ok(metrics.cloudInteriorTextureFraction <
-        HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT
+        CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT
             .minimumCloudInteriorTextureFraction);
     assert.equal(result.cloudLocalStructureReady, false);
     assert.equal(result.ready, false);
@@ -314,12 +314,12 @@ test("sparse smooth patches cannot pass from silhouette-only fine energy", () =>
 test("thin fibrous cirrus can pass with matte-normalized residual detail", () => {
     const fixture = thinFibrousFixture();
     const metrics = measureCloudPreviewImage(fixture);
-    const result = evaluateHighCloudPreviewImage(metrics, {
+    const result = evaluateCloudPreviewImage(metrics, {
         requireCloudMask: true,
     });
     assert.equal(metrics.cloudCoreSupportFraction, 0);
     assert.ok(metrics.cloudMaskResidualTextureFraction >=
-        HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT
+        CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT
             .minimumCloudMaskResidualTextureFraction);
     assert.equal(result.cloudLocalStructureReady, true);
     assert.equal(result.ready, true);
@@ -328,7 +328,7 @@ test("thin fibrous cirrus can pass with matte-normalized residual detail", () =>
 test("missing or mismatched renderer matte fails closed", () => {
     const fixture = cloudLocalFixture({ detailed: true });
     const { cloudMask: _unusedCloudMask, ...withoutMatteFixture } = fixture;
-    const withoutMatte = evaluateHighCloudPreviewImage(
+    const withoutMatte = evaluateCloudPreviewImage(
         measureCloudPreviewImage(withoutMatteFixture),
         { requireCloudMask: true },
     );
@@ -352,7 +352,7 @@ test("missing or mismatched renderer matte fails closed", () => {
     );
 });
 
-test("pair qualifier rejects missing and mismatched matte files", async () => {
+test("structured qualifier rejects missing and mismatched matte files", async () => {
     const root = mkdtempSync(join(tmpdir(), "cloud-preview-matte-contract-"));
     const finalPath = join(root, "final.png");
     const mattePath = join(root, "coverage.png");
@@ -370,11 +370,19 @@ test("pair qualifier rejects missing and mismatched matte files", async () => {
             raw: { width: 63, height: 40, channels: 3 },
         }).png().toFile(wrongMattePath);
         await assert.rejects(
-            qualifyCloudPreviewPair({ imagePath: finalPath, mattePath: join(root, "missing.png") }),
-            /requires both final image and same-case coverage matte/,
+            qualifyCloudPreviewImage({
+                imagePath: finalPath,
+                mattePath: join(root, "missing.png"),
+                profile: "artifact-and-texture",
+            }),
+            /requires a final image and same-case coverage matte/,
         );
         await assert.rejects(
-            qualifyCloudPreviewPair({ imagePath: finalPath, mattePath: wrongMattePath }),
+            qualifyCloudPreviewImage({
+                imagePath: finalPath,
+                mattePath: wrongMattePath,
+                profile: "artifact-and-texture",
+            }),
             /do not match final image/,
         );
     } finally {
@@ -413,7 +421,8 @@ test("rejected high-cloud pair is retained privately with bounded replacement", 
             qualification: { ready: false, radialArtifact: true },
             now: () => "2026-01-01T00:00:00.000Z",
         });
-        assert.match(first.destination, /rejected-high-cloud\/ci-case--a{16}$/);
+        assert.match(first.destination,
+            /rejected-image-qualification\/ci-case--a{16}$/);
         assert.equal(existsSync(join(first.destination, "final.png")), true);
         assert.equal(existsSync(join(first.destination, "coverage.png")), true);
         const rejection = JSON.parse(readFileSync(
@@ -433,7 +442,9 @@ test("rejected high-cloud pair is retained privately with bounded replacement", 
             coverageMetricsPath,
             qualification: { ready: false, matteMissing: true },
         });
-        assert.equal(readdirSync(join(root, "rejected-high-cloud")).length, 1,
+        assert.equal(readdirSync(join(
+            root, "rejected-image-qualification",
+        )).length, 1,
             "one case keeps one latest private rejection directory");
     } finally {
         rmSync(root, { recursive: true, force: true });
@@ -441,7 +452,7 @@ test("rejected high-cloud pair is retained privately with bounded replacement", 
 });
 
 test("non-finite evidence fails closed", () => {
-    const result = evaluateHighCloudPreviewImage({
+    const result = evaluateCloudPreviewImage({
         fineRms: Number.NaN,
         broadBandRms: 0,
         fineTextureFraction: 0,
@@ -457,13 +468,13 @@ test("non-finite evidence fails closed", () => {
 test("renderer-local evidence is finite and support-gated", () => {
     const fixture = thinFibrousFixture();
     const metrics = measureCloudPreviewImage(fixture);
-    const unsupported = evaluateHighCloudPreviewImage({
+    const unsupported = evaluateCloudPreviewImage({
         ...metrics,
         cloudSupportFraction: 0,
     }, { requireCloudMask: true });
     assert.equal(unsupported.cloudSupportReady, false);
     assert.equal(unsupported.ready, false);
-    const incomplete = evaluateHighCloudPreviewImage({
+    const incomplete = evaluateCloudPreviewImage({
         ...metrics,
         cloudMaskResidualRms: Number.NaN,
     }, { requireCloudMask: true });
@@ -471,21 +482,23 @@ test("renderer-local evidence is finite and support-gated", () => {
     assert.equal(incomplete.ready, false);
 });
 
-test("canonical high-cloud PNGs are qualified before capture publication", () => {
-    assert.match(captureSource, /\^\(ci\|cc\|cs\)-/);
+test("all final PNGs are qualified before capture publication", () => {
+    assert.match(captureSource, /"\$capture_debug" == "final"/);
     assert.match(captureSource, /qualify-cloud-preview-image\.mjs/);
     assert.match(captureSource,
-        /persist_capture_failure "high-cloud-image-qualification"/);
+        /persist_capture_failure "image-qualification"/);
     assert.match(captureSource,
-        /high-cloud-image-qualification"[\s\S]*rm -f "\$capture_output"/);
-    assert.match(captureSource, /cs-nebulosus-[\s\S]*--allow-smooth-veil/);
+        /image-qualification"[\s\S]*rm -f "\$capture_output"/);
+    assert.match(captureSource,
+        /CLOUD_PREVIEW_IMAGE_QUALIFICATION_PROFILE:-artifact-only/);
+    assert.doesNotMatch(captureSource, /allow-smooth-veil/);
 });
 
 test("black-box PNG checks delegate to the production qualifier and defer topology", () => {
     assert.match(blackBoxSource,
-        /HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT[\s\S]*?evaluateHighCloudPreviewImage[\s\S]*?measureCloudPreviewImage/);
+        /CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT[\s\S]*?evaluateCloudPreviewImage[\s\S]*?measureCloudPreviewImage/);
     assert.match(blackBoxSource,
-        /resize\(\{ width: HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT\.analysisWidth \}\)/);
+        /resize\(\{ width: CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT\.analysisWidth \}\)/);
     assert.match(blackBoxSource,
         /production image qualifier is ready/);
     assert.match(blackBoxSource,
@@ -552,17 +565,17 @@ test("coverage debug semantics are renderer-owned 1-T, not raw T", () => {
         height: fixture.height,
         channels: 3,
     });
-    assert.equal(evaluateHighCloudPreviewImage(
+    assert.equal(evaluateCloudPreviewImage(
         measureCloudPreviewImage({ ...fixture, cloudMask: coverage }),
         { requireCloudMask: true },
     ).ready, true);
-    assert.equal(evaluateHighCloudPreviewImage(
+    assert.equal(evaluateCloudPreviewImage(
         measureCloudPreviewImage({ ...fixture, cloudMask: invertedCoverage }),
         { requireCloudMask: true },
     ).ready, false, "raw T inverted the cloud support and must fail");
 });
 
-test("public high-cloud qualification captures final and coverage serially with bounded views", () => {
+test("public catalogue qualification gates every image and captures structured mattes", () => {
     const finalCapture = generatorSource.indexOf('debugView: "final"');
     const matteCapture = generatorSource.indexOf('debugView: "coverage"');
     assert.ok(finalCapture >= 0 && matteCapture > finalCapture);
@@ -576,14 +589,18 @@ test("public high-cloud qualification captures final and coverage serially with 
     assert.match(generatorSource,
         /timeoutMs: options\.timeoutMs,[\s\S]*signal: shutdownController\.signal/);
     assert.match(generatorSource,
-        /qualifyCloudPreviewPair\(\{[\s\S]*mattePath: coveragePath/);
+        /qualifyCloudPreviewImage\(\{[\s\S]*mattePath: coveragePath/);
     assert.match(generatorSource,
         /rmSync\(coveragePath, \{ force: true \}\)/);
     assert.match(generatorSource,
         /same case, production perspective, and camera signature/);
     assert.match(generatorSource, /retainRejectedCloudPair/);
-    assert.match(generatorSource, /rejected-high-cloud/);
+    assert.match(generatorSource, /rejected-image-qualification/);
     assert.match(generatorSource, /publicManifestPublished: false/);
     assert.doesNotMatch(generatorSource,
-        /rejected-high-cloud[\s\S]*public\/generated\/cloud-previews/);
+        /rejected-image-qualification[\s\S]*public\/generated\/cloud-previews/);
+    assert.match(generatorSource,
+        /profile: scenario\.imageQualificationProfile/);
+    assert.match(generatorSource,
+        /qualification: \{[\s\S]*gate: "artifact-texture"[\s\S]*state: "accepted"/);
 });

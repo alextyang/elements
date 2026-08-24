@@ -855,12 +855,6 @@ test("Cc, Cs, and Ci camera/source density share atlas-R support and authored RG
     const authoredSample = shaderSource.match(
         /fn cloud_high_ice_authored_sample\([\s\S]*?\n\}/,
     )?.[0] ?? "";
-    const spissatusMoment = shaderSource.match(
-        /fn cloud_spissatus_authored_second_moment\([\s\S]*?\n\}/,
-    )?.[0] ?? "";
-    const spissatusResidualVariance = shaderSource.match(
-        /fn cloud_spissatus_residual_density_variance\([\s\S]*?\n\}/,
-    )?.[0] ?? "";
     const sourceSampling = shaderSource.match(
         /fn cloud_high_ice_source_sample\([\s\S]*?fn cloud_macro_sdf_voxels/,
     )?.[0] ?? "";
@@ -888,16 +882,17 @@ test("Cc, Cs, and Ci camera/source density share atlas-R support and authored RG
         /if \(authored_source_allowed\) \{[\s\S]*?\n    \} else \{/,
     )?.[0] ?? "";
     assert.match(cameraSourceBranch,
-        /if \(species == 3\) \{[\s\S]*?cloud_resolved_high_ice_material\([\s\S]*?authored\.density/,
-        "camera Spissatus must resolve stable sub-voxel material inside the authored carrier");
-    assert.match(cameraSourceBranch, /result\.density = resolved_authored\.x/);
-    assert.match(cameraSourceBranch, /result\.detail = resolved_authored\.y/);
+        /result\.density = authored\.density/,
+        "camera transport must use the authored high-ice density directly");
     assert.match(cameraSourceBranch,
-        /cloud_spissatus_authored_second_moment\([\s\S]*?authored\.density,[\s\S]*?authored\.second_moment,[\s\S]*?result\.density/,
-        "camera Spissatus must remap authored moments to the resolved local mean");
+        /result\.high_ice_second_moment = authored\.second_moment/,
+        "camera transport must preserve authored high-ice moments");
     assert.match(cameraSourceBranch,
-        /cloud_spissatus_residual_density_variance\([\s\S]*?result\.density, authored\.coverage, sdf_voxels/,
-        "camera Spissatus must carry the residual density variance into expected Beer");
+        /result\.high_ice_residual_variance = 0\.0/,
+        "source-backed camera transport cannot add a second procedural residual");
+    assert.doesNotMatch(cameraSourceBranch,
+        /cloud_resolved_high_ice_material/,
+        "source-backed Spissatus cannot receive the legacy periodic display residual");
     assert.doesNotMatch(cameraSourceBranch,
         /cloud_morphology_cirrus_fibratus_subvoxel_density/,
         "source-backed Spissatus cannot inherit the separate Fibratus reconstruction");
@@ -911,16 +906,17 @@ test("Cc, Cs, and Ci camera/source density share atlas-R support and authored RG
         /if \(authored_source_allowed\) \{[\s\S]*?\n    \} else \{/,
     )?.[0] ?? "";
     assert.match(couplingSourceBranch,
-        /if \(species == 3\) \{[\s\S]*?cloud_resolved_high_ice_material\([\s\S]*?authored\.density/,
-        "source Spissatus must sample the same stationary sub-voxel material");
-    assert.match(couplingSourceBranch, /result\.density = resolved_authored\.x/);
-    assert.match(couplingSourceBranch, /result\.detail = resolved_authored\.y/);
+        /result\.density = authored\.density/,
+        "source transport must use the same authored high-ice density");
     assert.match(couplingSourceBranch,
-        /cloud_spissatus_authored_second_moment\([\s\S]*?authored\.density,[\s\S]*?authored\.second_moment,[\s\S]*?result\.density/,
-        "source Spissatus must use the same moment remap as the camera");
+        /result\.high_ice_second_moment = authored\.second_moment/,
+        "source transport must preserve the same authored high-ice moments");
     assert.match(couplingSourceBranch,
-        /cloud_spissatus_residual_density_variance\([\s\S]*?result\.density, authored\.coverage, sdf_voxels/,
-        "source Spissatus must expose the same residual variance to expected Beer");
+        /result\.high_ice_residual_variance = 0\.0/,
+        "source-backed coupling cannot add a second procedural residual");
+    assert.doesNotMatch(couplingSourceBranch,
+        /cloud_resolved_high_ice_material/,
+        "source-backed coupling cannot receive the legacy periodic display residual");
     assert.doesNotMatch(couplingSourceBranch,
         /cloud_morphology_cirrus_fibratus_subvoxel_density/,
         "source-backed coupling Spissatus cannot inherit the Fibratus reconstruction");
@@ -930,18 +926,10 @@ test("Cc, Cs, and Ci camera/source density share atlas-R support and authored RG
     assert.match(authoredSample,
         /let ray_length = length\(ray_direction_owner_local\)/,
         "authored correlation must project the ray in owner-local atlas axes");
-    assert.match(spissatusMoment,
-        /source_variance[\s\S]*?source_capacity[\s\S]*?mapped_variance[\s\S]*?mean \* \(1\.0 - mean\)/,
-        "Spissatus moment remapping must preserve normalized authored occupancy variance");
-    assert.match(spissatusResidualVariance,
-        /contrast_capacity = min\(mean, 1\.0 - mean\)/,
-        "procedural residual variance must collapse at both density bounds");
-    assert.match(spissatusResidualVariance,
-        /residual_rms = contrast_capacity \* 2\.0 \* local_amplitude \* 0\.22/,
-        "procedural residual variance must derive from the resolved field calibration");
-    assert.match(spissatusResidualVariance,
-        /support_probability \* residual_rms \* residual_rms/,
-        "conditional Spissatus residual energy must be converted to an unconditional source moment");
+    assert.doesNotMatch(shaderSource, /cloud_spissatus_authored_second_moment/,
+        "source-backed Spissatus cannot remap authored moments around a second density field");
+    assert.doesNotMatch(shaderSource, /cloud_spissatus_residual_density_variance/,
+        "source-backed Spissatus cannot manufacture procedural variance");
     assert.match(shaderSource, /var high_ice_owner_active = false/,
         "camera union must track whether any owner has authored source support");
     assert.match(shaderSource,
@@ -1409,7 +1397,7 @@ test("stratiform transport integrates local owner extinction at quadrature nodes
     assert.match(nodeSource,
         /cloud_fallback_diffuse_radiance\(\s*sun_optics,[\s\S]*?directional_atmosphere_phase_integral,[\s\S]*?incident_sky,[\s\S]*?lower_atmosphere,[\s\S]*?ground_irradiance,[\s\S]*?sky_tau,[\s\S]*?ground_tau\)/);
     const sheetCommonSource = nodeSource.slice(
-        nodeSource.indexOf("let source_sun_transmittance"),
+        nodeSource.indexOf("var source_sun_transmittance"),
         nodeSource.indexOf("let light_volume_direct_sun"),
     );
     const sheetResident = nodeSource.slice(
@@ -1531,7 +1519,7 @@ test("resident and fallback cloud sources partition direct and hemispheric paths
     const resident = march.slice(residentStart, fallbackStart);
     const fallback = march.slice(fallbackStart, blendStart);
     const commonSource = march.slice(
-        march.lastIndexOf("let source_sun_transmittance", residentStart),
+        march.lastIndexOf("let sun_local_tau", residentStart),
         residentStart);
 
     // Direct first order is complete in the cumulative RGB atlas before either
@@ -1540,6 +1528,9 @@ test("resident and fallback cloud sources partition direct and hemispheric paths
         /cloud_camera_source_transmittance\(point, 0u\)/);
     assert.match(commonSource,
         /cloud_camera_source_transmittance\(point, 1u\)/);
+    assert.match(commonSource,
+        /if \(genus == 3\)[\s\S]*?cloud_cirrostratus_source_optical_depth\(/,
+        "Cirrostratus direct light must use continuous owner-local Beer depth");
     assert.match(commonSource,
         /cloud_bulk_direct_radiance\([\s\S]*?source_sun_transmittance/);
     assert.match(commonSource,
@@ -1576,7 +1567,7 @@ test("resident and fallback cloud sources partition direct and hemispheric paths
     assert.doesNotMatch(fallback,
         /weather_production_cloud_direct_radiance|cloud_bulk_direct_radiance/);
     assert.match(fallback, /cloud_optical_multiple_scattering\(/);
-    assert.match(fallback, /cloud_local_directional_source_optical_depth\(/);
+    assert.match(fallback, /sun_local_tau/);
     assert.match(fallback, /cloud_sample_directional_sky_band_cache\(/);
     assert.match(fallback, /sun_optics\.asymmetry/);
     assert.match(fallback, /physical_diffuse_irradiance_at\(point\)/);
@@ -3535,7 +3526,9 @@ test("RGB affine camera transport has one atomic two-layer history ABI", () => {
         /var radiance = cloud_scattering \+ background \* cloud_transmittance/);
     assert.doesNotMatch(composite, /background \* cloud\.a/);
     assert.match(composite,
-        /output\.resolved_transmittance = vec4<f32>\(\s*cloud_transmittance, cloud_transmittance_y\)/);
+        /output\.resolved_radiance = vec4<f32>\(cloud\.radiance, geometry\.x\)/);
+    assert.match(composite,
+        /output\.resolved_transmittance = vec4<f32>\(\s*cloud_transmittance, geometry\.y\)/);
     assert.match(rendererSource,
         /cloudCurrent = createWebGpuTexture\([\s\S]{0,140}?renderUsage, 2\)/);
     assert.match(rendererSource,
@@ -3623,6 +3616,12 @@ test("resolved cloud history advances only for new transport samples", () => {
     assert.match(composite,
         /let exact_mean_history = prior_count \/ \(prior_count \+ 1\.0\)/);
     assert.match(composite,
+        /let offline_plate_accumulation = p\[53\]\.z > 0\.5/);
+    assert.match(composite,
+        /let offline_prior_count = max\(1\.0, exp2\(previous_temporal\.w\) - 1\.0\)/);
+    assert.match(composite,
+        /log2\(newly_offline_sample_count \+ 1\.0\)/);
+    assert.match(composite,
         /let bounded_live_history = min\(0\.98, exact_mean_history\)/);
     assert.match(composite,
         /let mean_history = select\([\s\S]*bounded_live_history,[\s\S]*exact_mean_history,[\s\S]*immutable_capture_epoch/);
@@ -3647,7 +3646,7 @@ test("resolved cloud history advances only for new transport samples", () => {
     assert.match(historyWeight, /new_transport_sample && accepts_history/);
     assert.doesNotMatch(historyWeight, /variance_confidence|residual_confidence|rejection|geometry\.w/);
     assert.match(composite,
-        /let cloud = select_composite_transport\([\s\S]*direct_resolved_history,[\s\S]*newly_resolved_cloud,[\s\S]*new_transport_sample/);
+        /var cloud = select_composite_transport\([\s\S]*direct_resolved_history,[\s\S]*newly_resolved_cloud,[\s\S]*new_transport_sample/);
     assert.match(validatorSource,
         /binding: 14, resource: transportArrayView\(resolvedCloudHistory\)/);
     assert.match(validatorSource,

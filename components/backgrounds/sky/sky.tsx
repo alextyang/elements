@@ -174,6 +174,8 @@ export interface SkyPreviewOptions {
     cloudEditorialRegime?: SkyCloudEditorialRegime;
     /** Seconds added to the astronomical moment for weather-evolution inspection. */
     cloudTimeOffset?: number;
+    /** Streamed 2.5-D cloud transport for the one production camera. */
+    cloudPlateManifestUrl?: string;
 }
 
 export interface SkySnapshot {
@@ -2288,6 +2290,8 @@ export function Sky({
                                 : undefined),
                         cloudEditorialRegime:
                             preview?.cloudEditorialRegime,
+                        cloudPlateManifestUrl:
+                            preview?.cloudPlateManifestUrl,
                     }}
                     onStats={onRendererStats}
                 />

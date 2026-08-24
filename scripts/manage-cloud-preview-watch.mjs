@@ -64,7 +64,7 @@ export const readWatchServiceState = (path = CLOUD_PREVIEW_WATCH_SERVICE_STATE_P
     if (!existsSync(path)) return undefined;
     try {
         const state = JSON.parse(readFileSync(path, "utf8"));
-        return state?.schemaVersion === 1 ? state : undefined;
+        return state?.schemaVersion === 2 ? state : undefined;
     } catch {
         return undefined;
     }

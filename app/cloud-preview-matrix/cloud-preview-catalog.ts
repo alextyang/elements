@@ -11,6 +11,7 @@ import {
     type WeatherQualificationAxis,
 } from "@/components/backgrounds/sky/weather-qualification-matrix";
 import {
+    DEFAULT_PRODUCTION_PERSPECTIVE_ID,
     productionPerspectiveCameraSignature,
     weatherQualificationCaseId,
 } from
@@ -32,8 +33,8 @@ export interface PreviewDefinition {
     captureParameter: "case" | "weather";
     qualificationUrl: string;
     implementation?: WeatherImplementationStatus;
-    photographicEvidence: "photographically qualified" |
-        "not photographically qualified";
+    photographicAcceptance: "accepted" | "not-accepted";
+    imageQualificationProfile: "artifact-and-texture" | "artifact-only";
     permutationCount: number;
     productionPerspective: string;
     productionCameraSignature: string;
@@ -47,11 +48,10 @@ export const titleCase = (value: string) => value
 /**
  * The canonical static-preview catalogue. The background generator and the
  * read-only matrix use this same identity set; camera variation is deliberately
- * excluded, so every entry resolves through one production perspective.
+ * excluded. Every entry uses the one production camera; qualification targets
+ * may retain additional perspectives for non-production robustness testing.
  */
-export const previewDefinitions = (
-    productionPerspective: string,
-): PreviewDefinition[] => {
+export const previewDefinitions = (): PreviewDefinition[] => {
     const baseByForm = new Map<string, typeof CLOUD_PHOTOGRAPH_CASES[number]>();
     for (const entry of CLOUD_PHOTOGRAPH_CASES) {
         const key = `${entry.genus}--${entry.species}`;
@@ -60,27 +60,36 @@ export const previewDefinitions = (
             baseByForm.set(key, entry);
         }
     }
-    const base: PreviewDefinition[] = [...baseByForm.values()].map((entry) => ({
-        id: `base:${entry.genus}:${entry.species}`,
-        caseId: entry.id,
-        title: entry.title,
-        detail: entry.environment.label,
-        genus: entry.genus,
-        group: "base-species",
-        scope: "canonical",
-        captureParameter: "case",
-        qualificationUrl: `/cloud-photographs?case=${encodeURIComponent(entry.id)}` +
-            `&productionPerspective=${productionPerspective}`,
-        photographicEvidence: "not photographically qualified",
-        permutationCount: 5,
-        productionPerspective,
-        productionCameraSignature: productionPerspectiveCameraSignature(
+    const base: PreviewDefinition[] = [...baseByForm.values()].map((entry) => {
+        const productionPerspective = DEFAULT_PRODUCTION_PERSPECTIVE_ID;
+        return {
+            id: `base:${entry.genus}:${entry.species}`,
+            caseId: entry.id,
+            title: entry.title,
+            detail: entry.environment.label,
+            genus: entry.genus,
+            group: "base-species",
+            scope: "canonical",
+            captureParameter: "case",
+            qualificationUrl:
+                `/cloud-photographs?case=${encodeURIComponent(entry.id)}` +
+                `&productionPerspective=${productionPerspective}`,
+            photographicAcceptance: "not-accepted",
+            imageQualificationProfile:
+                /^(cirrostratus|stratus)$/.test(entry.genus) &&
+                    entry.species === "nebulosus"
+                    ? "artifact-only" : "artifact-and-texture",
+            permutationCount: 5,
             productionPerspective,
-        ),
-    }));
+            productionCameraSignature: productionPerspectiveCameraSignature(
+                productionPerspective,
+            ),
+        };
+    });
     const orthogonal: PreviewDefinition[] =
         CLOUD_MORPHOLOGY_PHOTOGRAPH_TARGETS.map((target) => {
             const nativePerspective = target.perspectiveIds[0];
+            const productionPerspective = DEFAULT_PRODUCTION_PERSPECTIVE_ID;
             const caseId = cloudMorphologyPhotographCaseId({
                 targetId: target.id,
                 environmentId: target.environmentIds[0],
@@ -99,7 +108,8 @@ export const previewDefinitions = (
                 qualificationUrl:
                     `/cloud-photographs?case=${encodeURIComponent(caseId)}` +
                     `&productionPerspective=${productionPerspective}`,
-                photographicEvidence: "not photographically qualified",
+                photographicAcceptance: "not-accepted",
+                imageQualificationProfile: "artifact-and-texture",
                 permutationCount: target.environmentIds.length *
                     target.perspectiveIds.length * target.coverageIds.length,
                 productionPerspective,
@@ -112,6 +122,7 @@ export const previewDefinitions = (
         (target) => {
             const environmentId = target.environments[0];
             const nativePerspective = target.perspectives[0];
+            const productionPerspective = DEFAULT_PRODUCTION_PERSPECTIVE_ID;
             const caseId = weatherQualificationCaseId({
                 targetId: target.id,
                 environmentId,
@@ -133,10 +144,10 @@ export const previewDefinitions = (
                     `&capture=render&productionPerspective=` +
                     encodeURIComponent(productionPerspective),
                 implementation: target.implementation,
-                photographicEvidence: target.implementation ===
-                    "photographically-qualified"
-                    ? "photographically qualified"
-                    : "not photographically qualified",
+                photographicAcceptance: target.implementation ===
+                    "photographically-qualified" ? "accepted" : "not-accepted",
+                imageQualificationProfile: target.axis === "surface-obscuration"
+                    ? "artifact-only" : "artifact-and-texture",
                 permutationCount: target.environments.length *
                     target.perspectives.length,
                 productionPerspective,
@@ -148,4 +159,3 @@ export const previewDefinitions = (
     );
     return [...base, ...orthogonal, ...weather];
 };
-

@@ -1422,6 +1422,9 @@ async function validate() {
             { binding: 12, resource: compositeInputs[4].createView() },
             { binding: 13, resource: compositeInputs[5].createView() },
             { binding: 14, resource: transportArrayView(resolvedCloudHistory) },
+            { binding: 15, resource: transportArrayView(resolvedCloudHistory) },
+            { binding: 16, resource: transportArrayView(resolvedCloudHistory) },
+            { binding: 17, resource: linearSampler },
         ],
     });
     const cloudReconstructionMetricsBindGroup = device.createBindGroup({

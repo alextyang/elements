@@ -140,9 +140,8 @@ export const weatherQualificationCaseId = ({
 
 export const approvedProductionPerspectiveId = (
     perspectiveId: string | null | undefined,
-): string | undefined => WEATHER_QUALIFICATION_PERSPECTIVES.find(
-    ({ id }) => id === perspectiveId,
-)?.id;
+): string | undefined => perspectiveId === DEFAULT_PRODUCTION_PERSPECTIVE_ID
+    ? DEFAULT_PRODUCTION_PERSPECTIVE_ID : undefined;
 
 export interface ProductionPerspectiveCamera {
     id: string;
@@ -160,13 +159,9 @@ export interface ProductionPerspectiveCamera {
  * case but must never change live camera geometry.
  */
 export const resolveProductionPerspectiveCamera = (
-    perspectiveId: string | null | undefined,
+    _perspectiveId: string | null | undefined,
 ): ProductionPerspectiveCamera => {
-    const approvedId = approvedProductionPerspectiveId(perspectiveId) ??
-        DEFAULT_PRODUCTION_PERSPECTIVE_ID;
     const perspective = WEATHER_QUALIFICATION_PERSPECTIVES.find(
-        ({ id }) => id === approvedId,
-    ) ?? WEATHER_QUALIFICATION_PERSPECTIVES.find(
         ({ id }) => id === DEFAULT_PRODUCTION_PERSPECTIVE_ID,
     )!;
     return {

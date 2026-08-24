@@ -1310,6 +1310,14 @@ const layerForQualification = (
         ? target.precipitationKind === "virga" ? 0.24 :
             target.precipitationKind === "drizzle" ? 0.3 : 0.72
         : genus === "nimbostratus" ? 0.78 : genus === "cumulonimbus" ? 0.68 : 0;
+    if (target.axis === "convective-lifecycle" &&
+        target.lifecycleStage !== "precipitating" &&
+        target.lifecycleStage !== "decaying") {
+        // Mature and glaciating catalogue scenes may carry an early shower
+        // source, but precipitation must not dominate their labelled
+        // structural phase in the runtime lifecycle resolver.
+        precipitation = Math.min(precipitation, 0.38);
+    }
     let organization: Parameters<typeof createLayer>[0]["organization"] =
         rendererSpecies.includes("lenticularis") || rendererSpecies.includes("volutus")
             ? "banded"
@@ -2391,7 +2399,29 @@ const sceneForQualification = (
             })];
             assignment.sourceId = sourceId;
         }
-        if (target.classification.varieties.includes("duplicatus")) {
+        if (target.axis === "convective-lifecycle") {
+            const systemId = target.id;
+            scene.authoredSystems = [{
+                id: systemId,
+                layerIndex,
+                layer: { ...cloudLayer },
+                manifold: qualificationSystemManifold(
+                    systemId,
+                    cloudLayer,
+                    target.classification,
+                    {
+                        bearing: qualificationEditorialBearing(systemId),
+                        rangeKm: target.classification.genus === "cumulus"
+                            ? 8 : 22,
+                    },
+                ),
+            }];
+            scene.classifications = [{
+                ...assignment,
+                scope: "owner",
+                systemId,
+            }];
+        } else if (target.classification.varieties.includes("duplicatus")) {
             const firstId = `${target.id}:lower-layer`;
             const secondId = `${target.id}:upper-layer`;
             const depthKm = cloudLayer.thickness / 1000;

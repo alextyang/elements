@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "assets": [
+    {
+      "id": "cumulus-06",
+      "url": "https://cdn.cgheven.com/file/cghaven-2025/VFX/VDBS/Clouds/cumulus_clouds/Hero_Clouds/01-10/v6/Hero_Cloud_01_v6.rar",
+      "archiveSha256": "eae3ab613618eefc546d83df92fa3e3a97dc8c7dc95e2a7713dd37807ce2645c",
+      "entry": "Hero_Cloud_01_v6.vdb",
+      "vdbSha256": "a304ca1fbe591bf37b68f1aac73e20f93870c62aac4105aa526245914753e0ee"
+    },
+    {
+      "id": "cumulus-15",
+      "url": "https://cdn.cgheven.com/file/cghaven-2025/VFX/VDBS/Clouds/cumulus_clouds/Hero_Clouds/11-20/v15/Hero_Cloud_01_v15.rar",
+      "archiveSha256": "b465f7bdfa82756aa1fee38fe8c60e9cc7ad986a01db0a80b32d49c6aa1b2ca4",
+      "entry": "Hero_Cloud_01_v15.vdb",
+      "vdbSha256": "f10af5bf5f10c36cd0c782ce76906626ba0b0bb5a7e2eeb5093e80141db0d0f9"
+    },
+    {
+      "id": "congestus-21",
+      "url": "https://cdn.cgheven.com/file/cghaven-2025/VFX/VDBS/Clouds/Congestus_Cloud/Hero_Clouds/21-30/v21/Hero_Cloud_02_v21.rar",
+      "archiveSha256": "e8bae2f14c8d9a7f3f58501233740fce218202e6be2da6337a1371c02a2527bf",
+      "entry": "Hero_Cloud_02_v21.vdb",
+      "vdbSha256": "1abb95421e6b4a094557f7d9699c2948c60d36596d101fd6331f8cff4d703d5e"
+    },
+    {
+      "id": "congestus-23",
+      "url": "https://cdn.cgheven.com/file/cghaven-2025/VFX/VDBS/Clouds/Congestus_Cloud/Hero_Clouds/21-30/v23/Hero_Cloud_02_v23.rar",
+      "archiveSha256": "689342516acdf0f81a1b7fabda605234ab16dc737ea4126fa3ddc89f8459d271",
+      "entry": "Hero_Cloud_02_v23.vdb",
+      "vdbSha256": "0583b5261c4bd817e7abe3998aec1e71ceb425073575768f26c6349537282c4e"
+    },
+    {
+      "id": "congestus-25",
+      "url": "https://cdn.cgheven.com/file/cghaven-2025/VFX/VDBS/Clouds/Congestus_Cloud/Hero_Clouds/21-30/v25/Hero_Cloud_02_v25.rar",
+      "archiveSha256": "cd2c8e1d38adc8f29b1f8153883f4bb6f61249a2ff7fad89a156d570a44749eb",
+      "entry": "Hero_Cloud_02_v25.vdb",
+      "vdbSha256": "aec552eb16d825b808a680d0133b01152c7a6c222fcadc4bf2ef0173c0347555"
+    }
+  ]
+}

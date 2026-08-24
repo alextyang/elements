@@ -32,9 +32,10 @@ import {
 } from "./lib/cloud-preview-generation.mjs";
 import { loadCloudPreviewScenarios } from "./lib/cloud-preview-scenarios.mjs";
 import {
-    HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT,
+    CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT,
+    CLOUD_PREVIEW_IMAGE_QUALIFICATION_SCHEMA_VERSION,
     cloudMaskFromCoverage,
-    evaluateHighCloudPreviewImage,
+    evaluateCloudPreviewImage,
     measureCloudPreviewImage,
 } from "./lib/cloud-preview-image-qualification.mjs";
 
@@ -63,7 +64,7 @@ export const captureFailureCaseName = (caseId) =>
 /**
  * Preserve the primary reason recorded by capture-cloud-preview.sh. In
  * particular, a screenshot may pass page readiness and then fail the
- * renderer-independent high-cloud image qualifier; that result must survive
+ * renderer-independent image qualifier; that result must survive
  * into the generator's rejection instead of becoming only "Capture exited 1".
  */
 export const summarizeCloudPreviewCaptureFailure = (diagnostics) => {
@@ -73,7 +74,7 @@ export const summarizeCloudPreviewCaptureFailure = (diagnostics) => {
     const lines = diagnostics.split(/\r?\n/);
     const qualifier = lines
         .map((line) => line.match(
-            /Cloud preview high-cloud image qualification: .*/,
+            /Cloud preview image qualification: .*/,
         )?.[0])
         .filter(Boolean)
         .at(-1);
@@ -101,7 +102,6 @@ const usage = () => process.stdout.write(`Usage:
 Options:
   --force                     Re-render selected previews even when hashes match.
   --url URL                   Elements server (default http://127.0.0.1:3000).
-  --production-perspective ID Production camera (default oblique-natural).
   --only ID[,ID...]           Generate only these catalogue ids.
   --limit N                   Generate at most N selected pending entries.
   --transport-updates N       Completed transport threshold (minimum/default 64).
@@ -116,7 +116,6 @@ export const parseArguments = (values) => {
     const options = {
         force: false,
         url: process.env.CLOUD_PREVIEW_URL ?? "http://127.0.0.1:3000",
-        productionPerspective: "oblique-natural",
         only: [],
         limit: Number.POSITIVE_INFINITY,
         transportUpdates: 64,
@@ -133,7 +132,7 @@ export const parseArguments = (values) => {
         if (argument === "--fail-fast") { options.failFast = true; continue; }
         if (argument === "--list") { options.list = true; continue; }
         const [name, inline] = argument.split("=", 2);
-        if (!["--url", "--production-perspective", "--only", "--limit",
+        if (!["--url", "--only", "--limit",
             "--transport-updates", "--capture-mode", "--timeout-ms",
             "--cooldown-ms"].includes(name)) {
             throw new Error(`Unknown argument: ${argument}`);
@@ -141,7 +140,6 @@ export const parseArguments = (values) => {
         const value = inline ?? values[++index];
         if (!value) throw new Error(`${name} requires a value.`);
         if (name === "--url") options.url = value.replace(/\/$/, "");
-        if (name === "--production-perspective") options.productionPerspective = value;
         if (name === "--only") options.only.push(...value.split(",").filter(Boolean));
         if (name === "--limit") options.limit = Number(value);
         if (name === "--transport-updates") options.transportUpdates = Number(value);
@@ -155,12 +153,6 @@ export const parseArguments = (values) => {
     }
     if (!["native-metal", "headless"].includes(options.captureMode)) {
         throw new Error("--capture-mode must be native-metal or headless.");
-    }
-    if (options.productionPerspective !== "oblique-natural") {
-        throw new Error(
-            "Cloud preview publication is fixed to the oblique-natural " +
-            "production perspective.",
-        );
     }
     for (const [name, value] of [
         ["--limit", options.limit],
@@ -196,7 +188,6 @@ const wait = (milliseconds, signal) => new Promise((resolvePromise, reject) => {
 export const manifestFor = ({
     rendererHash,
     assetChecksums,
-    productionPerspective,
     captureMode,
     scenarios,
     entriesById,
@@ -215,7 +206,7 @@ export const manifestFor = ({
         schemaVersion: CLOUD_PREVIEW_SCHEMA_VERSION,
         rendererHash,
         assetChecksums,
-        productionPerspective,
+        perspectiveMode: "single-camera",
         captureMode,
         generatedAt: new Date().toISOString(),
         status: entries.length === scenarios.length ? "complete" : "partial",
@@ -269,7 +260,6 @@ export const publishPreviewEntry = ({
     path,
     rendererHash,
     assetChecksums,
-    productionPerspective,
     captureMode,
     scenarios,
     entriesById,
@@ -285,7 +275,6 @@ export const publishPreviewEntry = ({
     const manifest = manifestFor({
         rendererHash,
         assetChecksums,
-        productionPerspective,
         captureMode,
         scenarios,
         entriesById: stagedEntries,
@@ -301,11 +290,60 @@ export const publishPreviewEntry = ({
     return manifest;
 };
 
+const REQUIRED_IMAGE_METRICS = Object.freeze([
+    "fineRms",
+    "broadBandRms",
+    "fineTextureFraction",
+    "fineToBroadRatio",
+    "radialExplainedVariance",
+    "radialExplainedCoverage",
+    "cloudMaskUsed",
+    "cloudSupportFraction",
+]);
+const REQUIRED_STRUCTURED_IMAGE_METRICS = Object.freeze([
+    "cloudCoreSupportFraction",
+    "cloudCoreFraction",
+    "cloudEdgeFraction",
+    "cloudEdgeFineFraction",
+    "cloudInteriorFineRms",
+    "cloudInteriorBroadRms",
+    "cloudInteriorFineToBroadRatio",
+    "cloudInteriorTextureFraction",
+    "cloudMaskResidualRms",
+    "cloudMaskResidualFineToBroadRatio",
+    "cloudMaskResidualTextureFraction",
+    "cloudMaskEdgeProjection",
+]);
+
+export const isAcceptedCloudPreviewQualification = (
+    qualification,
+    profile,
+) => Boolean(
+    qualification && qualification.schemaVersion ===
+        CLOUD_PREVIEW_IMAGE_QUALIFICATION_SCHEMA_VERSION &&
+    qualification.gate === "artifact-texture" &&
+    qualification.profile === profile && qualification.state === "accepted" &&
+    typeof qualification.cloudMaskUsed === "boolean" &&
+    (profile !== "artifact-and-texture" || qualification.cloudMaskUsed) &&
+    typeof qualification.radialArtifact === "boolean" &&
+    typeof qualification.scaleSeparatedStructureReady === "boolean" &&
+    typeof qualification.cloudLocalStructureReady === "boolean" &&
+    qualification.metrics && typeof qualification.metrics === "object" &&
+    !Array.isArray(qualification.metrics) &&
+    REQUIRED_IMAGE_METRICS.every((key) =>
+        Object.hasOwn(qualification.metrics, key)) &&
+    (profile !== "artifact-and-texture" ||
+        REQUIRED_STRUCTURED_IMAGE_METRICS.every((key) =>
+            Object.hasOwn(qualification.metrics, key))) &&
+    Object.values(qualification.metrics).every((value) =>
+        typeof value === "boolean" ||
+        (typeof value === "number" && Number.isFinite(value)))
+);
+
 export const reusablePreviewEntries = ({
     existing,
     rendererHash,
     assetChecksums,
-    productionPerspective,
     captureMode,
     transportUpdates,
     scenarios,
@@ -313,13 +351,13 @@ export const reusablePreviewEntries = ({
     imageExistsImplementation = existsSync,
 }) => {
     const entriesById = new Map();
-    const options = { productionPerspective, captureMode, transportUpdates };
+    const options = { captureMode, transportUpdates };
     if (!(existing?.rendererHash === rendererHash &&
         cloudPreviewAssetChecksumsEqual(
             existing.assetChecksums,
             assetChecksums,
         ) &&
-        existing.productionPerspective === options.productionPerspective &&
+        existing.perspectiveMode === "single-camera" &&
         existing.captureMode === options.captureMode)) {
         return entriesById;
     }
@@ -329,13 +367,20 @@ export const reusablePreviewEntries = ({
         const expectedHash = scenarioContentHash({
             rendererHash,
             scenario,
-            productionPerspective: options.productionPerspective,
             transportUpdates: options.transportUpdates,
             captureMode: options.captureMode,
         });
         const imagePath = join(root, "public", entry.imageUrl);
         if (entry.caseId === scenario.caseId &&
             entry.captureParameter === scenario.captureParameter &&
+            entry.productionPerspective === scenario.productionPerspective &&
+            entry.productionCameraSignature ===
+                scenario.productionCameraSignature &&
+            entry.photographicAcceptance === scenario.photographicAcceptance &&
+            isAcceptedCloudPreviewQualification(
+                entry.qualification,
+                scenario.imageQualificationProfile,
+            ) &&
             entry.contentHash === expectedHash &&
             imageExistsImplementation(imagePath)) {
             entriesById.set(entry.id, entry);
@@ -369,12 +414,27 @@ export const publishImmutablePreviewImage = ({
     return { filename, finalPath, imageContentHash };
 };
 
-const isHighCloudCapture = (scenario) =>
-    scenario.captureParameter === "case" && /^(ci|cc|cs)-/.test(scenario.caseId);
+export const pruneUnreferencedPreviewImages = ({
+    imageRoot: root,
+    manifest,
+    listImplementation = readdirSync,
+    removeImplementation = rmSync,
+}) => {
+    const referenced = new Set(manifest.entries.map((entry) =>
+        String(entry.imageUrl).split("/").at(-1),
+    ));
+    const removed = [];
+    for (const filename of listImplementation(root)) {
+        if (!filename.endsWith(".png") || referenced.has(filename)) continue;
+        removeImplementation(join(root, filename), { force: true });
+        removed.push(filename);
+    }
+    return removed;
+};
 
 const analysisPixels = async (path) => {
     const { data, info } = await sharp(resolve(path))
-        .resize({ width: HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT.analysisWidth })
+        .resize({ width: CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT.analysisWidth })
         .removeAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
@@ -387,32 +447,41 @@ const analysisPixels = async (path) => {
  * guessed sky segmentation; dimensions must match after the fixed analysis
  * resize and the caller owns the case/camera/revision identity checks.
  */
-export const qualifyCloudPreviewPair = async ({
+export const qualifyCloudPreviewImage = async ({
     imagePath,
     mattePath,
-    allowSmoothVeil = false,
+    profile,
 }) => {
-    if (!existsSync(imagePath) || !existsSync(mattePath)) {
+    if (profile !== "artifact-and-texture" && profile !== "artifact-only") {
+        throw new Error(`Unsupported cloud preview image profile: ${profile}`);
+    }
+    if (!existsSync(imagePath) ||
+        (profile === "artifact-and-texture" && !existsSync(mattePath))) {
         throw new Error(
-            `Cloud preview qualification requires both final image and ` +
-            `same-case coverage matte: ${imagePath}, ${mattePath}`,
+            `Cloud preview ${profile} qualification requires a final image` +
+            `${profile === "artifact-and-texture"
+                ? " and same-case coverage matte" : ""}: ` +
+            `${imagePath}${mattePath ? `, ${mattePath}` : ""}`,
         );
     }
     const image = await analysisPixels(imagePath);
-    const matte = await analysisPixels(mattePath);
-    if (image.info.width !== matte.info.width ||
-        image.info.height !== matte.info.height) {
-        throw new Error(
-            `Cloud coverage matte dimensions ${matte.info.width}x${matte.info.height} ` +
-            `do not match final image ${image.info.width}x${image.info.height}.`,
-        );
+    let cloudMask;
+    if (mattePath) {
+        const matte = await analysisPixels(mattePath);
+        if (image.info.width !== matte.info.width ||
+            image.info.height !== matte.info.height) {
+            throw new Error(
+                `Cloud coverage matte dimensions ${matte.info.width}x${matte.info.height} ` +
+                `do not match final image ${image.info.width}x${image.info.height}.`,
+            );
+        }
+        cloudMask = cloudMaskFromCoverage({
+            data: matte.data,
+            width: matte.info.width,
+            height: matte.info.height,
+            channels: matte.info.channels,
+        });
     }
-    const cloudMask = cloudMaskFromCoverage({
-        data: matte.data,
-        width: matte.info.width,
-        height: matte.info.height,
-        channels: matte.info.channels,
-    });
     const metrics = measureCloudPreviewImage({
         data: image.data,
         width: image.info.width,
@@ -420,9 +489,9 @@ export const qualifyCloudPreviewPair = async ({
         channels: image.info.channels,
         cloudMask,
     });
-    return evaluateHighCloudPreviewImage(metrics, {
-        requireScaleSeparatedStructure: !allowSmoothVeil,
-        requireCloudMask: true,
+    return evaluateCloudPreviewImage(metrics, {
+        requireScaleSeparatedStructure: profile === "artifact-and-texture",
+        requireCloudMask: profile === "artifact-and-texture",
     });
 };
 
@@ -447,7 +516,7 @@ export const retainRejectedCloudPair = ({
     if (!/^[a-f0-9]{64}$/i.test(rendererRevision)) {
         throw new Error("Rejected cloud pair renderer revision is not a SHA-256 digest.");
     }
-    const rejectionRoot = join(root, "rejected-high-cloud");
+    const rejectionRoot = join(root, "rejected-image-qualification");
     const safeCase = safePreviewId(caseId);
     const casePrefix = `${safeCase}--`;
     mkdirSync(rejectionRoot, { recursive: true });
@@ -484,7 +553,7 @@ export const retainRejectedCloudPair = ({
     const coverageReadiness = readJsonIfPresent(coverageMetricsPath);
     const record = {
         schemaVersion: 1,
-        kind: "cloud-preview-high-cloud-rejection",
+        kind: "cloud-preview-image-qualification-rejection",
         caseId,
         rendererRevision,
         productionPerspective,
@@ -518,7 +587,6 @@ const main = async () => {
     });
     const scenarios = await loadCloudPreviewScenarios({
         repositoryRoot,
-        productionPerspective: options.productionPerspective,
     });
     if (options.list) {
         process.stdout.write(`${JSON.stringify(scenarios, null, 2)}\n`);
@@ -558,7 +626,6 @@ const main = async () => {
             existing,
             rendererHash,
             assetChecksums,
-            productionPerspective: options.productionPerspective,
             captureMode: options.captureMode,
             transportUpdates: options.transportUpdates,
             scenarios,
@@ -576,7 +643,6 @@ const main = async () => {
             manifest: manifestFor({
                 rendererHash,
                 assetChecksums,
-                productionPerspective: options.productionPerspective,
                 captureMode: options.captureMode,
                 scenarios,
                 entriesById,
@@ -592,7 +658,7 @@ const main = async () => {
             .slice(0, options.limit);
         process.stdout.write(
             `Cloud previews: ${entriesById.size}/${scenarios.length} current; ` +
-            `${pending.length} queued at ${options.productionPerspective}.\n`,
+            `${pending.length} queued at the single production camera.\n`,
         );
         const failures = [];
         if (pending.length > 0) {
@@ -648,7 +714,6 @@ const main = async () => {
             const contentHash = scenarioContentHash({
                 rendererHash,
                 scenario,
-                productionPerspective: options.productionPerspective,
                 transportUpdates: options.transportUpdates,
                 captureMode: options.captureMode,
             });
@@ -674,7 +739,8 @@ const main = async () => {
                 imageRoot,
                 `.${temporaryStem}.${process.pid}.tmp`,
             );
-            const requiresCloudMatte = isHighCloudCapture(scenario);
+            const requiresCloudMatte = scenario.imageQualificationProfile ===
+                "artifact-and-texture";
             process.stdout.write(
                 `[${index + 1}/${pending.length}] ${scenario.id} · ${scenario.caseId}\n`,
             );
@@ -695,7 +761,7 @@ const main = async () => {
                             ...process.env,
                             CLOUD_PREVIEW_URL: options.url,
                             CLOUD_PREVIEW_PRODUCTION_PERSPECTIVE:
-                                options.productionPerspective,
+                                scenario.productionPerspective,
                             CLOUD_PREVIEW_DEBUG_VIEW: debugView,
                             CLOUD_PREVIEW_TRANSPORT_UPDATES:
                                 String(options.transportUpdates),
@@ -755,7 +821,8 @@ const main = async () => {
                     }
                     if (metrics.sceneKey !== scenario.caseId ||
                         metrics.debugView !== debugView ||
-                        metrics.productionPerspective !== options.productionPerspective ||
+                        metrics.productionPerspective !==
+                            scenario.productionPerspective ||
                         metrics.viewport?.width !== 800 ||
                         metrics.viewport?.height !== 500 ||
                         metrics.renderBounds?.width !== 800 ||
@@ -791,21 +858,26 @@ const main = async () => {
                             "same case, production perspective, and camera signature.",
                         );
                     }
-                    qualificationResult = await qualifyCloudPreviewPair({
+                    qualificationResult = await qualifyCloudPreviewImage({
                         imagePath: rawPath,
                         mattePath: coveragePath,
-                        allowSmoothVeil: /^cs-nebulosus-/.test(scenario.caseId),
+                        profile: scenario.imageQualificationProfile,
                     });
-                    process.stdout.write(
-                        `Cloud preview high-cloud image qualification: ${
-                            JSON.stringify(qualificationResult)}\n`,
+                } else {
+                    qualificationResult = await qualifyCloudPreviewImage({
+                        imagePath: rawPath,
+                        profile: scenario.imageQualificationProfile,
+                    });
+                }
+                process.stdout.write(
+                    `Cloud preview image qualification: ${
+                        JSON.stringify(qualificationResult)}\n`,
+                );
+                if (!qualificationResult.ready) {
+                    throw new Error(
+                        "Cloud preview image qualification: " +
+                        JSON.stringify(qualificationResult),
                     );
-                    if (!qualificationResult.ready) {
-                        throw new Error(
-                            "Cloud preview high-cloud image qualification: " +
-                            JSON.stringify(qualificationResult),
-                        );
-                    }
                 }
                 const metadata = await sharp(rawPath)
                     .resize({ width: 480, withoutEnlargement: true })
@@ -826,13 +898,30 @@ const main = async () => {
                     height: metadata.height,
                     contentHash,
                     imageContentHash,
+                    productionPerspective: scenario.productionPerspective,
+                    productionCameraSignature:
+                        scenario.productionCameraSignature,
+                    photographicAcceptance: scenario.photographicAcceptance,
+                    qualification: {
+                        schemaVersion:
+                            CLOUD_PREVIEW_IMAGE_QUALIFICATION_SCHEMA_VERSION,
+                        gate: "artifact-texture",
+                        profile: scenario.imageQualificationProfile,
+                        state: "accepted",
+                        cloudMaskUsed: qualificationResult.cloudMaskUsed,
+                        radialArtifact: qualificationResult.radialArtifact,
+                        scaleSeparatedStructureReady:
+                            qualificationResult.scaleSeparatedStructureReady,
+                        cloudLocalStructureReady:
+                            qualificationResult.cloudLocalStructureReady,
+                        metrics: qualificationResult.metrics,
+                    },
                     generatedAt: new Date().toISOString(),
                 };
                 publishPreviewEntry({
                     path: manifestPath,
                     rendererHash,
                     assetChecksums,
-                    productionPerspective: options.productionPerspective,
                     captureMode: options.captureMode,
                     scenarios,
                     entriesById,
@@ -840,16 +929,15 @@ const main = async () => {
                     repositoryRoot,
                 });
             } catch (error) {
-                if (requiresCloudMatte &&
-                    (existsSync(rawPath) || existsSync(coveragePath) ||
+                if (existsSync(rawPath) || existsSync(coveragePath) ||
                         existsSync(finalMetricsPath) ||
-                        existsSync(coverageMetricsPath))) {
+                        existsSync(coverageMetricsPath)) {
                     try {
                         const retained = retainRejectedCloudPair({
                             root: workRoot,
                             caseId: scenario.caseId,
                             rendererRevision: rendererHash,
-                            productionPerspective: options.productionPerspective,
+                            productionPerspective: scenario.productionPerspective,
                             finalPath: rawPath,
                             coveragePath,
                             finalMetricsPath,
@@ -857,12 +945,12 @@ const main = async () => {
                             qualification: qualificationResult,
                         });
                         process.stderr.write(
-                            `Retained private high-cloud rejection at ` +
+                            `Retained private image-qualification rejection at ` +
                             `${retained.destination}.\n`,
                         );
                     } catch (retentionError) {
                         process.stderr.write(
-                            `Could not retain private high-cloud rejection: ` +
+                            `Could not retain private image-qualification rejection: ` +
                             `${retentionError instanceof Error
                                 ? retentionError.message : String(retentionError)}\n`,
                         );
@@ -898,7 +986,6 @@ const main = async () => {
         const finalManifest = manifestFor({
             rendererHash,
             assetChecksums,
-            productionPerspective: options.productionPerspective,
             captureMode: options.captureMode,
             scenarios,
             entriesById,
@@ -910,9 +997,15 @@ const main = async () => {
             expectedRendererHash: rendererHash,
             expectedAssetChecksums: assetChecksums,
         });
+        const prunedImages = pruneUnreferencedPreviewImages({
+            imageRoot,
+            manifest: finalManifest,
+        });
         process.stdout.write(
             `Cloud preview manifest: ${finalManifest.completed}/${finalManifest.total} ` +
-            `${finalManifest.status} · ${manifestPath}\n`,
+            `${finalManifest.status} · ${manifestPath}` +
+            `${prunedImages.length > 0
+                ? ` · pruned ${prunedImages.length} stale image(s)` : ""}\n`,
         );
         if (failures.length > 0) {
             throw new Error(`${failures.length} cloud preview capture(s) were rejected.`);

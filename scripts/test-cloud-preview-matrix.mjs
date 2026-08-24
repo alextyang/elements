@@ -37,6 +37,41 @@ const validEntry = {
     height: 600,
     contentHash: "b".repeat(64),
     imageContentHash: "a".repeat(64),
+    productionPerspective: "oblique-natural",
+    productionCameraSignature: "27|64|43.52|0.02|natural|auto",
+    photographicAcceptance: "not-accepted",
+    qualification: {
+        schemaVersion: 1,
+        gate: "artifact-texture",
+        profile: "artifact-and-texture",
+        state: "accepted",
+        cloudMaskUsed: true,
+        radialArtifact: false,
+        scaleSeparatedStructureReady: true,
+        cloudLocalStructureReady: true,
+        metrics: {
+            fineRms: 0.01,
+            broadBandRms: 0.02,
+            fineTextureFraction: 0.2,
+            fineToBroadRatio: 0.5,
+            radialExplainedVariance: 0.1,
+            radialExplainedCoverage: 0.05,
+            cloudMaskUsed: true,
+            cloudSupportFraction: 0.2,
+            cloudCoreSupportFraction: 0.1,
+            cloudCoreFraction: 0.5,
+            cloudEdgeFraction: 0.5,
+            cloudEdgeFineFraction: 0.01,
+            cloudInteriorFineRms: 0.01,
+            cloudInteriorBroadRms: 0.02,
+            cloudInteriorFineToBroadRatio: 0.5,
+            cloudInteriorTextureFraction: 0.2,
+            cloudMaskResidualRms: 0.01,
+            cloudMaskResidualFineToBroadRatio: 0.5,
+            cloudMaskResidualTextureFraction: 0.2,
+            cloudMaskEdgeProjection: 0.1,
+        },
+    },
     generatedAt: "2026-07-29T12:00:00.000Z",
 };
 
@@ -65,7 +100,7 @@ test("manifest polling is incremental, visibility-aware, and manually refreshabl
 
 test("manifest parser accepts the generator schema and rejects unsafe entries", () => {
     const manifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     rendererHash: "c".repeat(64),
     assetChecksums: {
         algorithm: "SHA-256",
@@ -73,7 +108,7 @@ test("manifest parser accepts the generator schema and rejects unsafe entries", 
         majorants: "b".repeat(64),
         exteriorBoundary: "c".repeat(64),
     },
-        productionPerspective: "oblique-natural",
+        perspectiveMode: "single-camera",
         captureMode: "native-metal",
         generatedAt: "2026-07-29T12:00:00.000Z",
         status: "partial",
@@ -102,8 +137,8 @@ test("manifest parser accepts the generator schema and rejects unsafe entries", 
     }), undefined, "duplicate ids cannot ambiguously replace a card");
     assert.equal(parseCloudPreviewManifest({
         ...manifest,
-        productionPerspective: "high-horizon",
-    }), undefined, "only the selected production camera can populate the grid");
+        perspectiveMode: "catalogue-native",
+    }), undefined, "only the single production camera can populate the grid");
     assert.equal(parseCloudPreviewManifest({
         ...manifest,
         total: 60,
@@ -112,14 +147,26 @@ test("manifest parser accepts the generator schema and rejects unsafe entries", 
         ...manifest,
         entries: [{ ...validEntry, imageContentHash: "d".repeat(64) }],
     }), undefined, "the immutable URL suffix must match the PNG byte hash");
-    assert.equal(parseCloudPreviewManifest({
+    assert.deepEqual(parseCloudPreviewManifest({
         ...manifest,
         schemaVersion: 2,
-    }), undefined);
+    }), manifest);
+    assert.equal(parseCloudPreviewManifest({
+        ...manifest,
+        schemaVersion: 1,
+    }), undefined, "obsolete manifests are not accepted through a fallback");
     assert.equal(parseCloudPreviewManifest({
         ...manifest,
         assetChecksums: undefined,
     }), undefined, "old manifests without asset identities are stale");
+    assert.equal(parseCloudPreviewManifest({
+        ...manifest,
+        entries: [{ ...validEntry, qualification: undefined }],
+    }), undefined, "generated pixels without image qualification are not ready");
+    assert.equal(parseCloudPreviewManifest({
+        ...manifest,
+        entries: [{ ...validEntry, photographicAcceptance: "generated" }],
+    }), undefined, "photographic acceptance is an explicit strict state");
 });
 
 test("completed entries are joined by stable catalogue id", () => {
@@ -127,6 +174,9 @@ test("completed entries are joined by stable catalogue id", () => {
     assert.match(source, /preview\.caseId === entry\.caseId/);
     assert.match(source,
         /preview\.captureParameter === entry\.captureParameter/);
+    assert.match(source,
+        /preview\.productionPerspective === entry\.productionPerspective/);
+    assert.match(source, /entry\.qualification\.profile/);
     assert.match(source, /manifestEntries\.get\(preview\.id\)/);
     assert.match(source, /manifestEntries\.has\(preview\.id\)/);
     assert.equal(cloudPreviewImageProxyUrl(validEntry.imageUrl),
@@ -146,22 +196,22 @@ test("completed entries are joined by stable catalogue id", () => {
     assert.match(imageRouteSource, /max-age=31536000, immutable/);
 });
 
-test("catalogue is shared, JSON-safe, and fixes every target to one perspective", () => {
+test("catalogue is shared, JSON-safe, and uses one production perspective", () => {
     assert.match(catalogueSource, /export const previewDefinitions/);
-    assert.match(catalogueSource, /productionPerspective: string/);
     assert.match(catalogueSource,
         /productionPerspectiveCameraSignature\([\s\S]*?productionPerspective/);
     assert.match(catalogueSource,
         /return \[\.\.\.base, \.\.\.orthogonal, \.\.\.weather\]/);
     assert.match(catalogueSource, /nativePerspective = target\.perspectiveIds\[0\]/);
     assert.match(catalogueSource, /nativePerspective = target\.perspectives\[0\]/);
+    assert.match(catalogueSource,
+        /productionPerspective = DEFAULT_PRODUCTION_PERSPECTIVE_ID/g);
     assert.match(catalogueSource, /scope: "canonical"/);
     assert.match(catalogueSource, /scope: "complete-weather"/);
     assert.doesNotMatch(source, /Production perspective" value=/,
         "the static page must not advertise ungenerated camera variation");
-    assert.match(source,
-        /productionPerspective = manifest\?\.productionPerspective/);
-    assert.match(source, /Every image uses the single production perspective/);
+    assert.match(source, /previewDefinitions\(\)/);
+    assert.match(source, /single oblique-natural production camera/);
 });
 
 test("every remaining selector has deterministic cyclic arrow navigation", () => {
@@ -198,7 +248,7 @@ test("display filters preserve useful catalogue labels and static statuses", () 
     assert.match(source, /Complete \$\{WEATHER_QUALIFICATION_SUMMARY\.targets\}/);
     assert.match(source, /"pending" \| "ready"/);
     assert.match(source, /preview\.implementation === evidenceFilter/);
-    assert.match(source, /preview\.photographicEvidence/);
+    assert.match(source, /preview\.photographicAcceptance/);
     assert.match(styleSource, /\.card\[data-state="pending"\]/);
     assert.match(styleSource, /\.manifestBadge\[data-state="complete"\]/);
     assert.match(styleSource, /\.manifestBadge\[data-state="partial"\]/);

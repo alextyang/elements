@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "sceneId": "thunderstorm-mature",
+  "sceneHash": "e807b3a09de84636a07e1f5eb1ab6798bd8b4c118242162b684404e65660b71b",
+  "rendererHash": "dd0f63ccc1d1557ec302ab0312ca70219c6e59b630afdb39afd7f3f45fe6d05c",
+  "definitionHash": "c0b57c0be966c27fa3118fb56da257548395c0eb1b9b2e5edda53315c0624339",
+  "generatedAt": "2026-08-24T09:05:13.481Z",
+  "status": "partial",
+  "backend": "blender-cycles-metal",
+  "sourceAsset": {
+    "id": "wdas-cloud-quarter",
+    "license": "CC-BY-SA-3.0",
+    "attribution": "Copyright 2017 Disney Enterprises, Inc.; cloud reference by Kevin Udy"
+  },
+  "fixedCamera": {
+    "perspectiveId": "oblique-natural",
+    "horizontalFovDegrees": 64,
+    "verticalFovDegrees": 43.52,
+    "viewElevationDegrees": 27
+  },
+  "timeline": {
+    "durationSeconds": 240,
+    "frameIntervalSeconds": 20,
+    "loop": true,
+    "crossfadeSeconds": 20
+  },
+  "groups": [
+    {
+      "id": "primary-storm-complex",
+      "label": "Primary connected storm complex",
+      "kind": "continuous-deep-convection",
+      "continuity": "shared-volume",
+      "components": [
+        {
+          "id": "storm-feeder-congestus",
+          "kind": "cloud-species",
+          "role": "boundary-layer feeder towers",
+          "genus": "cumulus",
+          "species": "cumulus-congestus",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 10,
+          "contribution": 0.62
+        },
+        {
+          "id": "storm-mature-core",
+          "kind": "cloud-species",
+          "role": "continuous deep convective core",
+          "genus": "cumulonimbus",
+          "species": "cumulonimbus-capillatus",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 20,
+          "contribution": 1
+        },
+        {
+          "id": "storm-incus-anvil",
+          "kind": "supplementary-feature",
+          "role": "glaciated tropopause outflow shield",
+          "genus": "cumulonimbus",
+          "form": "incus",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 30,
+          "contribution": 0.86
+        },
+        {
+          "id": "storm-rain-core",
+          "kind": "precipitation",
+          "role": "rain and hail precipitation curtain",
+          "genus": "cumulonimbus",
+          "form": "shower",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 40,
+          "contribution": 0.78
+        },
+        {
+          "id": "storm-arcus-pannus",
+          "kind": "accessory-cloud",
+          "role": "gust-front shelf and precipitation scud",
+          "genus": "cumulonimbus",
+          "form": "arcus-pannus",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 50,
+          "contribution": 0.54
+        }
+      ]
+    }
+  ],
+  "render": {
+    "width": 480,
+    "height": 270,
+    "minimumTransportSamples": 256,
+    "convergenceTarget": 0.02,
+    "volumeBounces": 64,
+    "radianceCalibration": 0.18
+  },
+  "completedFrames": 1,
+  "totalFrames": 12,
+  "frames": [
+    {
+      "index": 0,
+      "timeSeconds": 0,
+      "transportSamples": 512,
+      "convergenceDelta": 0.005468596790936918,
+      "lightingSignature": "67125880844c487b21db8397b062138186315cf48453ea75149cf104f46051a9",
+      "previewUrl": "/generated/cloud-plates/thunderstorm-mature/e807b3a09de84636a07e1f5eb1ab6798bd8b4c118242162b684404e65660b71b/frames/00000/preview.png",
+      "captureMetricsUrl": "/generated/cloud-plates/thunderstorm-mature/e807b3a09de84636a07e1f5eb1ab6798bd8b4c118242162b684404e65660b71b/frames/00000/capture-metrics.json",
+      "operators": [
+        {
+          "groupId": "primary-storm-complex",
+          "firstDepthKm": 15,
+          "radiance": {
+            "channel": "radiance",
+            "url": "/generated/cloud-plates/thunderstorm-mature/e807b3a09de84636a07e1f5eb1ab6798bd8b4c118242162b684404e65660b71b/frames/00000/radiance.rgba16f",
+            "sha256": "ba565aace4b1b76d5cc68961ad2e9a806b030243909be5d81340b2c74d88abea",
+            "width": 480,
+            "height": 270,
+            "format": "rgba16float-le",
+            "byteLength": 1036800
+          },
+          "transmittance": {
+            "channel": "transmittance",
+            "url": "/generated/cloud-plates/thunderstorm-mature/e807b3a09de84636a07e1f5eb1ab6798bd8b4c118242162b684404e65660b71b/frames/00000/transmittance.rgba16f",
+            "sha256": "65166404c1ecc19e83cdf1e71fec8527b678fa29c289036e6142a8732d6b01df",
+            "width": 480,
+            "height": 270,
+            "format": "rgba16float-le",
+            "byteLength": 1036800
+          }
+        }
+      ]
+    }
+  ]
+}

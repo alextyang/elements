@@ -15,11 +15,11 @@ The UI and background generator share `cloud-preview-catalog.ts`, which defines
   and exterior systems;
 - 216 weather qualification targets.
 
-Every image in a manifest uses the same recorded production perspective. The
-matrix does not offer camera variation because it must not imply that
-ungenerated views exist. Matrix scope, family, genus, status, and evidence
-selectors only filter static cards. Previous and next arrow buttons wrap around
-every selector's available values.
+Every target uses the single `oblique-natural` production perspective. The
+exact camera signature is recorded per entry; the manifest declares
+`perspectiveMode: "single-camera"`. The matrix does not offer camera
+variation because it must not imply that ungenerated views exist. Matrix scope,
+family, genus, status, and evidence selectors only filter static cards.
 
 ## Local workflow
 
@@ -121,7 +121,11 @@ recaptured regardless of its content hash.
 
 ## Publication contract
 
-The generator captures the catalogue serially at one production perspective.
+The generator captures the catalogue serially at each target's recorded native
+perspective. Structured cloud targets capture a same-case coverage matte and
+must pass the generic artifact-and-texture image gate. Expected smooth veils
+and surface-obscuration targets use the explicit artifact-only profile. All 276
+final images pass one of those profiles before publication.
 It processes each screenshot into a temporary PNG, atomically renames that file
 to its content-hashed final name, and only then atomically replaces
 `public/generated/cloud-previews/manifest.json`. A manifest entry therefore
@@ -133,8 +137,11 @@ manifest header also records `assetChecksums` (`algorithm`, `atlas`,
 `public/assets/sky/cloud-macro-atlas-v2.json`. A manifest without that complete
 identity is stale and cannot be used to resume entries; changing any cloud
 volume, majorant, or exterior-boundary checksum invalidates every prior entry.
-Final
-filenames encode the SHA-256 digest of the processed PNG bytes themselves, so
+Schema 2 entries store the gate profile, accepted state, measurements, native
+camera identity, and a separate strict `photographicAcceptance` value. Image
+generation or artifact qualification can therefore never be mislabeled as
+photographic acceptance. Old entries without this evidence are not reusable.
+Final filenames encode the SHA-256 digest of the processed PNG bytes themselves, so
 a forced recapture with different pixels can never overwrite an already
 cacheable immutable URL.
 

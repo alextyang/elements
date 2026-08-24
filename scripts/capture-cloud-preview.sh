@@ -13,11 +13,19 @@ capture_timeout_ms="${CLOUD_PREVIEW_PAGE_TIMEOUT_MS:-150000}"
 capture_diagnostic_reserve_ms="${CLOUD_PREVIEW_DIAGNOSTIC_RESERVE_MS:-5000}"
 capture_step_timeout_ms="${CLOUD_PREVIEW_CAPTURE_STEP_TIMEOUT_MS:-30000}"
 capture_mode="${CLOUD_PREVIEW_CAPTURE_MODE:-native-metal}"
+capture_qualification_profile="${CLOUD_PREVIEW_IMAGE_QUALIFICATION_PROFILE:-artifact-only}"
 capture_skip_qualification="${CLOUD_PREVIEW_SKIP_IMAGE_QUALIFICATION:-0}"
 capture_immutable_output="${CLOUD_PREVIEW_IMMUTABLE_OUTPUT:-0}"
 capture_disable_case_switch="${CLOUD_PREVIEW_DISABLE_CASE_SWITCH:-0}"
 capture_metrics_path="${CLOUD_PREVIEW_CAPTURE_METRICS_PATH:-}"
+capture_cloud_time_offset="${CLOUD_PLATE_TIME_OFFSET_SECONDS:-0}"
+capture_plate_scene="${CLOUD_PLATE_SCENE_ID:-}"
+capture_plate_frame="${CLOUD_PLATE_FRAME_INDEX:-}"
+capture_plate_token="${CLOUD_PLATE_CAPTURE_TOKEN:-local-cloud-plate-capture}"
+capture_plate_width="${CLOUD_PLATE_WIDTH:-}"
+capture_plate_height="${CLOUD_PLATE_HEIGHT:-}"
 capture_native_config="$capture_root/scripts/config/cloud-preview-native-playwright.json"
+capture_native_headless_config="$capture_root/scripts/config/cloud-preview-native-headless-playwright.json"
 capture_adapter_policy="$capture_root/components/backgrounds/sky/cloud-transport-adapter-policy.mjs"
 capture_adapter_probe_url="$capture_base_url/cloud-preview-adapter-probe.html"
 capture_persistent_session="${CLOUD_PREVIEW_PERSISTENT_SESSION:-}"
@@ -60,8 +68,14 @@ if [[ "$capture_skip_qualification" != "0" &&
     echo "Cloud preview capture mode flags must be 0 or 1." >&2
     exit 2
 fi
-if [[ "$capture_mode" != "native-metal" && "$capture_mode" != "headless" ]]; then
-    echo "CLOUD_PREVIEW_CAPTURE_MODE must be native-metal or headless" >&2
+if [[ "$capture_mode" != "native-metal" &&
+    "$capture_mode" != "native-metal-headless" &&
+    "$capture_mode" != "headless" ]]; then
+    echo "CLOUD_PREVIEW_CAPTURE_MODE must be native-metal, native-metal-headless, or headless" >&2
+    exit 2
+fi
+if [[ "$capture_qualification_profile" != "artifact-only" ]]; then
+    echo "Standalone capture supports only artifact-only image qualification; publication owns matte-backed artifact-and-texture qualification." >&2
     exit 2
 fi
 if (( capture_owns_session == 0 )) && {
@@ -78,6 +92,20 @@ if [[ ! "$capture_timeout_ms" =~ ^[0-9]+$ ]] ||
     (( capture_step_timeout_ms < 1000 )) ||
     (( capture_timeout_ms < 1000 )); then
     echo "Cloud preview timeouts must be positive integer milliseconds." >&2
+    exit 2
+fi
+if [[ ! "$capture_cloud_time_offset" =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+    echo "CLOUD_PLATE_TIME_OFFSET_SECONDS must be a finite decimal." >&2
+    exit 2
+fi
+if [[ -n "$capture_plate_scene" ]] && {
+    [[ ! "$capture_plate_scene" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] ||
+    [[ ! "$capture_plate_frame" =~ ^[0-9]+$ ]] ||
+    [[ ! "$capture_plate_width" =~ ^[0-9]+$ ]] ||
+    [[ ! "$capture_plate_height" =~ ^[0-9]+$ ]] ||
+    (( capture_plate_width < 64 || capture_plate_height < 64 ));
+}; then
+    echo "Cloud plate export requires a safe scene id, nonnegative frame index, and dimensions of at least 64 pixels." >&2
     exit 2
 fi
 if (( capture_diagnostic_reserve_ms >= capture_timeout_ms )); then
@@ -148,7 +176,10 @@ fi
 capture_encoded_case="$(node -p 'encodeURIComponent(process.argv[1])' "$capture_case")"
 capture_encoded_perspective="$(node -p 'encodeURIComponent(process.argv[1])' "$capture_perspective")"
 capture_encoded_debug="$(node -p 'encodeURIComponent(process.argv[1])' "$capture_debug")"
-capture_url="$capture_base_url/cloud-photographs?$capture_parameter=$capture_encoded_case&capture=render&debug=$capture_encoded_debug&productionPerspective=$capture_encoded_perspective"
+capture_url="$capture_base_url/cloud-photographs?$capture_parameter=$capture_encoded_case&capture=render&debug=$capture_encoded_debug&productionPerspective=$capture_encoded_perspective&cloudTimeOffset=$capture_cloud_time_offset"
+if [[ -n "$capture_plate_scene" ]]; then
+    capture_url="${capture_url}&cloudPlateCapture=1"
+fi
 
 capture_cli_transcript_failed() {
     # playwright-cli can emit protocol/runtime failures while exiting zero.
@@ -169,7 +200,7 @@ capture_report_failure() {
     # primary failure instead of implying that page diagnostics were absent.
     qualifier="$(
         printf '%s\n' "$transcript" |
-            sed -n 's/^.*\(Cloud preview high-cloud image qualification: .*$\)/\1/p' |
+            sed -n 's/^.*\(Cloud preview image qualification: .*$\)/\1/p' |
             tail -n 1 |
             cut -c 1-8192
     )" || true
@@ -286,6 +317,8 @@ if (( capture_owns_session != 0 )); then
     capture_open_args=(open about:blank)
     if [[ "$capture_mode" == "native-metal" ]]; then
         capture_open_args+=(--config "$capture_native_config")
+    elif [[ "$capture_mode" == "native-metal-headless" ]]; then
+        capture_open_args+=(--config "$capture_native_headless_config")
     fi
     capture_open_output="$(
         "${capture_cli[@]}" --session "$capture_session" "${capture_open_args[@]}" 2>&1
@@ -372,7 +405,8 @@ else
     capture_record_lifecycle "adapter-preflight-reused" \
         "backend=$capture_adapter_backend adapter=$capture_adapter_info"
 fi
-if [[ "$capture_mode" == "native-metal" &&
+if [[ ( "$capture_mode" == "native-metal" ||
+        "$capture_mode" == "native-metal-headless" ) &&
     "$capture_adapter_backend" != "native-apple-metal" ]]; then
     persist_capture_failure "adapter-policy" 1 \
         "Native cloud preview capture refused non-Apple-Metal WebGPU: $capture_adapter_info"
@@ -439,7 +473,10 @@ capture_run_output="$(
         // the CLI's larger default viewport needlessly doubles full-quality
         // WebGPU shading work and can cause the same thermal spike as the old
         // live matrix even if the viewport is reduced afterward.
-        await page.setViewportSize({ width: 800, height: 500 });
+        await page.setViewportSize({
+            width: $([[ -n "$capture_plate_scene" ]] && printf '%s' "$capture_plate_width" || printf 800),
+            height: $([[ -n "$capture_plate_scene" ]] && printf '%s' "$capture_plate_height" || printf 500),
+        });
         const target = {
             caseId: $(node -p 'JSON.stringify(process.argv[1])' "$capture_case"),
             captureParameter:
@@ -449,6 +486,7 @@ capture_run_output="$(
             productionPerspective:
                 $(node -p 'JSON.stringify(process.argv[1])' "$capture_perspective"),
         };
+        const lightingDiagnostic = target.debugView.startsWith('lighting-');
         const persistent = $([[ -n "$capture_persistent_session" ]] && printf true || printf false);
         const canSwitch = persistent && $([[ "$capture_disable_case_switch" == "1" || "$capture_debug" != "final" ]] && printf false || printf true) && await page.evaluate(() =>
             typeof window.__elementsCloudPreviewCapture?.switchCase === 'function');
@@ -561,10 +599,12 @@ capture_run_output="$(
                 selected === 0 && lightState === 'empty' &&
                 !requiresVolumetricLighting &&
                 transportNonFinite === 0 && radianceNonFinite === 0;
-            return evidence.getAttribute('data-benchmark-ready') === 'ready' &&
+            return (request.lightingDiagnostic ||
+                evidence.getAttribute('data-benchmark-ready') === 'ready') &&
                 reconstructionMature &&
                 (!requiresVolumetricLighting || volumetricLightingReady) &&
-                (!requiresHighCloudEvidence || highCloudReady) &&
+                (request.lightingDiagnostic || !requiresHighCloudEvidence ||
+                    highCloudReady) &&
                 (!hasCloudLighting || exactOnlyLightingReady || (
                 lightState === 'complete' && ready === selected
             )) && transportNonFinite === 0 && radianceNonFinite === 0;
@@ -574,6 +614,7 @@ capture_run_output="$(
             sceneKey: target.caseId,
             debugView: target.debugView,
             productionPerspective: target.productionPerspective,
+            lightingDiagnostic,
         };
         if (persistent) {
             await page.evaluate(() => new Promise((resolve) => {
@@ -726,6 +767,8 @@ capture_run_output="$(
                 'data-cloud-raw-radiance-spatial-variation')),
             resolvedRadianceSpatialVariation: Number(element.getAttribute(
                 'data-cloud-resolved-radiance-spatial-variation')),
+            convergenceDelta: Number(element.getAttribute(
+                'data-cloud-resolved-radiance-temporal-delta')),
             directVolumeReady: element.getAttribute(
                 'data-cloud-direct-volume-ready') === 'true',
             residentP1Ready: element.getAttribute(
@@ -757,12 +800,14 @@ capture_run_output="$(
         if (state.sceneKey !== target.caseId ||
             state.debugView !== target.debugView ||
             state.productionPerspective !== target.productionPerspective ||
-            state.benchmarkReady !== 'ready' || !state.reconstructionMature ||
+            (!lightingDiagnostic && state.benchmarkReady !== 'ready') ||
+            !state.reconstructionMature ||
             state.reconstructionRawNonFinite !== 0 ||
             state.reconstructionResolvedNonFinite !== 0 ||
             (state.requiresVolumetricLighting &&
                 !state.volumetricLightingReady) ||
-            (state.requiresHighCloudEvidence && !state.highCloudReady) ||
+            (!lightingDiagnostic && state.requiresHighCloudEvidence &&
+                !state.highCloudReady) ||
             state.renderState === 'failed' || state.lightState === 'failed' ||
             state.renderFailure !== 'none' ||
             (state.lightFailure !== 'none' && state.lightFailure !== 'unavailable') ||
@@ -777,6 +822,30 @@ capture_run_output="$(
             type: 'png',
             timeout: remaining(),
         });
+        const cloudPlateScene =
+            $(node -p 'JSON.stringify(process.argv[1])' "$capture_plate_scene");
+        if (cloudPlateScene) {
+            const cloudPlateRequest = {
+                sceneId: cloudPlateScene,
+                frame: Number(
+                    $(node -p 'JSON.stringify(process.argv[1])' "$capture_plate_frame")
+                ),
+                token:
+                    $(node -p 'JSON.stringify(process.argv[1])' "$capture_plate_token"),
+            };
+            await page.waitForFunction(() => {
+                const canvas = document.querySelector(
+                    '[data-benchmark-render] canvas[data-sky-renderer="webgpu"]'
+                );
+                return typeof canvas?.__elementsCloudPlateCapture === 'function';
+            }, undefined, { timeout: remaining() });
+            state.cloudPlateExport = await page.evaluate((request) => {
+                const canvas = document.querySelector(
+                    '[data-benchmark-render] canvas[data-sky-renderer="webgpu"]'
+                );
+                return canvas.__elementsCloudPlateCapture(request);
+            }, cloudPlateRequest);
+        }
         // playwright-cli's run-code host intentionally does not expose the
         // browser TextEncoder/btoa globals. Keep encoding inside the page
         // realm, just as the adapter preflight does, and return only the
@@ -850,24 +919,21 @@ if [[ -n "$capture_metrics_path" ]]; then
     fi
 fi
 
-# The first canonical catalogue group uses stable WMO genus prefixes. Its
-# final composited PNG receives a second, renderer-independent publication
-# check so broad concentric/cascade artifacts cannot masquerade as thin-cloud
-# texture in the renderer's occupied-pixel radiance metric.
+# Every final composited PNG receives a renderer-independent artifact/texture
+# check. Public catalogue generation performs the stricter profile-aware form
+# with a same-case coverage matte and skips this standalone preflight.
 if [[ "$capture_skip_qualification" != "1" &&
-    "$capture_parameter" == "case" &&
-    "$capture_case" =~ ^(ci|cc|cs)- ]]; then
-    capture_image_qualification_args=("$capture_output")
-    if [[ "$capture_case" =~ ^cs-nebulosus- ]]; then
-        capture_image_qualification_args+=(--allow-smooth-veil)
-    fi
+    "$capture_debug" == "final" ]]; then
+    capture_image_qualification_args=(
+        "$capture_output" --profile "$capture_qualification_profile"
+    )
     capture_image_qualification_status=0
     capture_image_qualification_output="$(
         node "$capture_root/scripts/qualify-cloud-preview-image.mjs" \
             "${capture_image_qualification_args[@]}" 2>&1
     )" || capture_image_qualification_status=$?
     if (( capture_image_qualification_status != 0 )); then
-        persist_capture_failure "high-cloud-image-qualification" \
+        persist_capture_failure "image-qualification" \
             "$capture_image_qualification_status" \
             "$capture_image_qualification_output"
         # Keep the fully rendered rejection beside its bounded diagnostics for

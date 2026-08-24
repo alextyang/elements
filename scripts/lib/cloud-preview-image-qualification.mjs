@@ -1,7 +1,8 @@
 const clamp = (value, minimum, maximum) =>
     Math.min(maximum, Math.max(minimum, value));
 
-export const HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT = Object.freeze({
+export const CLOUD_PREVIEW_IMAGE_QUALIFICATION_SCHEMA_VERSION = 1;
+export const CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT = Object.freeze({
     analysisWidth: 256,
     radialCenterSteps: 7,
     radialBins: 56,
@@ -266,7 +267,7 @@ export const measureCloudPreviewImage = ({
     height,
     channels,
     cloudMask,
-}, contract = HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT) => {
+}, contract = CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT) => {
     if (!(width > 0 && height > 0 && channels >= 3) ||
         data.length < width * height * channels) {
         throw new Error("Cloud preview image pixels are incomplete.");
@@ -410,10 +411,10 @@ export const measureCloudPreviewImage = ({
     return metrics;
 };
 
-export const evaluateHighCloudPreviewImage = (
+export const evaluateCloudPreviewImage = (
     metrics,
     {
-        contract = HIGH_CLOUD_IMAGE_QUALIFICATION_CONTRACT,
+        contract = CLOUD_PREVIEW_IMAGE_QUALIFICATION_CONTRACT,
         requireScaleSeparatedStructure = true,
         requireCloudMask = false,
     } = {},
@@ -493,7 +494,7 @@ export const evaluateHighCloudPreviewImage = (
         : scaleSeparatedStructureReady &&
             (interiorMaterialReady || thinMaterialReady);
     // With a renderer matte, silhouette-only evidence is never sufficient for
-    // a structured high-cloud capture, even when the broad radial test is
+    // a structured cloud capture, even when the broad radial test is
     // quiet.  The explicit smooth-veil profile is the sole waiver for this
     // local material gate; radial-artifact rejection remains independent.
     const cloudLocalGateReady = !cloudMaskUsed ||

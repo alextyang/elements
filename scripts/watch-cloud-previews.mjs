@@ -135,7 +135,7 @@ export const parseArguments = (values) => {
         if (!options.initial) {
             throw new Error(
                 "Detached preview service cannot accept --no-initial; it always " +
-                "starts the full 276-case oblique-natural matrix.",
+                "starts the full 276-case single-camera matrix.",
             );
         }
         const nonGeneratingArgument = options.generatorArgs.find((argument) =>
@@ -143,7 +143,7 @@ export const parseArguments = (values) => {
         if (nonGeneratingArgument) {
             throw new Error(
                 `Detached preview service cannot accept ${nonGeneratingArgument}; ` +
-                "it always generates the full 276-case oblique-natural matrix.",
+                "it always generates the full 276-case single-camera matrix.",
             );
         }
         const partialMatrixArgument = options.generatorArgs.find((argument) =>
@@ -154,7 +154,7 @@ export const parseArguments = (values) => {
         if (partialMatrixArgument) {
             throw new Error(
                 `Detached preview service cannot accept ${partialMatrixArgument}; ` +
-                "it always owns the full 276-case oblique-natural matrix.",
+                "it always owns the full 276-case single-camera matrix.",
             );
         }
     }
@@ -447,7 +447,7 @@ const main = () => {
     const publishServiceState = () => {
         if (!options.serviceStatePath || serviceReleased) return;
         writeCloudPreviewServiceStateSafely(options.serviceStatePath, {
-            schemaVersion: 1,
+            schemaVersion: 2,
             pid: process.pid,
             token: options.serviceToken,
             startedAt: serviceStartedAt,
@@ -456,7 +456,7 @@ const main = () => {
             priority: options.priority,
             debounceMs: options.debounceMs,
             mode: options.externalServer ? "external-server" : "managed-production",
-            perspective: "oblique-natural",
+            perspectiveMode: "single-camera",
         });
     };
     const removeOwnedServiceState = () => {

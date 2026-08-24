@@ -243,7 +243,6 @@ export const transpileCloudPreviewModuleClosure = ({
  */
 export const loadCloudPreviewScenarios = async ({
     repositoryRoot,
-    productionPerspective = "oblique-natural",
 }) => {
     const sourceRoot = resolve(repositoryRoot, "components/backgrounds/sky");
     const temporaryRoot = mkdtempSync(join(tmpdir(), "elements-cloud-previews-"));
@@ -299,12 +298,29 @@ export const loadCloudPreviewScenarios = async ({
         writeFileSync(catalogOutputPath, rewrittenCatalogOutput);
 
         const catalog = await import(pathToFileURL(catalogOutputPath).href);
-        const scenarios = catalog.previewDefinitions(productionPerspective);
+        const scenarios = catalog.previewDefinitions();
         const duplicateIds = scenarios.filter((scenario, index) =>
             scenarios.findIndex(({ id }) => id === scenario.id) !== index);
         if (duplicateIds.length > 0) {
             throw new Error(`Duplicate cloud preview ids: ${duplicateIds
                 .map(({ id }) => id).join(", ")}`);
+        }
+        const invalid = scenarios.find((scenario) =>
+            typeof scenario.productionPerspective !== "string" ||
+            !scenario.productionPerspective ||
+            typeof scenario.productionCameraSignature !== "string" ||
+            !scenario.productionCameraSignature ||
+            !["artifact-and-texture", "artifact-only"].includes(
+                scenario.imageQualificationProfile,
+            ) ||
+            !["accepted", "not-accepted"].includes(
+                scenario.photographicAcceptance,
+            ));
+        if (invalid) {
+            throw new Error(
+                `Cloud preview catalogue entry lacks qualification metadata: ` +
+                `${invalid.id ?? "unknown"}`,
+            );
         }
         return scenarios;
     } finally {

@@ -15,8 +15,8 @@ import {
 import { basename, dirname, join, relative } from "node:path";
 import { spawn } from "node:child_process";
 
-export const CLOUD_PREVIEW_SCHEMA_VERSION = 1;
-export const CLOUD_PREVIEW_GENERATOR_VERSION = 3;
+export const CLOUD_PREVIEW_SCHEMA_VERSION = 2;
+export const CLOUD_PREVIEW_GENERATOR_VERSION = 4;
 export const CLOUD_PREVIEW_ASSET_MANIFEST_PATH =
     "public/assets/sky/cloud-macro-atlas-v2.json";
 export const CLOUD_PREVIEW_ASSET_CHECKSUM_ALGORITHM = "SHA-256";
@@ -160,13 +160,12 @@ export const cloudPreviewAssetChecksumsEqual = (left, right) =>
 export const scenarioContentHash = ({
     rendererHash,
     scenario,
-    productionPerspective,
     transportUpdates,
     captureMode,
 }) => sha256([
     `generator:${CLOUD_PREVIEW_GENERATOR_VERSION}\0`,
     `renderer:${rendererHash}\0`,
-    `perspective:${productionPerspective}\0`,
+    `perspective:${scenario.productionPerspective}\0`,
     `updates:${transportUpdates}\0`,
     `capture-mode:${captureMode}\0`,
     stableJson(scenario),

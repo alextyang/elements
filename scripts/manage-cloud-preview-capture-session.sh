@@ -7,6 +7,7 @@ session_state="${2:?session state path is required}"
 session_base_url="${CLOUD_PREVIEW_URL:-http://127.0.0.1:3000}"
 session_mode="${CLOUD_PREVIEW_CAPTURE_MODE:-native-metal}"
 session_native_config="$session_root/scripts/config/cloud-preview-native-playwright.json"
+session_native_headless_config="$session_root/scripts/config/cloud-preview-native-headless-playwright.json"
 session_adapter_policy="$session_root/components/backgrounds/sky/cloud-transport-adapter-policy.mjs"
 session_probe_url="$session_base_url/cloud-preview-adapter-probe.html"
 
@@ -77,8 +78,10 @@ if [[ "$session_command" != "start" ]]; then
     echo "session command must be start or stop" >&2
     exit 2
 fi
-if [[ "$session_mode" != "native-metal" && "$session_mode" != "headless" ]]; then
-    echo "CLOUD_PREVIEW_CAPTURE_MODE must be native-metal or headless" >&2
+if [[ "$session_mode" != "native-metal" &&
+    "$session_mode" != "native-metal-headless" &&
+    "$session_mode" != "headless" ]]; then
+    echo "CLOUD_PREVIEW_CAPTURE_MODE must be native-metal, native-metal-headless, or headless" >&2
     exit 2
 fi
 if ! curl -fsS --max-time 10 "$session_base_url/cloud-photographs" >/dev/null; then
@@ -108,6 +111,8 @@ trap 'exit 129' HUP
 open_args=(open about:blank)
 if [[ "$session_mode" == "native-metal" ]]; then
     open_args+=(--config "$session_native_config")
+elif [[ "$session_mode" == "native-metal-headless" ]]; then
+    open_args+=(--config "$session_native_headless_config")
 fi
 open_status=0
 open_output="$(
@@ -174,7 +179,8 @@ adapter_backend="$(node --input-type=module -e '
     const info = JSON.parse(process.argv[2]);
     process.stdout.write(policy.resolveCloudTransportAdapterBackend(info));
 ' "$session_adapter_policy" "$adapter_info")"
-if [[ "$session_mode" == "native-metal" &&
+if [[ ( "$session_mode" == "native-metal" ||
+        "$session_mode" == "native-metal-headless" ) &&
     "$adapter_backend" != "native-apple-metal" ]]; then
     echo "Native cloud preview capture refused non-Apple-Metal WebGPU: $adapter_info" >&2
     exit 1

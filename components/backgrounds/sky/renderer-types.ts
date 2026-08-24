@@ -61,6 +61,8 @@ export interface SkyRendererOptions {
     cloudComposition: SkyCloudComposition;
     cloudPerspective: SkyCloudPerspective;
     cloudEditorialRegime: SkyCloudEditorialRegime;
+    /** Content-addressed 2.5-D affine cloud transport manifest. */
+    cloudPlateManifestUrl?: string;
 }
 
 export interface SkyRendererAdapterInfo {
@@ -274,6 +276,7 @@ export const DEFAULT_SKY_RENDERER_OPTIONS: SkyRendererOptions = {
     cloudComposition: "graphic",
     cloudPerspective: "natural",
     cloudEditorialRegime: "auto",
+    cloudPlateManifestUrl: undefined,
 };
 
 export const resolveSkyRendererOptions = (

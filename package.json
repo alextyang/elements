@@ -34,6 +34,8 @@
     "cloud:previews:watch:status": "node scripts/manage-cloud-preview-watch.mjs status",
     "cloud:previews:watch:stop": "node scripts/manage-cloud-preview-watch.mjs stop",
     "cloud:previews:watch:restart": "node scripts/manage-cloud-preview-watch.mjs restart",
+    "cloud:plates:bootstrap": "node scripts/bootstrap-cloud-vdb-assets.mjs",
+    "cloud:plates:render": "node scripts/render-cloud-plates.mjs",
     "cloud:diagnostics": "node scripts/capture-cloud-diagnostics.mjs",
     "sky:qualify": "bash scripts/qualify-cloud-renderer.sh"
   },

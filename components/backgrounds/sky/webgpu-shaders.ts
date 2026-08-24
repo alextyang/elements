@@ -6475,6 +6475,15 @@ fn deform_cloud_macro_coordinate(
             coordinate.x * PI * 2.0 + seeds.y * PI * 2.0) *
             mix(0.024, 0.009, inversion_strength);
     }
+    if (formation_mechanism == 12) {
+        // Cirrostratus owns a stochastic 3-D ice-water-content field in its
+        // atlas volume. Runtime deformation is limited to continuous vertical
+        // wind shear; it must not add the periodic cap wave used by liquid and
+        // mixed-phase frontal shields. That wave projected as nested shell
+        // contours when a broad transparent veil crossed the ground view.
+        result.x += centered.y * shear * 0.16;
+        result.z -= centered.y * shear * 0.27;
+    }
     if (formation_mechanism == 8 || topology == 5) {
         // Lenticular packets remain phase-locked to terrain. Wavelength and
         // crest count alter the standing displacement; time never enters.
@@ -6913,17 +6922,17 @@ fn cloud_macro_volume_rgba(
         atlas_binding.atlas_offset.xyz;
     let centre = textureSampleLevel(
         cloud_macro_atlas, cloud_macro_sampler, atlas_uv, 0.0);
-    // The inversion-bounded deck is a continuous liquid sheet, but its
-    // compact 48^3 exemplar has only a handful of occupied altitude texels.
-    // A single trilinear lookup therefore preserves the storage terraces as
-    // broad horizontal radiance plateaus once a physical ray marcher resolves
-    // the finite owner.  Reconstruct one bounded atlas-voxel footprint in the
-    // owner frame.  This is a physical material reconstruction shared by
-    // camera and source transport (not a screen-space mask or grade), and is
-    // restricted to the inversion-bounded formation ABI so other volumes keep
-    // their authoritative anatomy unchanged.
+    // Thin physical sheets cannot expose their compact 48^3 storage planes.
+    // Reconstruct a bounded owner-vertical material footprint shared by camera
+    // and source transport (never a screen-space mask or grade). The liquid
+    // inversion deck needs one-voxel support; the stochastic-ice veil uses a
+    // five-tap binomial footprint matching its authored 50--80 m vertical IWC
+    // correlation scale. This turns the sampled stochastic realization into a
+    // continuous material field without inventing condensate outside support.
     let formation_mechanism = i32(round(atlas_binding.majorant_scale.w));
-    if (formation_mechanism != 10) { return centre; }
+    if (formation_mechanism != 10 && formation_mechanism != 12) {
+        return centre;
+    }
     let vertical_voxel = vec3<f32>(0.0, 1.0 / 47.0, 0.0);
     let lower_coordinate = clamp(
         storage_coordinate - vertical_voxel,
@@ -6939,23 +6948,49 @@ fn cloud_macro_volume_rgba(
         cloud_macro_atlas, cloud_macro_sampler, lower_uv, 0.0);
     let upper = textureSampleLevel(
         cloud_macro_atlas, cloud_macro_sampler, upper_uv, 0.0);
+    var weighted = (lower + centre * 2.0 + upper) * 0.25;
+    var all_supported = centre.r > 0.0001 &&
+        lower.r > 0.0001 && upper.r > 0.0001;
+    var monotone_lower = min(lower, min(centre, upper));
+    var monotone_upper = max(lower, max(centre, upper));
+    if (formation_mechanism == 12) {
+        let lower_two_coordinate = clamp(
+            storage_coordinate - 2.0 * vertical_voxel,
+            vec3<f32>(0.0), vec3<f32>(1.0));
+        let upper_two_coordinate = clamp(
+            storage_coordinate + 2.0 * vertical_voxel,
+            vec3<f32>(0.0), vec3<f32>(1.0));
+        let lower_two = textureSampleLevel(
+            cloud_macro_atlas, cloud_macro_sampler,
+            lower_two_coordinate * atlas_binding.atlas_scale.xyz +
+                atlas_binding.atlas_offset.xyz,
+            0.0);
+        let upper_two = textureSampleLevel(
+            cloud_macro_atlas, cloud_macro_sampler,
+            upper_two_coordinate * atlas_binding.atlas_scale.xyz +
+                atlas_binding.atlas_offset.xyz,
+            0.0);
+        weighted = (lower_two + lower * 4.0 + centre * 6.0 +
+            upper * 4.0 + upper_two) * 0.0625;
+        all_supported = all_supported &&
+            lower_two.r > 0.0001 && upper_two.r > 0.0001;
+        monotone_lower = min(monotone_lower, min(lower_two, upper_two));
+        monotone_upper = max(monotone_upper, max(lower_two, upper_two));
+    }
     // The symmetric kernel has unit mass over the supported interior, so
     // vertical integration of R and the packed optical attributes is
     // unchanged away from the conservative boundaries.  Clamp each channel
     // to the three source values as a monotone reconstruction guard.  An empty
     // centre remains empty: neighbouring occupied texels cannot grow
     // condensate past the conservative atlas support at the deck base or cap.
-    let monotone_lower = min(lower, min(centre, upper));
-    let monotone_upper = max(lower, max(centre, upper));
     let filtered = clamp(
-        (lower + centre * 2.0 + upper) * 0.25,
+        weighted,
         monotone_lower, monotone_upper);
     // G/B are phase/material attributes, not independent condensate.  Blend
     // them with the same unit-mass kernel only when all three taps are inside
     // resident support; otherwise retain the centre attributes instead of
     // diluting a base/cap with an empty continuation.
-    let material_has_two_sided_support = centre.r > 0.0001 &&
-        lower.r > 0.0001 && upper.r > 0.0001;
+    let material_has_two_sided_support = all_supported;
     // Alpha is the signed-distance support carrier, not an optical colour.
     // Keep the geometric field exactly as authored; reconstructing it would
     // move the physical base or cap even when material support is conservative.
@@ -7515,63 +7550,6 @@ fn cloud_resolved_high_ice_material(
         local_correlation);
 }
 
-// The authored Spissatus realization is a conservative 96^3 condensate and
-// support carrier, not the terminal display-resolution ice field.  Map its
-// unresolved occupancy moments onto the locally resolved mean, then add the
-// stationary procedural residual as a separate, bounded density variance.
-// This preserves the authored clear/support probability, cannot grow material
-// outside authored R/A support, and gives camera/source Beer closures the same
-// distribution after either path samples the same owner-space residual.
-fn cloud_spissatus_authored_second_moment(
-    authored_density: f32,
-    authored_second_moment: f32,
-    resolved_density: f32,
-) -> f32 {
-    let source_mean = clamp(authored_density, 0.0, 1.0);
-    let source_capacity = source_mean * (1.0 - source_mean);
-    let source_variance = max(
-        0.0,
-        clamp(authored_second_moment,
-            source_mean * source_mean, source_mean) -
-            source_mean * source_mean);
-    let occupancy_fraction = select(
-        0.0,
-        clamp(source_variance / max(1e-6, source_capacity), 0.0, 1.0),
-        source_capacity > 1e-6);
-    let mean = clamp(resolved_density, 0.0, 1.0);
-    let mapped_variance = occupancy_fraction * mean * (1.0 - mean);
-    return clamp(
-        mean * mean + mapped_variance,
-        mean * mean,
-        mean);
-}
-
-fn cloud_spissatus_residual_density_variance(
-    resolved_density: f32,
-    authored_coverage: f32,
-    sdf_voxels: f32,
-) -> f32 {
-    let mean = clamp(resolved_density, 0.0, 1.0);
-    let contrast_capacity = min(mean, 1.0 - mean);
-    // Match the exact Spissatus amplitude and core attenuation used by
-    // cloud_resolved_high_ice_material.  The balanced volume channels are
-    // calibrated to a 0.22 RMS stationary residual; expected-Beer performs
-    // the subsequent footprint/correlation reduction exactly once.
-    let inward_depth = max(0.0, -sdf_voxels);
-    let core_amount = smoothstep(2.0, 9.0, inward_depth);
-    let local_amplitude = 0.43 * mix(1.0, 0.72, core_amount);
-    let residual_rms = contrast_capacity * 2.0 * local_amplitude * 0.22;
-    // Source G is unconditional parent-cell support coverage.  The residual
-    // exists only inside that authored support, so its unconditional moment
-    // carries the same probability exactly once before the Beer footprint
-    // closure reduces it by N_eff.
-    let support_probability = clamp(authored_coverage, 0.0, 1.0);
-    return clamp(
-        support_probability * residual_rms * residual_rms,
-        0.0,
-        mean * (1.0 - mean));
-}
-
 struct CloudMacroOwnerSample {
     density: f32,
     detail: f32,
@@ -7844,48 +7822,25 @@ fn cloud_macro_owner_sample(
         geometric_depth / 96.0,
         2.0 * major_radius / 96.0);
     if (authored_source_allowed) {
-        // The authored 96^3 realization owns mass and finite support. Dense
-        // Spissatus additionally resolves a bounded sub-voxel ice field; the
-        // identical call in directional coupling keeps light and camera
-        // transport on one stationary 3-D realization.
+        // The authored 96^3 realization owns mass, finite support, and its
+        // unresolved moments. Do not layer the legacy periodic residual over
+        // this source: that duplicates structure and can create radial or
+        // repeated high-ice artifacts in both camera and light transport.
         let authored = cloud_high_ice_authored_sample(
             canonical, atlas_binding, transport_material_density,
             source_voxel_dimensions,
             high_ice_lateral_filter_radius_km,
             high_ice_depth_filter_radius_km,
             high_ice_ray_direction_owner_local);
-        var resolved_authored = vec4<f32>(
-            authored.density, saturate(macro_sample.g), 0.0, 0.0);
-        if (species == 3) {
-            resolved_authored = cloud_resolved_high_ice_material(
-                canonical, local_position, macro_sample, sdf_voxels,
-                authored.density, system, genus, species,
-                high_ice_lateral_filter_radius_km,
-                high_ice_depth_filter_radius_km,
-                high_ice_ray_direction_owner_local);
-        }
-        result.density = resolved_authored.x;
-        result.detail = resolved_authored.y;
+        result.density = authored.density;
+        result.detail = saturate(macro_sample.g);
         result.unresolved_ice_variance = 0.0;
         result.unresolved_ice_correlation = 0.0;
-        result.high_ice_second_moment = select(
-            authored.second_moment,
-            cloud_spissatus_authored_second_moment(
-                authored.density,
-                authored.second_moment,
-                result.density),
-            species == 3);
+        result.high_ice_second_moment = authored.second_moment;
         result.high_ice_coverage = authored.coverage;
-        result.high_ice_residual_variance = select(
-            0.0,
-            cloud_spissatus_residual_density_variance(
-                result.density, authored.coverage, sdf_voxels),
-            species == 3);
+        result.high_ice_residual_variance = 0.0;
         result.high_ice_mean_density = result.density;
-        result.high_ice_correlation_length = select(
-            authored.correlation_length,
-            max(authored.correlation_length, 0.18),
-            species == 3);
+        result.high_ice_correlation_length = authored.correlation_length;
         result.high_ice_lateral_filter_radius = max(
             0.0, high_ice_lateral_filter_radius_km);
         result.high_ice_depth_filter_radius = max(
@@ -10404,38 +10359,15 @@ fn cloud_coupling_filtered_macro_owner_sample(
             coupling_filter_radius_km,
             max(0.0, depth_filter_radius_km),
             ray_direction_owner_local);
-        var resolved_authored = vec4<f32>(
-            authored.density, saturate(macro_sample.g), 0.0, 0.0);
-        if (species == 3) {
-            resolved_authored = cloud_resolved_high_ice_material(
-                canonical, local_position, macro_sample, sdf_voxels,
-                authored.density, system, genus, species,
-                coupling_filter_radius_km,
-                max(0.0, depth_filter_radius_km),
-                ray_direction_owner_local);
-        }
-        result.density = resolved_authored.x;
-        result.detail = resolved_authored.y;
+        result.density = authored.density;
+        result.detail = saturate(macro_sample.g);
         result.unresolved_ice_variance = 0.0;
         result.unresolved_ice_correlation = 0.0;
         result.high_ice_mean_density = result.density;
-        result.high_ice_second_moment = select(
-            authored.second_moment,
-            cloud_spissatus_authored_second_moment(
-                authored.density,
-                authored.second_moment,
-                result.density),
-            species == 3);
+        result.high_ice_second_moment = authored.second_moment;
         result.high_ice_coverage = authored.coverage;
-        result.high_ice_residual_variance = select(
-            0.0,
-            cloud_spissatus_residual_density_variance(
-                result.density, authored.coverage, sdf_voxels),
-            species == 3);
-        result.high_ice_correlation_length = select(
-            authored.correlation_length,
-            max(authored.correlation_length, 0.18),
-            species == 3);
+        result.high_ice_residual_variance = 0.0;
+        result.high_ice_correlation_length = authored.correlation_length;
         result.high_ice_lateral_filter_radius = coupling_filter_radius_km;
         result.high_ice_depth_filter_radius = max(
             0.0, depth_filter_radius_km);
@@ -11620,6 +11552,58 @@ fn cloud_local_directional_source_optical_depth(
         local_optics, resolved_tau);
 }
 
+// Transparent Cirrostratus cannot sample the cascaded 32-knot shadow field:
+// its depth/cascade interpolation planes become visible as screen-radial
+// bands. It also cannot use the voxel SDF cap above, whose quantized distance
+// levels reproduce the same failure. A Cs receiver instead integrates a
+// continuous Beer path to its finite owner's analytic boundary. Density and
+// high-ice footprint moments remain the authored local material; only the
+// discontinuous distance representation is removed.
+fn cloud_cirrostratus_source_optical_depth(
+    point: vec3<f32>, density: f32,
+    spectral_extinction_rgb_per_km: vec3<f32>,
+    local_material: CloudLocalMaterial,
+    local_optics: CloudLocalOptics,
+    source_direction: vec3<f32>,
+) -> vec3<f32> {
+    if (local_material.atlas_match <= 0.5) { return vec3<f32>(0.0); }
+    let secondary_amount = select(
+        0.0,
+        1.0 - saturate(local_material.primary_fraction),
+        local_material.secondary_owner > 0.5);
+    let primary_amount = 1.0 - secondary_amount;
+    var owner_exit_path = cloud_owner_source_exit_path_km(
+        point,
+        cloud_material_owner(local_material.primary_owner),
+        source_direction) * primary_amount;
+    if (secondary_amount > 0.0001) {
+        owner_exit_path += cloud_owner_source_exit_path_km(
+            point,
+            cloud_material_owner(local_material.secondary_owner),
+            source_direction) * secondary_amount;
+    }
+    if (owner_exit_path <= 1e-5) { return vec3<f32>(0.0); }
+    let resolved_tau = min(
+        vec3<f32>(CLOUD_FALLBACK_DIFFUSE_MAX_TAU),
+        max(vec3<f32>(0.0),
+            density * spectral_extinction_rgb_per_km) * owner_exit_path);
+    if (local_optics.high_ice_coverage > 1e-5 ||
+        local_optics.high_ice_second_moment > 1e-5) {
+        return cloud_high_ice_expected_beer_tau(
+            resolved_tau,
+            local_optics.high_ice_mean_density,
+            local_optics.high_ice_second_moment,
+            local_optics.high_ice_coverage,
+            local_optics.high_ice_residual_variance,
+            owner_exit_path,
+            local_optics.high_ice_correlation_length,
+            local_optics.high_ice_lateral_filter_radius,
+            local_optics.high_ice_depth_filter_radius);
+    }
+    return cloud_unresolved_footprint_optical_depth(
+        local_optics, resolved_tau);
+}
+
 // Ordinary cloud single scattering is a bulk-mixture source. Basing it on an
 // owner identity made a third overlapping owner disappear abruptly whenever
 // the second and third strengths exchanged rank. The material moments above
@@ -11702,6 +11686,44 @@ fn cloud_fallback_diffuse_radiance(
         ground_first_and_higher_order;
 }
 
+// A transparent Cirrostratus veil is optically thin enough that the exterior
+// sky field is effectively constant across its sub-kilometre physical depth.
+// Re-evaluating the atmosphere/ground profiles at every camera-march sample
+// exposes their discrete transport levels as concentric screen bands. Resolve
+// exterior illumination once at the veil centroid instead; continuous camera
+// Beer integration of the stochastic IWC field still owns all visible spatial
+// structure and extinction. No blur, screen-space filter, or radial primitive
+// participates in this closure.
+fn cloud_cirrostratus_exterior_diffuse_radiance(
+    local: CloudLocalOptics,
+    point: vec3<f32>, layer: Layer,
+) -> vec3<f32> {
+    let centroid_altitude_km = max(0.0,
+        layer.geometry.x + 0.5 * max(0.02, layer.geometry.y));
+    let centroid_radius_km = PLANET_RADIUS + centroid_altitude_km;
+    let centroid_point = coupling_safe_normalize(point) * centroid_radius_km;
+    let upper_atmosphere =
+        physical_diffuse_irradiance_at(centroid_point) / PI;
+    let lower_atmosphere =
+        physical_lower_atmosphere_irradiance_at(centroid_point) / PI;
+    // A Cirrostratus veil covers a broad solid angle and remains optically
+    // thin. Its incident diffuse field is the hemispheric radiance mean, not
+    // the renderer's finite directional-lobe cache. Imprinting those lobe
+    // axes on every receiver produced the screen-radial fan that looked like
+    // nested circles. The normalized phase integral of a hemispheric-constant
+    // field is the half-sum below.
+    let directional_atmosphere_phase_integral =
+        0.5 * (upper_atmosphere + lower_atmosphere);
+    return cloud_fallback_diffuse_radiance(
+        local,
+        directional_atmosphere_phase_integral,
+        upper_atmosphere,
+        lower_atmosphere,
+        physical_ground_irradiance_at(centroid_point) / PI,
+        vec3<f32>(0.0),
+        vec3<f32>(0.0));
+}
+
 fn is_sheet_layer(layer: Layer) -> bool {
     let genus = i32(round(layer.scale.z));
     let species = i32(round(layer.species.x));
@@ -11762,13 +11784,30 @@ fn sheet_node_source_radiance(
         primary_volume_confidence, secondary_volume_confidence);
     var resolved_light_volume_confidence = light_volume_confidence;
 
-    let source_sun_transmittance =
-        cloud_camera_source_transmittance(point, 0u);
-    let source_moon_transmittance =
-        cloud_camera_source_transmittance(point, 1u);
+    let cirrostratus = i32(round(layer.scale.z)) == 3;
     let diffuse_optical_depth = cloud_local_sdf_diffuse_optical_depth(
         point, density, spectral_extinction_coefficient,
         local_material, layer);
+    var sun_local_tau = cloud_local_directional_source_optical_depth(
+        point, density, spectral_extinction_coefficient,
+        local_material, sun_optics, diffuse_optical_depth, sun_direction);
+    var moon_local_tau = cloud_local_directional_source_optical_depth(
+        point, density, spectral_extinction_coefficient,
+        local_material, moon_optics, diffuse_optical_depth, moon_direction);
+    var source_sun_transmittance =
+        cloud_camera_source_transmittance(point, 0u);
+    var source_moon_transmittance =
+        cloud_camera_source_transmittance(point, 1u);
+    if (cirrostratus) {
+        sun_local_tau = cloud_cirrostratus_source_optical_depth(
+            point, density, spectral_extinction_coefficient,
+            local_material, sun_optics, sun_direction);
+        moon_local_tau = cloud_cirrostratus_source_optical_depth(
+            point, density, spectral_extinction_coefficient,
+            local_material, moon_optics, moon_direction);
+        source_sun_transmittance = exp(-sun_local_tau);
+        source_moon_transmittance = exp(-moon_local_tau);
+    }
     let primary_amount = 1.0 - secondary_amount;
     let source_sun_direct = cloud_bulk_direct_radiance(
         density, spectral_extinction_coefficient, sun_optics,
@@ -11819,12 +11858,6 @@ fn sheet_node_source_radiance(
         needs_exterior_diffuse_reference ||
         needs_source_higher_order_reference) {
         analytic_reference_evaluated = true;
-        let sun_local_tau = cloud_local_directional_source_optical_depth(
-            point, density, spectral_extinction_coefficient,
-            local_material, sun_optics, diffuse_optical_depth, sun_direction);
-        let moon_local_tau = cloud_local_directional_source_optical_depth(
-            point, density, spectral_extinction_coefficient,
-            local_material, moon_optics, diffuse_optical_depth, moon_direction);
         let sun_multi = cloud_optical_multiple_scattering(
             sun_optics, source_sun_transmittance,
             sun_local_tau, sun_cosine);
@@ -11841,34 +11874,32 @@ fn sheet_node_source_radiance(
         source_higher_order_reference = cloud_finite_nonnegative_radiance(
             source_higher_order, vec3<f32>(0.0));
 
-        let atmosphere_point = renderer_to_atmosphere_world(point);
-        let physical_altitude_km = max(0.0,
-            length(atmosphere_point) -
-                physical_atmosphere.radii_scales.x);
-        let incident_sky = physical_diffuse_irradiance_at(point) / PI;
-        let lower_atmosphere =
-            physical_lower_atmosphere_irradiance_at(point) / PI;
-        let ground_irradiance = physical_ground_irradiance_at(point) / PI;
-        if (!(*directional_sky_cache_valid)) {
-            *directional_sky_cache = cloud_directional_sky_band_cache(
-                layer, direction);
-            *directional_sky_cache_valid = true;
+        var diffuse = cloud_cirrostratus_exterior_diffuse_radiance(
+            sun_optics, point, layer);
+        if (!cirrostratus) {
+            if (!(*directional_sky_cache_valid)) {
+                *directional_sky_cache = cloud_directional_sky_band_cache(
+                    layer, direction);
+                *directional_sky_cache_valid = true;
+            }
+            let atmosphere_point = renderer_to_atmosphere_world(point);
+            let physical_altitude_km = max(0.0,
+                length(atmosphere_point) -
+                    physical_atmosphere.radii_scales.x);
+            let directional_atmosphere_phase_integral =
+                cloud_sample_directional_sky_band_cache(
+                    *directional_sky_cache,
+                    physical_altitude_km,
+                    sun_optics.asymmetry);
+            diffuse = cloud_fallback_diffuse_radiance(
+                sun_optics,
+                directional_atmosphere_phase_integral,
+                physical_diffuse_irradiance_at(point) / PI,
+                physical_lower_atmosphere_irradiance_at(point) / PI,
+                physical_ground_irradiance_at(point) / PI,
+                diffuse_optical_depth.upper_rgb,
+                diffuse_optical_depth.lower_rgb);
         }
-        let directional_atmosphere_phase_integral =
-            cloud_sample_directional_sky_band_cache(
-                *directional_sky_cache,
-                physical_altitude_km,
-                sun_optics.asymmetry);
-        let sky_tau = diffuse_optical_depth.upper_rgb;
-        let ground_tau = diffuse_optical_depth.lower_rgb;
-        let diffuse = cloud_fallback_diffuse_radiance(
-            sun_optics,
-            directional_atmosphere_phase_integral,
-            incident_sky,
-            lower_atmosphere,
-            ground_irradiance,
-            sky_tau,
-            ground_tau);
         exterior_diffuse_reference = cloud_finite_nonnegative_radiance(
             diffuse, vec3<f32>(0.0));
         analytic_diffuse_radiance = cloud_finite_nonnegative_radiance(
@@ -12118,7 +12149,7 @@ fn march_layer(
         maximum_step_km = select(0.10, 0.08, species == 1);
     }
     if (genus == 2) { maximum_step_km = 0.08; }
-    if (genus == 3) { maximum_step_km = 0.12; }
+    if (genus == 3) { maximum_step_km = 0.08; }
     if (genus == 10) { maximum_step_km = 0.08; }
     step_count = max(
         step_count,
@@ -12246,8 +12277,13 @@ fn march_layer(
                 0.5 * parent_step_length,
                 high_ice_camera_packet);
             // Correlated R2 strata preserve the spatial/temporal blue-noise
-            // rank for ordinary media. High-ice uses fixed positive GL2 nodes
-            // so each subsegment's physical depth footprint is explicit.
+            // rank for ordinary media. Compact Ci/Cc packets use fixed
+            // positive GL2 nodes. A broad transparent Cirrostratus veil must
+            // not: repeating those nodes across a shallow shell projects the
+            // integration lattice into coherent screen-radial arcs. Give each
+            // half-packet an independent bounded R2 position so the one fixed
+            // production camera converges the IWC integral without a radial
+            // sampling primitive.
             let stratum_jitter = fract(
                 jitter + actual_steps * 0.5698402909980532 +
                     f32(index) * 0.438289);
@@ -12258,10 +12294,16 @@ fn march_layer(
                     CLOUD_CAMERA_HIGH_ICE_GL2_NODE) *
                     0.5 * parent_step_length,
                 high_ice_camera_packet);
-            let travelled = select(
+            var travelled = select(
                 mix(step_near, step_far, guarded_jitter),
                 0.5 * (step_near + step_far) + gl2_offset,
                 high_ice_camera_packet);
+            if (high_ice_camera_packet && genus == 3) {
+                let packet_near = step_near +
+                    f32(camera_subnode) * 0.5 * parent_step_length;
+                let packet_far = packet_near + 0.5 * parent_step_length;
+                travelled = mix(packet_near, packet_far, guarded_jitter);
+            }
             actual_steps += 1.0;
         let point = origin + direction * travelled;
         let fibratus_filter_radius_km = max(0.0, travelled) *
@@ -12357,10 +12399,30 @@ fn march_layer(
             // One continuous cumulative RGB atlas owns all same- and
             // inter-layer cloud extinction. Resident P1 fields remain a
             // higher-order representation and are never multiplied here.
-            let source_sun_transmittance =
+            var sun_local_tau =
+                cloud_local_directional_source_optical_depth(
+                    point, density, spectral_extinction_coefficient,
+                    local_material, sun_optics, diffuse_optical_depth,
+                    sun_direction);
+            var moon_local_tau =
+                cloud_local_directional_source_optical_depth(
+                    point, density, spectral_extinction_coefficient,
+                    local_material, moon_optics, diffuse_optical_depth,
+                    moon_direction);
+            var source_sun_transmittance =
                 cloud_camera_source_transmittance(point, 0u);
-            let source_moon_transmittance =
+            var source_moon_transmittance =
                 cloud_camera_source_transmittance(point, 1u);
+            if (genus == 3) {
+                sun_local_tau = cloud_cirrostratus_source_optical_depth(
+                    point, density, spectral_extinction_coefficient,
+                    local_material, sun_optics, sun_direction);
+                moon_local_tau = cloud_cirrostratus_source_optical_depth(
+                    point, density, spectral_extinction_coefficient,
+                    local_material, moon_optics, moon_direction);
+                source_sun_transmittance = exp(-sun_local_tau);
+                source_moon_transmittance = exp(-moon_local_tau);
+            }
             let local_sun_irradiance =
                 physical_source_irradiance_at(0u, point);
             let local_moon_irradiance =
@@ -12413,36 +12475,6 @@ fn march_layer(
                 needs_exterior_diffuse_reference ||
                 needs_source_higher_order_reference) {
                 analytic_reference_evaluated = true;
-                if (!directional_sky_cache_valid) {
-                    directional_sky_cache = cloud_directional_sky_band_cache(
-                        layer, direction);
-                    directional_sky_cache_valid = true;
-                }
-                let atmosphere_point = renderer_to_atmosphere_world(point);
-                let physical_altitude_km = max(
-                    0.0,
-                    length(atmosphere_point) -
-                        physical_atmosphere.radii_scales.x,
-                );
-                let directional_atmosphere_phase_integral =
-                    cloud_sample_directional_sky_band_cache(
-                        directional_sky_cache,
-                        physical_altitude_km,
-                        sun_optics.asymmetry);
-                let incident_sky = physical_diffuse_irradiance_at(point) / PI;
-                let lower_atmosphere =
-                    physical_lower_atmosphere_irradiance_at(point) / PI;
-                let ground = physical_ground_irradiance_at(point) / PI;
-                let sun_local_tau =
-                    cloud_local_directional_source_optical_depth(
-                        point, density, spectral_extinction_coefficient,
-                        local_material, sun_optics, diffuse_optical_depth,
-                        sun_direction);
-                let moon_local_tau =
-                    cloud_local_directional_source_optical_depth(
-                        point, density, spectral_extinction_coefficient,
-                        local_material, moon_optics, diffuse_optical_depth,
-                        moon_direction);
                 let sun_multi = cloud_optical_multiple_scattering(
                     sun_optics, source_sun_transmittance,
                     sun_local_tau, sun_cosine);
@@ -12455,16 +12487,35 @@ fn march_layer(
                 source_higher_order_reference =
                     cloud_finite_nonnegative_radiance(
                         source_higher_order, vec3<f32>(0.0));
-                let sky_tau = diffuse_optical_depth.upper_rgb;
-                let ground_tau = diffuse_optical_depth.lower_rgb;
-                let multiple = cloud_fallback_diffuse_radiance(
-                    sun_optics,
-                    directional_atmosphere_phase_integral,
-                    incident_sky,
-                    lower_atmosphere,
-                    ground,
-                    sky_tau,
-                    ground_tau);
+                var multiple = cloud_cirrostratus_exterior_diffuse_radiance(
+                    sun_optics, point, layer);
+                if (genus != 3) {
+                    if (!directional_sky_cache_valid) {
+                        directional_sky_cache =
+                            cloud_directional_sky_band_cache(
+                                layer, direction);
+                        directional_sky_cache_valid = true;
+                    }
+                    let atmosphere_point = renderer_to_atmosphere_world(point);
+                    let physical_altitude_km = max(
+                        0.0,
+                        length(atmosphere_point) -
+                            physical_atmosphere.radii_scales.x,
+                    );
+                    let directional_atmosphere_phase_integral =
+                        cloud_sample_directional_sky_band_cache(
+                            directional_sky_cache,
+                            physical_altitude_km,
+                            sun_optics.asymmetry);
+                    multiple = cloud_fallback_diffuse_radiance(
+                        sun_optics,
+                        directional_atmosphere_phase_integral,
+                        physical_diffuse_irradiance_at(point) / PI,
+                        physical_lower_atmosphere_irradiance_at(point) / PI,
+                        physical_ground_irradiance_at(point) / PI,
+                        diffuse_optical_depth.upper_rgb,
+                        diffuse_optical_depth.lower_rgb);
+                }
                 exterior_diffuse_reference =
                     cloud_finite_nonnegative_radiance(
                         multiple, vec3<f32>(0.0));
@@ -17016,6 +17067,9 @@ ${FULLSCREEN_VERTEX}
 @group(0) @binding(13) var previous_temporal_texture: texture_2d<f32>;
 @group(0) @binding(14) var previous_resolved_cloud_texture:
     texture_2d_array<f32>;
+@group(0) @binding(15) var cloud_plate_first_texture: texture_2d_array<f32>;
+@group(0) @binding(16) var cloud_plate_second_texture: texture_2d_array<f32>;
+@group(0) @binding(17) var cloud_plate_sampler: sampler;
 
 struct CompositeTransport {
     radiance: vec3<f32>,
@@ -17091,6 +17145,32 @@ fn sample_resolved_transport(uv: vec2<f32>) -> CompositeTransport {
         clamp(textureSample(
             previous_resolved_cloud_texture, linear_sampler, uv, 1).rgb,
             vec3<f32>(0.0), vec3<f32>(1.0)),
+    );
+}
+
+fn sample_cloud_plate_transport(uv: vec2<f32>) -> CompositeTransport {
+    let amount = clamp(p[34].w, 0.0, 1.0);
+    let first_radiance = textureSample(
+        cloud_plate_first_texture, cloud_plate_sampler, uv, 0).rgb;
+    let second_radiance = textureSample(
+        cloud_plate_second_texture, cloud_plate_sampler, uv, 0).rgb;
+    let first_transmittance = clamp(textureSample(
+        cloud_plate_first_texture, cloud_plate_sampler, uv, 1).rgb,
+        vec3<f32>(1e-6), vec3<f32>(1.0));
+    let second_transmittance = clamp(textureSample(
+        cloud_plate_second_texture, cloud_plate_sampler, uv, 1).rgb,
+        vec3<f32>(1e-6), vec3<f32>(1.0));
+    // Extinction is multiplicative, so interpolate optical depth rather than
+    // alpha/transmittance. This prevents gray fringe halos during a slow
+    // crossfade while radiance remains the premultiplied affine source term.
+    let optical_depth = mix(
+        -log(first_transmittance),
+        -log(second_transmittance),
+        amount,
+    );
+    return CompositeTransport(
+        mix(first_radiance, second_radiance, amount),
+        exp(-optical_depth),
     );
 }
 
@@ -17539,8 +17619,14 @@ fn composite_fragment(input: VertexOut) -> CompositeOutput {
         sampled_complementary_motion,
         previous_camera_visibility,
     );
-    let current = mix_composite_transport(
+    let cloud_plate_playback = p[53].w > 0.5;
+    let marched_current = mix_composite_transport(
         complementary, current_candidate, updated_weight);
+    let current = select_composite_transport(
+        marched_current,
+        sample_cloud_plate_transport(input.uv),
+        cloud_plate_playback,
+    );
     let geometry = mix(complementary_geometry, geometry_candidate, updated_weight);
     let motion = mix(complementary_motion, motion_candidate, updated_weight);
     let previous_geometry = complementary_geometry;
@@ -17689,7 +17775,19 @@ fn composite_fragment(input: VertexOut) -> CompositeOutput {
     let geometric_accept = select(
         0.0, 1.0,
         reconstruction_confidence >= 0.55 || immutable_sample_accept);
-    let prior_count = max(1.0, previous_temporal.w * 64.0);
+    // Plate rendering is allowed to converge for arbitrarily long jobs. Live
+    // reconstruction stores a normalized 64-frame stability age, while the
+    // offline path stores log2(sample_count + 1) in the same lane. Log storage
+    // avoids the finite-integer ceiling of rgba16float and preserves the
+    // per-pixel reset semantics needed at stochastic silhouettes.
+    let offline_plate_accumulation = p[53].z > 0.5;
+    let live_prior_count = max(1.0, previous_temporal.w * 64.0);
+    let offline_prior_count = max(1.0, exp2(previous_temporal.w) - 1.0);
+    let prior_count = select(
+        live_prior_count,
+        offline_prior_count,
+        offline_plate_accumulation,
+    );
     let exact_mean_history = prior_count / (prior_count + 1.0);
     let bounded_live_history = min(0.98, exact_mean_history);
     let mean_history = select(
@@ -17713,11 +17811,14 @@ fn composite_fragment(input: VertexOut) -> CompositeOutput {
         immutable_resolve_history,
         history_weight,
     );
-    let cloud = select_composite_transport(
+    var cloud = select_composite_transport(
         direct_resolved_history,
         newly_resolved_cloud,
         new_transport_sample,
     );
+    if (cloud_plate_playback) {
+        cloud = current;
+    }
     // Population-variance form of Welford's online update. Unlike blending a
     // squared residual, this remains an analytic moment estimate at every
     // history length and does not overstate young-history variance.
@@ -17737,10 +17838,20 @@ fn composite_fragment(input: VertexOut) -> CompositeOutput {
         min(1.0, previous_temporal.z + 0.085),
         accepts_history,
     );
-    let newly_stable_age = select(
+    let newly_live_stable_age = select(
         1.0 / 64.0,
         min(1.0, previous_temporal.w + 1.0 / 64.0),
         accepts_history,
+    );
+    let newly_offline_sample_count = select(
+        1.0,
+        prior_count + 1.0,
+        accepts_history,
+    );
+    let newly_stable_age = select(
+        newly_live_stable_age,
+        log2(newly_offline_sample_count + 1.0),
+        offline_plate_accumulation,
     );
     let accumulated_mean = select(
         direct_previous_temporal.x,
@@ -17852,9 +17963,13 @@ fn composite_fragment(input: VertexOut) -> CompositeOutput {
         persistent_confidence,
         stable_age,
     );
-    output.resolved_radiance = vec4<f32>(cloud.radiance, 0.0);
+    // Offline 2.5-D plates retain the resolved affine transport exactly. The
+    // otherwise-unused alpha channels carry first and mean interaction depth,
+    // allowing a streamed plate to preserve occlusion/parallax without a
+    // separate full-resolution geometry allocation.
+    output.resolved_radiance = vec4<f32>(cloud.radiance, geometry.x);
     output.resolved_transmittance = vec4<f32>(
-        cloud_transmittance, cloud_transmittance_y);
+        cloud_transmittance, geometry.y);
     return output;
 }
 `;

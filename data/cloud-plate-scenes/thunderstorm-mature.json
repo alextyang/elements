@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "id": "thunderstorm-mature",
+  "label": "Mature continuous thunderstorm complex",
+  "description": "One connected deep-convective cloud group with feeder convection, a mature cumulonimbus core, glaciated anvil, precipitation, and storm accessories.",
+  "fixedCamera": {
+    "perspectiveId": "oblique-natural",
+    "horizontalFovDegrees": 64,
+    "verticalFovDegrees": 43.52,
+    "viewElevationDegrees": 27
+  },
+  "source": {
+    "captureParameter": "weather",
+    "caseId": "multilayer-convective-anvil--tropical-convection--horizon-wide"
+  },
+  "timeline": {
+    "durationSeconds": 240,
+    "frameIntervalSeconds": 20,
+    "loop": true,
+    "crossfadeSeconds": 20
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "minimumTransportSamples": 1024,
+    "convergenceTarget": 0.002,
+    "backend": "blender-cycles-metal"
+  },
+  "offlineComposition": {
+    "sourceKind": "wdas-complex",
+    "sourceAssetId": "wdas-cloud",
+    "scatteringStrength": 1.35,
+    "radianceCalibration": 0.18,
+    "volumeInstances": [
+      {
+        "id": "mature-core-volume",
+        "componentId": "storm-mature-core",
+        "target": [0, 1.1, 8.5],
+        "scale": [0.055, 0.065, 0.024],
+        "rotationDegrees": -5,
+        "scatteringMultiplier": 1,
+        "bottomFade": 0,
+        "phaseOffset": 0
+      },
+      {
+        "id": "western-feeder-volume",
+        "componentId": "storm-feeder-congestus",
+        "target": [-8, 0, 5.1],
+        "scale": [0.029, 0.036, 0.016],
+        "rotationDegrees": 24,
+        "scatteringMultiplier": 1,
+        "bottomFade": 0,
+        "phaseOffset": 1.73
+      },
+      {
+        "id": "eastern-feeder-volume",
+        "componentId": "storm-feeder-congestus",
+        "target": [7.8, -0.2, 5.4],
+        "scale": [0.028, 0.038, 0.016],
+        "rotationDegrees": -31,
+        "scatteringMultiplier": 1,
+        "bottomFade": 0,
+        "phaseOffset": 3.46
+      },
+      {
+        "id": "glaciated-anvil-volume",
+        "componentId": "storm-incus-anvil",
+        "target": [-1.4, 0.8, 11.3],
+        "scale": [0.09, 0.04, 0.024],
+        "rotationDegrees": 8,
+        "scatteringMultiplier": 0.35,
+        "bottomFade": 0.8,
+        "phaseOffset": 5.19
+      }
+    ],
+    "precipitation": {
+      "componentId": "storm-rain-core",
+      "target": [0.2, -2, 1.5],
+      "dimensions": [20, 4, 11],
+      "rotationDegrees": -4,
+      "densityScale": 0.28
+    }
+  },
+  "groups": [
+    {
+      "id": "primary-storm-complex",
+      "label": "Primary connected storm complex",
+      "kind": "continuous-deep-convection",
+      "continuity": "shared-volume",
+      "components": [
+        {
+          "id": "storm-feeder-congestus",
+          "kind": "cloud-species",
+          "role": "boundary-layer feeder towers",
+          "genus": "cumulus",
+          "species": "cumulus-congestus",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 10,
+          "contribution": 0.62
+        },
+        {
+          "id": "storm-mature-core",
+          "kind": "cloud-species",
+          "role": "continuous deep convective core",
+          "genus": "cumulonimbus",
+          "species": "cumulonimbus-capillatus",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 20,
+          "contribution": 1
+        },
+        {
+          "id": "storm-incus-anvil",
+          "kind": "supplementary-feature",
+          "role": "glaciated tropopause outflow shield",
+          "genus": "cumulonimbus",
+          "form": "incus",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 30,
+          "contribution": 0.86
+        },
+        {
+          "id": "storm-rain-core",
+          "kind": "precipitation",
+          "role": "rain and hail precipitation curtain",
+          "genus": "cumulonimbus",
+          "form": "shower",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 40,
+          "contribution": 0.78
+        },
+        {
+          "id": "storm-arcus-pannus",
+          "kind": "accessory-cloud",
+          "role": "gust-front shelf and precipitation scud",
+          "genus": "cumulonimbus",
+          "form": "arcus-pannus",
+          "continuityVolumeId": "storm-volume-0",
+          "transportOrder": 50,
+          "contribution": 0.54
+        }
+      ]
+    }
+  ]
+}

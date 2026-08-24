@@ -19,8 +19,10 @@ import test from "node:test";
 
 import {
     captureFailureCaseName,
+    isAcceptedCloudPreviewQualification,
     manifestFor,
     parseArguments,
+    pruneUnreferencedPreviewImages,
     publishImmutablePreviewImage,
     publishPreviewEntry,
     readCloudPreviewCaptureFailure,
@@ -71,6 +73,7 @@ import {
 import {
     CLOUD_PREVIEW_WATCH_SERVICE_LOG_PATH,
     inspectWatchServiceIdentity,
+    readWatchServiceState,
 } from "./manage-cloud-preview-watch.mjs";
 import { parseGeneratedPlaywrightDaemonPid } from
     "./lib/playwright-session-cleanup.mjs";
@@ -114,14 +117,14 @@ const nativeConfig = JSON.parse(readFileSync(new URL(
 test("capture failure summaries preserve qualifier stage and compact metrics", () => {
     const diagnostics = [
         "lifecycle_stage=capture-navigation-start",
-        "stage=high-cloud-image-qualification",
+        "stage=image-qualification",
         "case=ci-spissatus-day-oblique-natural",
         "--- playwright transcript ---",
-        "Cloud preview high-cloud image qualification: {\"ready\":false,\"finite\":true,\"radialArtifact\":true,\"scaleSeparatedStructureReady\":false,\"metrics\":{\"fineRms\":0.0040303862728781215,\"broadBandRms\":0.015879154263987408,\"fineTextureFraction\":0.0324462890625,\"fineToBroadRatio\":0.2538161797457123,\"radialExplainedVariance\":0.23993745138622438,\"radialExplainedCoverage\":0.1424560546875}}",
+        "Cloud preview image qualification: {\"ready\":false,\"finite\":true,\"radialArtifact\":true,\"scaleSeparatedStructureReady\":false,\"metrics\":{\"fineRms\":0.0040303862728781215,\"broadBandRms\":0.015879154263987408,\"fineTextureFraction\":0.0324462890625,\"fineToBroadRatio\":0.2538161797457123,\"radialExplainedVariance\":0.23993745138622438,\"radialExplainedCoverage\":0.1424560546875}}",
     ].join("\n");
     const summary = summarizeCloudPreviewCaptureFailure(diagnostics);
-    assert.match(summary, /stage=high-cloud-image-qualification/);
-    assert.match(summary, /Cloud preview high-cloud image qualification/);
+    assert.match(summary, /stage=image-qualification/);
+    assert.match(summary, /Cloud preview image qualification/);
     assert.match(summary, /"radialArtifact":true/);
     assert.match(summary, /"scaleSeparatedStructureReady":false/);
     assert.match(summary, /"fineRms":0\.0040303862728781215/);
@@ -143,16 +146,18 @@ test("capture failure summaries preserve qualifier stage and compact metrics", (
 test("generator consumes the exact shared UI catalogue at one production camera", async () => {
     const scenarios = await loadCloudPreviewScenarios({
         repositoryRoot,
-        productionPerspective: "oblique-natural",
     });
     assert.equal(scenarios.length, 276,
         "the shared full-grid catalogue is 32 base + 28 orthogonal + 216 weather");
     assert.equal(new Set(scenarios.map(({ id }) => id)).size, scenarios.length);
-    assert.ok(scenarios.every(({ productionPerspective }) =>
-        productionPerspective === "oblique-natural"));
+    assert.deepEqual(new Set(scenarios.map(({ productionPerspective }) =>
+        productionPerspective)), new Set(["oblique-natural"]));
+    assert.ok(scenarios.every(({ imageQualificationProfile }) =>
+        imageQualificationProfile === "artifact-and-texture" ||
+        imageQualificationProfile === "artifact-only"));
     assert.match(scenarioLoaderSource,
         /app\/cloud-preview-matrix\/cloud-preview-catalog\.ts/);
-    assert.match(scenarioLoaderSource, /catalog\.previewDefinitions\(productionPerspective\)/);
+    assert.match(scenarioLoaderSource, /catalog\.previewDefinitions\(\)/);
 });
 
 test("catalogue loader follows weather qualification runtime dependencies", () => {
@@ -262,8 +267,11 @@ test("renderer and scenario content hashes invalidate exact inputs", () => {
         assert.notEqual(first, second);
         const common = {
             rendererHash: second,
-            scenario: { id: "base:cumulus:humilis", caseId: "case-a" },
-            productionPerspective: "oblique-natural",
+            scenario: {
+                id: "base:cumulus:humilis",
+                caseId: "case-a",
+                productionPerspective: "oblique-natural",
+            },
             transportUpdates: 64,
             captureMode: "native-metal",
         };
@@ -276,6 +284,13 @@ test("renderer and scenario content hashes invalidate exact inputs", () => {
             ...common,
             captureMode: "headless",
         }), "native Metal and software/headless captures cannot share cache keys");
+        assert.notEqual(scenarioContentHash(common), scenarioContentHash({
+            ...common,
+            scenario: {
+                ...common.scenario,
+                productionPerspective: "horizon-wide",
+            },
+        }), "a target camera change must invalidate deterministic capture bytes");
     } finally {
         rmSync(temporary, { recursive: true, force: true });
     }
@@ -319,12 +334,12 @@ test("manifest records capture backend identity", () => {
     const manifest = manifestFor({
         rendererHash: "renderer-a",
         assetChecksums,
-        productionPerspective: "oblique-natural",
         captureMode: "native-metal",
         scenarios: [],
         entriesById: new Map(),
     });
     assert.equal(manifest.captureMode, "native-metal");
+    assert.equal(manifest.perspectiveMode, "single-camera");
     assert.deepEqual(manifest.assetChecksums, assetChecksums);
     assert.equal(manifest.status, "complete");
 });
@@ -375,6 +390,58 @@ test("old manifests without asset identities never reuse entries", () => {
     });
     assert.equal(reused.size, 0,
         "a pre-identity manifest is stale even when renderer metadata matches");
+});
+
+test("reuse requires explicit current image qualification and camera identity", () => {
+    const qualification = {
+        schemaVersion: 1,
+        gate: "artifact-texture",
+        profile: "artifact-and-texture",
+        state: "accepted",
+        cloudMaskUsed: true,
+        radialArtifact: false,
+        scaleSeparatedStructureReady: true,
+        cloudLocalStructureReady: true,
+        metrics: {
+            fineRms: 0.01,
+            broadBandRms: 0.02,
+            fineTextureFraction: 0.2,
+            fineToBroadRatio: 0.5,
+            radialExplainedVariance: 0.1,
+            radialExplainedCoverage: 0.05,
+            cloudMaskUsed: true,
+            cloudSupportFraction: 0.2,
+            cloudCoreSupportFraction: 0.1,
+            cloudCoreFraction: 0.5,
+            cloudEdgeFraction: 0.5,
+            cloudEdgeFineFraction: 0.01,
+            cloudInteriorFineRms: 0.01,
+            cloudInteriorBroadRms: 0.02,
+            cloudInteriorFineToBroadRatio: 0.5,
+            cloudInteriorTextureFraction: 0.2,
+            cloudMaskResidualRms: 0.01,
+            cloudMaskResidualFineToBroadRatio: 0.5,
+            cloudMaskResidualTextureFraction: 0.2,
+            cloudMaskEdgeProjection: 0.1,
+        },
+    };
+    assert.equal(isAcceptedCloudPreviewQualification(
+        qualification,
+        "artifact-and-texture",
+    ), true);
+    assert.equal(isAcceptedCloudPreviewQualification({
+        ...qualification,
+        metrics: { fineRms: Number.NaN },
+    }, "artifact-and-texture"), false);
+    assert.equal(isAcceptedCloudPreviewQualification({
+        ...qualification,
+        cloudMaskUsed: false,
+    }, "artifact-and-texture"), false);
+    assert.equal(isAcceptedCloudPreviewQualification({
+        ...qualification,
+        profile: "artifact-only",
+        cloudMaskUsed: false,
+    }, "artifact-only"), true);
 });
 
 test("manifest writes and generation locks are atomic and single-owner", () => {
@@ -524,6 +591,27 @@ test("published preview filenames hash PNG bytes and never replace content", () 
         assert.equal(duplicate.filename, first.filename);
         assert.equal(existsSync(duplicateTemporary), false,
             "identical bytes reuse the immutable asset without replacing it");
+    } finally {
+        rmSync(temporary, { recursive: true, force: true });
+    }
+});
+
+test("preview publication prunes only unreferenced generated PNGs", () => {
+    const temporary = mkdtempSync(join(tmpdir(), "elements-preview-prune-"));
+    try {
+        writeFileSync(join(temporary, "current.png"), "current");
+        writeFileSync(join(temporary, "stale.png"), "stale");
+        writeFileSync(join(temporary, "notes.txt"), "preserve non-images");
+        const removed = pruneUnreferencedPreviewImages({
+            imageRoot: temporary,
+            manifest: {
+                entries: [{ imageUrl: "/generated/cloud-previews/images/current.png" }],
+            },
+        });
+        assert.deepEqual(removed, ["stale.png"]);
+        assert.equal(existsSync(join(temporary, "current.png")), true);
+        assert.equal(existsSync(join(temporary, "stale.png")), false);
+        assert.equal(existsSync(join(temporary, "notes.txt")), true);
     } finally {
         rmSync(temporary, { recursive: true, force: true });
     }
@@ -913,6 +1001,7 @@ exit 0
                     "native-apple-metal",
                 CLOUD_PREVIEW_TEST_OPERATION_LOG: operationLog,
                 CLOUD_PREVIEW_TEST_OUTPUT: outputImage,
+                CLOUD_PREVIEW_SKIP_IMAGE_QUALIFICATION: "1",
             },
         });
         assert.equal(result.status, 0, result.stderr);
@@ -1107,7 +1196,7 @@ test("capture reports a post-screenshot qualifier rejection as the primary failu
         writeFileSync(fakeNode, `#!/bin/sh
 case "$*" in
   *qualify-cloud-preview-image.mjs*)
-    printf '%s\\n' 'Cloud preview high-cloud image qualification: {"ready":false,"finite":true,"radialArtifact":true,"scaleSeparatedStructureReady":false,"metrics":{"fineRms":0.0040303862728781215,"broadBandRms":0.015879154263987408,"fineTextureFraction":0.0324462890625,"fineToBroadRatio":0.2538161797457123,"radialExplainedVariance":0.23993745138622438,"radialExplainedCoverage":0.1424560546875}}'
+    printf '%s\\n' 'Cloud preview image qualification: {"ready":false,"finite":true,"radialArtifact":true,"scaleSeparatedStructureReady":false,"metrics":{"fineRms":0.0040303862728781215,"broadBandRms":0.015879154263987408,"fineTextureFraction":0.0324462890625,"fineToBroadRatio":0.2538161797457123,"radialExplainedVariance":0.23993745138622438,"radialExplainedCoverage":0.1424560546875}}'
     exit 1
     ;;
 esac
@@ -1166,9 +1255,9 @@ exit 0
         });
         assert.equal(result.status, 1, result.stderr);
         assert.match(result.stderr,
-            /Cloud preview capture failed at stage=high-cloud-image-qualification:/);
+            /Cloud preview capture failed at stage=image-qualification:/);
         assert.match(result.stderr,
-            /Cloud preview high-cloud image qualification: \{"ready":false/);
+            /Cloud preview image qualification: \{"ready":false/);
         assert.match(result.stderr, /"fineRms":0\.0040303862728781215/);
         assert.doesNotMatch(result.stderr,
             /Cloud preview readiness: unavailable before benchmark diagnostics attached/);
@@ -1180,9 +1269,9 @@ exit 0
             diagnosticRoot,
             "case-ci-spissatus-day.failure.log",
         ), "utf8");
-        assert.match(diagnostics, /stage=high-cloud-image-qualification/);
+        assert.match(diagnostics, /stage=image-qualification/);
         assert.match(diagnostics,
-            /Cloud preview high-cloud image qualification: \{"ready":false/);
+            /Cloud preview image qualification: \{"ready":false/);
         assert.ok(statSync(join(
             diagnosticRoot,
             "case-ci-spissatus-day.failure.log",
@@ -1377,6 +1466,8 @@ test("watcher coalesces edits behind exactly one active generator", () => {
     assert.deepEqual(serviceOptions.generatorArgs, [
         "--cooldown-ms", String(CLOUD_PREVIEW_WATCH_COOLDOWN_MS),
     ], "service ownership arguments never leak into the generator command");
+    assert.match(watcherSource, /schemaVersion: 2/);
+    assert.match(watcherSource, /perspectiveMode: "single-camera"/);
     assert.throws(() => parseWatcherArguments([
         "--service-state", serviceOptions.serviceStatePath,
     ]), /provided together/);
@@ -1384,24 +1475,24 @@ test("watcher coalesces edits behind exactly one active generator", () => {
         "--service-state", serviceOptions.serviceStatePath,
         "--service-token", "c".repeat(32),
         "--limit", "1",
-    ]), /full 276-case oblique-natural matrix/);
+    ]), /full 276-case single-camera matrix/);
     for (const nonGeneratingArgument of ["--list", "--help", "-h"]) {
         assert.throws(() => parseWatcherArguments([
             "--service-state", serviceOptions.serviceStatePath,
             "--service-token", "c".repeat(32),
             nonGeneratingArgument,
-        ]), /full 276-case oblique-natural matrix/);
+        ]), /full 276-case single-camera matrix/);
     }
     assert.throws(() => parseWatcherArguments([
         "--service-state", serviceOptions.serviceStatePath,
         "--service-token", "c".repeat(32),
         "--no-initial",
-    ]), /full 276-case oblique-natural matrix/);
+    ]), /full 276-case single-camera matrix/);
 });
 
 test("detached watcher management is token-qualified and bounded", () => {
     const state = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         pid: 81234,
         token: "b".repeat(32),
     };
@@ -1451,6 +1542,30 @@ test("detached watcher management is token-qualified and bounded", () => {
     assert.match(serviceManagerSource, /CHILD_STOP_GRACE_MS = 10_000/);
     assert.match(CLOUD_PREVIEW_WATCH_SERVICE_LOG_PATH,
         /output\/playwright\/cloud-previews\/watch-service\.log$/);
+});
+
+test("watch service state accepts only single-camera schema 2", () => {
+    const root = mkdtempSync(join(tmpdir(), "cloud-preview-watch-state-"));
+    const path = join(root, "state.json");
+    try {
+        const current = {
+            schemaVersion: 2,
+            pid: 123,
+            token: "a".repeat(32),
+            perspectiveMode: "single-camera",
+        };
+        writeFileSync(path, JSON.stringify(current));
+        assert.deepEqual(readWatchServiceState(path), current);
+        writeFileSync(path, JSON.stringify({
+            ...current,
+            schemaVersion: 1,
+            perspectiveMode: "catalogue-native",
+        }));
+        assert.equal(readWatchServiceState(path), undefined,
+            "obsolete multi-camera state has no compatibility fallback");
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
 });
 
 test("watch coordinator debounces, terminates stale work, and restarts single-flight", () => {
@@ -1795,5 +1910,5 @@ test("CLI exposes resumable, forced-full, and strict completed-render controls",
         /native-metal or headless/);
     assert.throws(() => parseArguments([
         "--production-perspective", "flat-editorial",
-    ]), /fixed to the oblique-natural production perspective/);
+    ]), /Unknown argument/);
 });
