@@ -280,7 +280,7 @@ double stormComplexEnvelope(Vec3 p, std::uint32_t seed, bool anvil)
         const double thickness = 0.026 + 0.020 *
             (1.0 - smoothstep(-0.08, 0.52, q.x));
         const double vertical = 1.0 - std::abs(z - anvilCenter) / thickness;
-        const double downwind = smoothstep(-0.18, -0.05, q.x) *
+        const double downwind = smoothstep(-0.12, -0.04, q.x) *
             (1.0 - smoothstep(0.44, 0.57, q.x));
         const double lateralCenter = 0.02 + 0.10 * q.x;
         const double lateralRadius = 0.22 + 0.10 * smoothstep(-0.08, 0.46, q.x);
@@ -292,9 +292,11 @@ double stormComplexEnvelope(Vec3 p, std::uint32_t seed, bool anvil)
         const double iceFibres = 0.20 * (fbm(
             {(q.x + 0.1) * 4.0, (q.y - 0.2) * 36.0, z * 11.0},
             seed + 471U, 6) - 0.50);
-        const double anvilField = std::min(
-            std::min(vertical, lateral), downwind) + iceTurbulence +
-            iceFibres - 0.12;
+        const double anvilSupport = std::min(
+            std::min(vertical, lateral), downwind);
+        const double turbulenceMask = smoothstep(-0.22, 0.08, anvilSupport);
+        const double anvilField = anvilSupport +
+            (iceTurbulence + iceFibres) * turbulenceMask - 0.12;
         field = std::max(field, anvilField);
 
         // A small overshooting top is part of the same updraft field.  Its
@@ -322,9 +324,9 @@ double stormComplexEnvelope(Vec3 p, std::uint32_t seed, bool anvil)
         seed + 483U);
     const double edgeDetail = fbm(
         {q.x * 26.0, q.y * 29.0, z * 23.0}, seed + 487U, 6);
-    field += (0.38 * (macroEdge - 0.50) +
-        0.68 * (coarseBillow - 0.48) +
-        0.30 * (fineBillow - 0.48) +
+    field += (0.30 * (macroEdge - 0.50) +
+        0.45 * (coarseBillow - 0.48) +
+        0.22 * (fineBillow - 0.48) +
         0.18 * (edgeDetail - 0.50)) *
         (1.0 - smoothstep(0.10, 0.58, field));
     return field;
@@ -448,10 +450,10 @@ double applySpeciesMorphology(std::string_view species, std::string_view genus,
         return baseDensity * (1.0 - 0.18 * smoothstep(0.64, 0.90, p.z));
     }
     if (contains(species, "capillatus")) {
-        const double iceOutflow = 0.52 * fibrousEnvelope(
-            {p.x - 0.06, p.y, p.z + 0.02}, seed + 283U, false) *
-            smoothstep(0.64, 0.76, p.z);
-        return clamp01(std::max(baseDensity, iceOutflow));
+        // Cumulonimbus capillatus fibres are authored inside the connected
+        // storm outflow field.  Adding a second free-standing cirrus field
+        // here would create detached ice flecks upstream of the incus.
+        return baseDensity;
     }
     if (contains(species, "uncinus")) {
         const double hook = ellipse(p, {0.16, -0.04, 0.76}, {0.17, 0.10, 0.075});

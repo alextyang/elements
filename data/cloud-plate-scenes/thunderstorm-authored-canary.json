@@ -41,7 +41,7 @@
   "lighting": {
     "sunEnergy": 4.5,
     "keyEnergy": 0,
-    "worldStrength": 0.065,
+    "worldStrength": 0.02,
     "worldColor": [0.52, 0.66, 0.94]
   }
 }
