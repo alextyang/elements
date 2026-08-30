@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "cumulus-congestus",
+  "generativeAi": false,
   "methodBenchmark": "data/cloud-render-benchmarks/cumulus-congestus.json",
   "winningTransport": {
     "engine": "cycles",
@@ -39,14 +40,6 @@
       "scatteringStrength": 1.2
     },
     {
-      "id": "exemplar-synthesis-8101",
-      "kind": "synthesized-vdb",
-      "seed": 8101,
-      "axisConvention": "z-up",
-      "scale": [0.9, 0.9, 0.9],
-      "scatteringStrength": 0.4
-    },
-    {
       "id": "exemplar-synthesis-8110",
       "kind": "synthesized-vdb",
       "seed": 8110,
@@ -55,12 +48,34 @@
       "scatteringStrength": 0.4
     },
     {
-      "id": "exemplar-synthesis-8113",
-      "kind": "synthesized-vdb",
-      "seed": 8113,
+      "id": "simulated-congestus-9212",
+      "kind": "simulated-vdb",
+      "seed": 9212,
+      "regime": "sheared",
       "axisConvention": "z-up",
-      "scale": [0.9, 0.9, 0.9],
-      "scatteringStrength": 0.4
+      "scale": [1.5, 1.5, 3],
+      "scatteringStrength": 2.2,
+      "detailStrength": 0
+    },
+    {
+      "id": "simulated-congestus-9213",
+      "kind": "simulated-vdb",
+      "seed": 9213,
+      "regime": "developing",
+      "axisConvention": "z-up",
+      "scale": [1.45, 1.45, 2.8],
+      "scatteringStrength": 2.2,
+      "detailStrength": 0
+    },
+    {
+      "id": "simulated-congestus-9214",
+      "kind": "simulated-vdb",
+      "seed": 9214,
+      "regime": "mature",
+      "axisConvention": "z-up",
+      "scale": [1.1, 1.1, 1.1],
+      "scatteringStrength": 2.2,
+      "detailStrength": 0
     }
   ],
   "authoring": {
@@ -79,5 +94,14 @@
     "depth": 320,
     "height": 288,
     "voxelSize": 0.04
+  },
+  "simulation": {
+    "backend": "blender-mantaflow",
+    "script": "scripts/blender/simulate_congestus.py",
+    "resolution": 64,
+    "frames": 90,
+    "captureFrame": 60,
+    "densityGrid": "density",
+    "axisConvention": "z-up"
   }
 }

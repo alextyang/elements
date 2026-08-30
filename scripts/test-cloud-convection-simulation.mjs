@@ -16,6 +16,11 @@ test("Congestus simulation uses one connected source and a gas solver", () => {
     assert.match(source, /flow_behavior = "INFLOW"/);
     assert.match(source, /bpy\.ops\.fluid\.bake_data/);
     assert.match(source, /capture_frame/);
+    assert.match(source, /"developing"/);
+    assert.match(source, /"mature"/);
+    assert.match(source, /"sheared"/);
+    assert.match(source, /"regime": regime/);
+    assert.match(source, /shutil\.rmtree\(cache_directory\)/);
     assert.doesNotMatch(source, /imagegen|diffusion|openai/i);
 });
 
@@ -24,7 +29,12 @@ test("simulation bakes wavelet detail to an OpenVDB density cache", () => {
     assert.match(source, /cache_noise_format = "OPENVDB"/);
     assert.match(source, /use_noise = True/);
     assert.match(source, /bpy\.ops\.fluid\.bake_noise/);
+    assert.match(source,
+        /frame_set\(1\)[\s\S]*bpy\.ops\.fluid\.bake_noise/);
     assert.match(source, /density/);
+    assert.match(source, /source_grid = "density_noise"/);
+    assert.match(source, /source_grid = "density"/);
+    assert.match(source, /normalized\.returncode != 0/);
     assert.match(renderer, /CLOUD_DENSITY_GRID/);
     assert.match(renderer, /CLOUD_STORM_DETAIL_STRENGTH/);
     assert.match(normalizer, /density_noise/);

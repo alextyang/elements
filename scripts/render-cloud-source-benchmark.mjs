@@ -18,6 +18,8 @@ import { qualifyCloudPlateImage } from
     "./lib/cloud-plate-image-qualification.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const defaultMantaflowSimulationScript =
+    "scripts/blender/simulate_congestus.py";
 const sha256File = (path) => createHash("sha256")
     .update(readFileSync(path)).digest("hex");
 
@@ -114,6 +116,84 @@ const synthesizedVdb = ({ benchmark, candidate, workRoot }) => {
     return output;
 };
 
+const simulatedVdb = ({ benchmark, candidate, workRoot, blender }) => {
+    const simulation = benchmark.simulation;
+    if (!simulation) throw new Error("Simulation settings are required.");
+    const script = simulation.script ?? defaultMantaflowSimulationScript;
+    const scriptPath = join(repositoryRoot, script);
+    if (!existsSync(scriptPath)) {
+        throw new Error(`Missing Mantaflow simulation script ${script}.`);
+    }
+    const resolution = Number(
+        process.env.CLOUD_SOURCE_SIMULATION_RESOLUTION ?? simulation.resolution,
+    );
+    const frames = Number(
+        process.env.CLOUD_SOURCE_SIMULATION_FRAMES ?? simulation.frames,
+    );
+    const captureFrame = Number(
+        process.env.CLOUD_SOURCE_SIMULATION_CAPTURE_FRAME ??
+        simulation.captureFrame,
+    );
+    if (![resolution, frames, captureFrame].every(Number.isInteger) ||
+        resolution < 32 || frames < 12 || captureFrame < 1 ||
+        captureFrame > frames) {
+        throw new Error("Invalid CLOUD_SOURCE_SIMULATION_* override.");
+    }
+    const output = join(workRoot, `${candidate.id}.vdb`);
+    const result = run(blender, [
+        "--background", "--factory-startup",
+        "--python", scriptPath,
+        "--", output, String(candidate.seed),
+        String(resolution), String(frames), String(captureFrame),
+        candidate.regime,
+    ]);
+    const metricsLine = result.stdout.split(/\r?\n/).find((line) =>
+        line.startsWith("CLOUD_CONVECTION_METRICS:"),
+    );
+    if (!metricsLine) {
+        throw new Error(
+            `Mantaflow simulation ${candidate.id} did not emit metrics.`,
+        );
+    }
+    const metrics = JSON.parse(metricsLine.slice(
+        "CLOUD_CONVECTION_METRICS:".length,
+    ));
+    if (!existsSync(output)) {
+        throw new Error(`Mantaflow simulation did not write ${output}.`);
+    }
+    for (const [key, expected] of [
+        ["seed", candidate.seed],
+        ["resolution", resolution],
+        ["frames", frames],
+        ["captureFrame", captureFrame],
+        ["regime", candidate.regime],
+    ]) {
+        if (metrics[key] !== expected) {
+            throw new Error(
+                `Mantaflow metadata ${key}=${metrics[key]} does not match ` +
+                `benchmark value ${expected}.`,
+            );
+        }
+    }
+    return {
+        path: output,
+        metadata: {
+            backend: metrics.backend,
+            seed: metrics.seed,
+            resolution: metrics.resolution,
+            frames: metrics.frames,
+            captureFrame: metrics.captureFrame,
+            regime: metrics.regime,
+            sourceGrid: metrics.sourceGrid,
+            densityGrid: simulation.densityGrid,
+            axisConvention: candidate.axisConvention,
+            script,
+            scriptSha256: sha256File(scriptPath),
+            normalizedVdbSha256: sha256File(output),
+        },
+    };
+};
+
 const makeScene = ({ method, benchmark, candidate }) => {
     const base = JSON.parse(readFileSync(
         join(repositoryRoot, benchmark.methodBenchmark), "utf8",
@@ -141,7 +221,7 @@ const makeScene = ({ method, benchmark, candidate }) => {
                 scale: candidate.scale,
                 rotationDegrees: -7,
                 scatteringMultiplier: 1,
-                detailStrength: 0,
+                detailStrength: candidate.detailStrength ?? 0,
                 bottomFade: 0,
                 phaseOffset: 0,
             }],
@@ -191,14 +271,36 @@ const main = async () => {
     mkdirSync(workRoot, { recursive: true });
     mkdirSync(publicRoot, { recursive: true });
     const method = benchmark.winningTransport;
+    const requestedIds = new Set((process.env.CLOUD_SOURCE_CANDIDATES ?? "")
+        .split(",").map((value) => value.trim()).filter(Boolean));
+    const candidates = requestedIds.size > 0
+        ? benchmark.candidates.filter(({ id: candidateId }) =>
+            requestedIds.has(candidateId))
+        : benchmark.candidates;
+    if (candidates.length === 0 || candidates.length !==
+        (requestedIds.size || benchmark.candidates.length)) {
+        throw new Error("CLOUD_SOURCE_CANDIDATES contains an unknown id.");
+    }
+    const renderSamples = Number(process.env.CLOUD_SOURCE_SAMPLES ??
+        method.samples);
+    if (!Number.isInteger(renderSamples) || renderSamples < 1) {
+        throw new Error("CLOUD_SOURCE_SAMPLES must be a positive integer.");
+    }
+    const renderDenoiser = process.env.CLOUD_SOURCE_DENOISER ??
+        method.denoiser.toUpperCase();
     const results = [];
-    for (const candidate of benchmark.candidates) {
+    for (const candidate of candidates) {
         process.stdout.write(`Authoring and rendering ${candidate.id}...\n`);
-        const sourcePath = candidate.kind === "generated-vdb"
-            ? generatedVdb({ benchmark, candidate, workRoot })
+        const source = candidate.kind === "generated-vdb"
+            ? { path: generatedVdb({ benchmark, candidate, workRoot }) }
             : candidate.kind === "synthesized-vdb"
-                ? synthesizedVdb({ benchmark, candidate, workRoot })
-                : referenceVdb(candidate);
+                ? { path: synthesizedVdb({ benchmark, candidate, workRoot }) }
+                : candidate.kind === "simulated-vdb"
+                    ? simulatedVdb({
+                        benchmark, candidate, workRoot, blender,
+                    })
+                    : { path: referenceVdb(candidate) };
+        const sourcePath = source.path;
         const scenePath = join(workRoot, `${candidate.id}.json`);
         writeFileSync(scenePath, `${JSON.stringify(makeScene({
             method, benchmark, candidate,
@@ -209,16 +311,18 @@ const main = async () => {
             "--background", "--factory-startup",
             "--python", join(repositoryRoot, "scripts/blender/render_cloud_plate.py"),
             "--", scenePath, "0", "0", String(method.width), String(method.height),
-            String(method.samples), "0.002", renderRoot, String(candidate.seed ?? 7319),
+            String(renderSamples), "0.002", renderRoot,
+            String(candidate.seed ?? 7319),
         ], { env: {
             ...process.env,
             CLOUD_STORM_SOURCE_KIND: candidate.kind,
             CLOUD_STORM_VDB_PATH: sourcePath,
             CLOUD_VOLUME_SOURCE_MAP: JSON.stringify({ [candidate.id]: sourcePath }),
             CLOUD_STORM_SCATTERING_STRENGTH: String(candidate.scatteringStrength),
+            CLOUD_DENSITY_GRID: benchmark.simulation?.densityGrid ?? "density",
             CLOUD_PLATE_RENDER_METHOD: "CYCLES_VOLUME",
             CLOUD_PLATE_PHASE_FUNCTION: method.phaseFunction.toUpperCase(),
-            CLOUD_PLATE_DENOISER: "NONE",
+            CLOUD_PLATE_DENOISER: renderDenoiser,
             CLOUD_PLATE_PATH_GUIDING: "NONE",
             CLOUD_PLATE_WORLD_MODEL:
                 benchmark.lightingOverride.worldModel.toUpperCase(),
@@ -237,7 +341,9 @@ const main = async () => {
             id: candidate.id,
             kind: candidate.kind,
             seed: candidate.seed,
+            ...(candidate.regime ? { regime: candidate.regime } : {}),
             sourceSha256: sha256File(sourcePath),
+            ...(source.metadata ? { sourceMetadata: source.metadata } : {}),
             previewPath,
             previewUrl: `/cloud-source-benchmarks/${id}/${candidate.id}.png`,
             previewSha256: sha256File(publicPreview),
@@ -262,8 +368,16 @@ const main = async () => {
             exemplarSynthesis: sha256File(join(
                 repositoryRoot, "scripts/openvdb/cloud_vdb_synthesizer.cpp",
             )),
+            mantaflowSimulation: sha256File(join(
+                repositoryRoot, benchmark.simulation.script,
+            )),
         },
         winningTransport: method,
+        execution: {
+            candidateIds: candidates.map(({ id: candidateId }) => candidateId),
+            samples: renderSamples,
+            denoiser: renderDenoiser,
+        },
         lighting: benchmark.lightingOverride,
         comparisonUrl: `/cloud-source-benchmarks/${id}/comparison.png`,
         comparisonSha256: sha256File(comparisonPath),
