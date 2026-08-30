@@ -8674,9 +8674,8 @@ export function SkyRendererCanvas({
                 <div className={styles.edgeColor} />
                 <div className={styles.horizon} />
                 <CelestialCanvas scene={celestial} paused={paused} />
-                <div className={`${styles.clouds} ${styles.cloudsHigh}`} />
-                <div className={`${styles.clouds} ${styles.cloudsLow}`} />
-                <div className={styles.mistLayer} />
+                {/* WebGL2 clouds are integrated by AtmosphereCanvas. Flat CSS
+                    ellipses here would double-render the restored volume. */}
                 <div className={styles.atmosphere} />
                 <div className={styles.grain} />
                 {webGpuError && (

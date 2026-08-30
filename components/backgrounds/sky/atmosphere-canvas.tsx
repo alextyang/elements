@@ -2,6 +2,13 @@
 
 import { useEffect, useRef } from "react";
 
+import {
+    CLOUD_COMPOSITE,
+    CLOUD_FUNCTIONS,
+    CLOUD_UNIFORMS,
+    packCloudLayers,
+} from "./webgl-cloud-shader";
+import { createCloudNoise } from "./webgl-cloud-noise";
 import type { CloudScene } from "./cloud-scene";
 import type { HydrometeorSceneOverrides } from "./hydrometeor-system";
 import type { GroundAlbedoRgb } from "./atmospheric-composition";
@@ -114,6 +121,7 @@ uniform vec3 u_left;
 uniform vec3 u_right;
 uniform vec3 u_glow;
 uniform vec3 u_haze;
+${CLOUD_UNIFORMS}
 
 const float PI = 3.141592653589793;
 
@@ -224,6 +232,7 @@ float henyey_greenstein(float cosine, float g) {
     return (1.0 - g2) /
         max(0.12, 4.0 * PI * pow(1.0 + g2 - 2.0 * g * cosine, 1.5));
 }
+${CLOUD_FUNCTIONS}
 
 void main() {
     // WebGL has a bottom-left texture origin; convert to the screen's top-left.
@@ -424,6 +433,8 @@ void main() {
         (1.0 - night) * (0.004 + humidity * 0.005 + cloudiness * 0.006);
     vec3 ground_bounce_color = mix(aerosol_white, solar_scatter, low_sun_path * 0.36);
     radiance += ground_bounce_color * ground_bounce;
+
+${CLOUD_COMPOSITE}
 
     // Natural night is layered rather than uniformly blue: weak airglow,
     // integrated celestial radiance, moon aureole, and near-horizon extinction.
@@ -662,6 +673,15 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             return undefined;
         }
 
+        // The restored WebGL volume path generates one continuous Perlin/
+        // Worley density basis on this context. Species state shapes that
+        // field during the world-space march; no sprite, atlas lobe, or CSS
+        // cloud participates in this backend.
+        const cloudNoise = createCloudNoise(gl);
+        if (!cloudNoise) {
+            console.warn("WebGL cloud noise unavailable; rendering clear sky");
+        }
+
         const buffer = gl.createBuffer();
         if (!buffer) return undefined;
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -754,6 +774,58 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             gl.uniform3fv(uniform("u_aerosol_tint"), current.aerosolTint);
             gl.uniform4fv(uniform("u_seed"), current.seed);
 
+            const packedClouds = packCloudLayers(
+                current.cloudScene,
+                current.cloudTime + current.cloudTimeOffset,
+            );
+            gl.uniform4fv(uniform("u_layer_geometry"), packedClouds.geometry);
+            gl.uniform4fv(uniform("u_layer_shape"), packedClouds.shape);
+            gl.uniform4fv(uniform("u_layer_motion"), packedClouds.motion);
+            gl.uniform4fv(uniform("u_layer_phase"), packedClouds.phase);
+            gl.uniform4fv(uniform("u_layer_scale"), packedClouds.scale);
+            gl.uniform4fv(uniform("u_layer_drift"), packedClouds.drift);
+            gl.uniform3fv(
+                uniform("u_cloud_sun_radiance"), current.sunRadiance,
+            );
+            gl.uniform3fv(
+                uniform("u_cloud_moon_radiance"), current.moonRadiance,
+            );
+            gl.uniform3fv(uniform("u_cloud_ambient"), current.cloudAmbient);
+            gl.uniform3fv(
+                uniform("u_cloud_ground_light"), current.cloudGroundLight,
+            );
+            gl.uniform4f(
+                uniform("u_cloud_quality"),
+                64,
+                6,
+                1 / 70000,
+                cloudNoise && packedClouds.active ? 1 : 0,
+            );
+            gl.uniform1f(
+                uniform("u_cloud_time"),
+                (current.cloudTime + current.cloudTimeOffset) % 100000,
+            );
+            gl.uniform1f(uniform("u_cloud_fog"), current.cloudScene.fog);
+            gl.uniform1f(
+                uniform("u_cloud_noctilucent"),
+                current.cloudScene.noctilucent,
+            );
+
+            if (cloudNoise) {
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_3D, cloudNoise.base);
+                gl.uniform1i(uniform("u_cloud_base"), 0);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_3D, cloudNoise.detail);
+                gl.uniform1i(uniform("u_cloud_detail"), 1);
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, cloudNoise.weather);
+                gl.uniform1i(uniform("u_cloud_weather"), 2);
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, cloudNoise.curl);
+                gl.uniform1i(uniform("u_cloud_curl"), 3);
+            }
+
             gl.uniform1f(uniform("u_airglow"), current.airglowStrength);
             gl.uniform1f(uniform("u_blackout"), current.nightBlackout);
             gl.uniform3fv(
@@ -783,6 +855,7 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             drawRef.current = null;
             resizeObserver.disconnect();
             document.removeEventListener("visibilitychange", visibilityHandler);
+            cloudNoise?.dispose();
             gl.deleteBuffer(buffer);
             gl.deleteProgram(program);
         };
