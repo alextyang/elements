@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "id": "cumulus-congestus",
+  "methodBenchmark": "data/cloud-render-benchmarks/cumulus-congestus.json",
+  "winningTransport": {
+    "engine": "cycles",
+    "phaseFunction": "mie",
+    "denoiser": "none",
+    "samples": 4096,
+    "volumeBounces": 64,
+    "width": 640,
+    "height": 360
+  },
+  "lightingOverride": {
+    "sunElevationDegrees": 24,
+    "sunAzimuthDegrees": 65,
+    "sunAngleDegrees": 0.53,
+    "sunEnergy": 15,
+    "worldStrength": 0.002,
+    "worldModel": "nishita"
+  },
+  "candidates": [
+    {
+      "id": "cc0-truth-congestus-23",
+      "kind": "reference-vdb",
+      "assetId": "congestus-23",
+      "manifest": "data/cloud-plate-assets/cgheven-vdb.json",
+      "axisConvention": "wdas-y-up",
+      "scale": [1.8, 1.8, 1.8],
+      "scatteringStrength": 0.55,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "hierarchical-plume-7202",
+      "kind": "generated-vdb",
+      "seed": 7202,
+      "axisConvention": "z-up",
+      "scale": [0.72, 0.72, 1.2],
+      "scatteringStrength": 1.2
+    },
+    {
+      "id": "exemplar-synthesis-8101",
+      "kind": "synthesized-vdb",
+      "seed": 8101,
+      "axisConvention": "z-up",
+      "scale": [0.9, 0.9, 0.9],
+      "scatteringStrength": 0.4
+    },
+    {
+      "id": "exemplar-synthesis-8104",
+      "kind": "synthesized-vdb",
+      "seed": 8104,
+      "axisConvention": "z-up",
+      "scale": [0.9, 0.9, 0.9],
+      "scatteringStrength": 0.4
+    },
+    {
+      "id": "exemplar-synthesis-8107",
+      "kind": "synthesized-vdb",
+      "seed": 8107,
+      "axisConvention": "z-up",
+      "scale": [0.9, 0.9, 0.9],
+      "scatteringStrength": 0.4
+    }
+  ],
+  "authoring": {
+    "genus": "cumulus",
+    "species": "cumulus-congestus",
+    "width": 384,
+    "depth": 240,
+    "height": 216,
+    "voxelSize": 0.05333333333333334,
+    "evolution": 0
+  },
+  "synthesis": {
+    "manifest": "data/cloud-plate-assets/cgheven-vdb.json",
+    "basisAssetIds": ["congestus-21", "congestus-23", "congestus-25"],
+    "width": 512,
+    "depth": 320,
+    "height": 288,
+    "voxelSize": 0.04
+  }
+}

@@ -16,3 +16,8 @@ add_executable(cloud-vdb-author cloud_vdb_author.cpp)
 target_compile_features(cloud-vdb-author PRIVATE cxx_std_20)
 target_link_libraries(cloud-vdb-author PRIVATE OpenVDB::openvdb)
 target_compile_options(cloud-vdb-author PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(cloud-vdb-synthesizer cloud_vdb_synthesizer.cpp)
+target_compile_features(cloud-vdb-synthesizer PRIVATE cxx_std_20)
+target_link_libraries(cloud-vdb-synthesizer PRIVATE OpenVDB::openvdb)
+target_compile_options(cloud-vdb-synthesizer PRIVATE -Wall -Wextra -Wpedantic)
