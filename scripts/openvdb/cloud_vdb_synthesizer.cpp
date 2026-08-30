@@ -166,7 +166,7 @@ double sampleSource(const Source& source, double x, double y, double z)
 std::string deterministicUuid(const Config& config)
 {
     std::ostringstream identity;
-    identity << "exemplar-warped-congestus-v2|" << config.seed << '|'
+    identity << "exemplar-assembled-congestus-v3|" << config.seed << '|'
              << config.width << '|' << config.depth << '|' << config.height
              << '|' << std::setprecision(17) << config.voxelSize;
     for (const auto& path : config.sources) identity << '|' << path.filename().string();
@@ -225,11 +225,12 @@ try {
     output->insertMeta("cloud:species",
         openvdb::StringMetadata("cumulus-congestus"));
     output->insertMeta("cloud:authoring",
-        openvdb::StringMetadata("exemplar-warped-congestus-v2"));
+        openvdb::StringMetadata("exemplar-assembled-congestus-v3"));
     output->insertMeta("cloud:seed", openvdb::Int32Metadata(
         static_cast<std::int32_t>(config.seed)));
     auto accessor = output->getAccessor();
     const std::size_t primary = config.seed % sources.size();
+    constexpr int componentCount = 5;
     std::uint64_t active = 0;
     double maximum = 0.0;
     for (int z = 0; z < config.height; ++z) {
@@ -244,44 +245,57 @@ try {
                     py * 4.3, pz * 3.9, px * 4.9, config.seed + 151U) - 0.5);
                 const double warpZ = 0.025 * (fbm(
                     pz * 3.7, px * 4.5, py * 4.1, config.seed + 211U) - 0.5);
-                double primaryDensity = 0.0;
-                for (std::size_t index = 0; index < sources.size(); ++index) {
+                double assembledDensity = 0.0;
+                for (int component = 0; component < componentCount; ++component) {
+                    const std::size_t index = (primary + component) % sources.size();
                     const double angle = (lattice(
-                        static_cast<int>(index), 7, 11, config.seed + 271U) - 0.5)
-                        * 0.58;
+                        component, 7, 11, config.seed + 271U) - 0.5) * 0.46;
                     const double cosine = std::cos(angle);
                     const double sine = std::sin(angle);
-                    const double centeredX = px - 0.5 + warpX;
-                    const double centeredY = py - 0.5 + warpY;
-                    const double scaleX = 0.84 + 0.30 * lattice(
-                        static_cast<int>(index), 13, 17, config.seed + 277U);
-                    const double scaleY = 0.86 + 0.26 * lattice(
-                        static_cast<int>(index), 19, 23, config.seed + 281U);
-                    const double scaleZ = 0.88 + 0.24 * lattice(
-                        static_cast<int>(index), 29, 31, config.seed + 283U);
-                    const double offsetX = 0.10 * (lattice(
-                        static_cast<int>(index), 37, 41, config.seed + 293U) - 0.5);
-                    const double offsetY = 0.08 * (lattice(
-                        static_cast<int>(index), 43, 47, config.seed + 307U) - 0.5);
+                    const std::array<double, componentCount> centerZ {
+                        0.25, 0.43, 0.62, 0.79, 0.48};
+                    const std::array<double, componentCount> extentX {
+                        1.02, 0.72, 0.56, 0.39, 0.50};
+                    const std::array<double, componentCount> extentY {
+                        0.96, 0.77, 0.64, 0.50, 0.58};
+                    const std::array<double, componentCount> extentZ {
+                        0.52, 0.61, 0.55, 0.39, 0.44};
+                    const double drift = 0.13 * (centerZ[component] - 0.25) +
+                        0.11 * (lattice(component, 37, 41,
+                            config.seed + 293U) - 0.5);
+                    const double centerX = 0.48 + drift;
+                    const double centerY = 0.50 + 0.08 * (lattice(
+                        component, 43, 47, config.seed + 307U) - 0.5);
+                    const double scaleX = extentX[component] * (0.91 + 0.18 *
+                        lattice(component, 13, 17, config.seed + 277U));
+                    const double scaleY = extentY[component] * (0.91 + 0.18 *
+                        lattice(component, 19, 23, config.seed + 281U));
+                    const double scaleZ = extentZ[component] * (0.91 + 0.18 *
+                        lattice(component, 29, 31, config.seed + 283U));
+                    const double centeredX = px - centerX + warpX;
+                    const double centeredY = py - centerY + warpY;
                     const double qx = 0.5 +
-                        (cosine * centeredX - sine * centeredY - offsetX) / scaleX;
+                        (cosine * centeredX - sine * centeredY) / scaleX;
                     const double qy = 0.5 +
-                        (sine * centeredX + cosine * centeredY - offsetY) / scaleY;
-                    const double qz = std::clamp(
-                        0.5 + (pz - 0.5 + warpZ) / scaleZ, 0.0, 1.0);
+                        (sine * centeredX + cosine * centeredY) / scaleY;
+                    const double qz = 0.5 +
+                        (pz - centerZ[component] + warpZ) / scaleZ;
                     const double value = (qx < 0.0 || qx > 1.0 ||
-                        qy < 0.0 || qy > 1.0) ? 0.0 :
+                        qy < 0.0 || qy > 1.0 || qz < 0.0 || qz > 1.0) ? 0.0 :
                         sampleSource(sources[index], qx, qy, qz);
-                    if (index == primary) primaryDensity = value;
+                    assembledDensity = std::max(assembledDensity, value);
                 }
                 // Reintroduce resolved boundary/interior turbulence after
                 // deformation. This is density variation in object space, not
                 // image noise, and therefore survives sample convergence.
                 const double microDetail = fbm(
                     px * 53.0, py * 61.0, pz * 47.0, config.seed + 401U);
-                const double detailScale = 0.38 + 1.24 * microDetail;
+                const double mesoDetail = fbm(
+                    px * 17.0, py * 19.0, pz * 15.0, config.seed + 431U);
+                const double detailScale =
+                    (0.24 + 1.52 * microDetail) * (0.68 + 0.64 * mesoDetail);
                 const double density = std::clamp(
-                    primaryDensity * detailScale, 0.0, 1.0);
+                    assembledDensity * detailScale, 0.0, 1.0);
                 if (density <= 0.002) continue;
                 accessor.setValue(openvdb::Coord(x, y, z),
                     static_cast<float>(density));
