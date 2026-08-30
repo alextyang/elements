@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "cumulus-congestus",
+  "label": "Cumulus congestus fixed-camera rendering benchmark",
+  "species": {
+    "genus": "cumulus",
+    "species": "cumulus-congestus",
+    "diagnosticFeatures": [
+      "flat turbulent condensation base",
+      "vertically stacked cauliflower turrets",
+      "connected optically thick core",
+      "fine evaporative boundary wisps",
+      "sunward silver lining and self-shadowed interior"
+    ]
+  },
+  "source": {
+    "assetId": "congestus-23",
+    "manifest": "data/cloud-plate-assets/cgheven-vdb.json",
+    "license": "CC0-1.0",
+    "axisConvention": "z-up"
+  },
+  "fixedCamera": {
+    "perspectiveId": "oblique-natural",
+    "position": [16, -30, 3.3],
+    "target": [0, 0, 7.4],
+    "lensMm": 31,
+    "sensorWidthMm": 36
+  },
+  "lighting": {
+    "sunElevationDegrees": 24,
+    "sunAzimuthDegrees": 224,
+    "sunAngleDegrees": 0.53,
+    "sunEnergy": 4.5,
+    "worldStrength": 0.02,
+    "worldModel": "nishita"
+  },
+  "render": {
+    "width": 640,
+    "height": 360,
+    "samples": 512,
+    "volumeBounces": 64,
+    "radianceCalibration": 0.28
+  },
+  "methods": [
+    "mesh-isosurface",
+    "eevee-null-scattering",
+    "cycles-henyey-greenstein",
+    "cycles-draine",
+    "cycles-mie",
+    "cycles-mie-raw"
+  ]
+}
