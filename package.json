@@ -37,6 +37,7 @@
     "cloud:plates:bootstrap": "node scripts/bootstrap-cloud-vdb-assets.mjs",
     "cloud:plates:qualify": "node scripts/qualify-cloud-plate-frame.mjs",
     "cloud:plates:render": "node scripts/render-cloud-plates.mjs",
+    "cloud:methods:benchmark": "node scripts/render-cloud-method-benchmark.mjs",
     "cloud:vdb:build": "node scripts/author-cloud-vdb.mjs --build-only",
     "cloud:vdb:author": "node scripts/author-cloud-vdb.mjs",
     "cloud:diagnostics": "node scripts/capture-cloud-diagnostics.mjs",

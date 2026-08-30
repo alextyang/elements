@@ -17,7 +17,7 @@
     "assetId": "congestus-23",
     "manifest": "data/cloud-plate-assets/cgheven-vdb.json",
     "license": "CC0-1.0",
-    "axisConvention": "z-up"
+    "axisConvention": "wdas-y-up"
   },
   "fixedCamera": {
     "perspectiveId": "oblique-natural",
@@ -27,11 +27,11 @@
     "sensorWidthMm": 36
   },
   "lighting": {
-    "sunElevationDegrees": 24,
-    "sunAzimuthDegrees": 224,
+    "sunElevationDegrees": 18,
+    "sunAzimuthDegrees": 132,
     "sunAngleDegrees": 0.53,
-    "sunEnergy": 4.5,
-    "worldStrength": 0.02,
+    "sunEnergy": 15,
+    "worldStrength": 0.002,
     "worldModel": "nishita"
   },
   "render": {
@@ -39,7 +39,8 @@
     "height": 360,
     "samples": 512,
     "volumeBounces": 64,
-    "radianceCalibration": 0.28
+    "scatteringStrength": 0.55,
+    "radianceCalibration": 1.4
   },
   "methods": [
     "mesh-isosurface",

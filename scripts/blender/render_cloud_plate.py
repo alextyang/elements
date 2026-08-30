@@ -167,6 +167,44 @@ def cloud_volume_material(
     return material
 
 
+def mesh_isosurface_material(name):
+    """Deliberately non-volumetric baseline for the method benchmark."""
+    material = bpy.data.materials.new(name)
+    material.use_nodes = True
+    tree = material.node_tree
+    principled = tree.nodes.get("Principled BSDF")
+    principled.inputs["Base Color"].default_value = (0.84, 0.88, 0.94, 1.0)
+    principled.inputs["Roughness"].default_value = 0.88
+    return material
+
+
+def add_mesh_isosurface_modifier(obj, material):
+    """Render a VDB density threshold as geometry without baking another asset."""
+    nodes = bpy.data.node_groups.new(
+        f"{obj.name} density isosurface", "GeometryNodeTree"
+    )
+    nodes.interface.new_socket(
+        name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry"
+    )
+    nodes.interface.new_socket(
+        name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry"
+    )
+    group_input = nodes.nodes.new("NodeGroupInput")
+    group_output = nodes.nodes.new("NodeGroupOutput")
+    volume_to_mesh = nodes.nodes.new("GeometryNodeVolumeToMesh")
+    volume_to_mesh.inputs["Threshold"].default_value = 0.08
+    volume_to_mesh.inputs["Adaptivity"].default_value = 0.0
+    set_material = nodes.nodes.new("GeometryNodeSetMaterial")
+    set_material.inputs["Material"].default_value = material
+    nodes.links.new(
+        group_input.outputs["Geometry"], volume_to_mesh.inputs["Volume"]
+    )
+    nodes.links.new(volume_to_mesh.outputs["Mesh"], set_material.inputs["Geometry"])
+    nodes.links.new(set_material.outputs["Geometry"], group_output.inputs["Geometry"])
+    modifier = obj.modifiers.new("density isosurface", "NODES")
+    modifier.node_group = nodes
+
+
 def unit_box_mesh(name):
     """Create a bounded volume domain without Blender primitive operators."""
     vertices = [
@@ -383,13 +421,20 @@ def add_composed_storm_group(time_seconds, scene_definition):
         "CLOUD_STORM_SCATTERING_STRENGTH",
         str(composition["scatteringStrength"]),
     ))
+    render_method = os.environ.get("CLOUD_PLATE_RENDER_METHOD", "CYCLES_VOLUME")
     for instance, specification in zip(instances, specifications):
-        instance.data.materials.append(cloud_volume_material(
-            f"{specification['id']} multiple-scattering medium",
-            scattering_strength * specification["scatteringMultiplier"],
-            bottom_fade=specification["bottomFade"],
-            detail_strength=specification.get("detailStrength", 0.0),
-        ))
+        if render_method == "MESH_ISOSURFACE":
+            material = mesh_isosurface_material(
+                f"{specification['id']} opaque density isosurface"
+            )
+            add_mesh_isosurface_modifier(instance, material)
+        else:
+            instance.data.materials.append(cloud_volume_material(
+                f"{specification['id']} multiple-scattering medium",
+                scattering_strength * specification["scatteringMultiplier"],
+                bottom_fade=specification["bottomFade"],
+                detail_strength=specification.get("detailStrength", 0.0),
+            ))
     return instances[0]
 
 
@@ -401,7 +446,8 @@ def configure_scene(config, scene_definition):
     # exported as a single affine transport operator for the storm group.
     if os.environ.get("CLOUD_DEBUG_PRECIP_ONLY") != "1":
         add_composed_storm_group(config["time"], scene_definition)
-    add_precipitation_curtain(config["time"], scene_definition)
+    if scene_definition["offlineComposition"].get("precipitation"):
+        add_precipitation_curtain(config["time"], scene_definition)
 
     camera_data = bpy.data.cameras.new("oblique-natural camera")
     camera = bpy.data.objects.new("oblique-natural camera", camera_data)
@@ -419,7 +465,14 @@ def configure_scene(config, scene_definition):
     sun_data.angle = math.radians(0.53)
     sun = bpy.data.objects.new("storm side sun", sun_data)
     bpy.context.collection.objects.link(sun)
-    sun.location = (-28.0, -36.0, 30.0)
+    sun_elevation = math.radians(lighting.get("sunElevationDegrees", 24.0))
+    sun_azimuth = math.radians(lighting.get("sunAzimuthDegrees", 224.0))
+    sun_distance = 60.0
+    sun.location = (
+        sun_distance * math.cos(sun_elevation) * math.sin(sun_azimuth),
+        sun_distance * math.cos(sun_elevation) * math.cos(sun_azimuth),
+        sun_distance * math.sin(sun_elevation),
+    )
     look_at(sun, (0.0, 0.0, 8.0))
 
     key_data = bpy.data.lights.new("storm softbox", "AREA")
@@ -439,8 +492,12 @@ def configure_scene(config, scene_definition):
         sky = world.node_tree.nodes.new("ShaderNodeTexSky")
         sky.sky_type = "MULTIPLE_SCATTERING"
         sky.sun_disc = False
-        sky.sun_elevation = math.radians(24.0)
-        sky.sun_rotation = math.radians(224.0)
+        sky.sun_elevation = math.radians(
+            lighting.get("sunElevationDegrees", 24.0)
+        )
+        sky.sun_rotation = math.radians(
+            lighting.get("sunAzimuthDegrees", 224.0)
+        )
         sky.altitude = 0.35
         sky.air_density = 1.0
         sky.aerosol_density = 0.45
@@ -470,6 +527,13 @@ def configure_scene(config, scene_definition):
         config["output"], f".render-{config['frame']:05d}.exr"
     )
     scene.view_settings.look = "None"
+
+    render_method = os.environ.get("CLOUD_PLATE_RENDER_METHOD", "CYCLES_VOLUME")
+    if render_method == "EEVEE_VOLUME":
+        scene.render.engine = "BLENDER_EEVEE"
+        return scene
+    if render_method not in ("CYCLES_VOLUME", "MESH_ISOSURFACE"):
+        raise RuntimeError(f"Unsupported cloud render method: {render_method}")
 
     cycles_preferences = bpy.context.preferences.addons["cycles"].preferences
     cycles_preferences.compute_device_type = "METAL"
@@ -638,8 +702,16 @@ def main():
     bpy.data.images.remove(image)
     os.remove(scene.render.filepath)
     metrics = {
-        "backend": "blender-cycles-metal",
-        "device": "Apple Metal",
+        "backend": (
+            "blender-eevee" if scene.render.engine == "BLENDER_EEVEE"
+            else "blender-cycles-metal"
+        ),
+        "device": (
+            "Apple Metal" if scene.render.engine == "CYCLES" else "GPU raster"
+        ),
+        "renderMethod": os.environ.get(
+            "CLOUD_PLATE_RENDER_METHOD", "CYCLES_VOLUME"
+        ).lower().replace("_", "-"),
         "frame": config["frame"],
         "width": config["width"],
         "height": config["height"],
@@ -647,9 +719,15 @@ def main():
         "adaptiveThreshold": None,
         "samplingMode": "paired-fixed-spp",
         "denoiser": (
-            "OpenImageDenoise" if scene.cycles.use_denoising else "none"
+            "OpenImageDenoise"
+            if scene.render.engine == "CYCLES" and scene.cycles.use_denoising
+            else "none"
         ),
-        "pathGuiding": "volume" if scene.cycles.use_guiding else "none",
+        "pathGuiding": (
+            "volume"
+            if scene.render.engine == "CYCLES" and scene.cycles.use_guiding
+            else "none"
+        ),
         "phaseFunction": os.environ.get(
             "CLOUD_PLATE_PHASE_FUNCTION", "HENYEY_GREENSTEIN"
         ).lower().replace("_", "-"),
