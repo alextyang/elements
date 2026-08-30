@@ -6,7 +6,7 @@
     "engine": "cycles",
     "phaseFunction": "mie",
     "denoiser": "none",
-    "samples": 4096,
+    "samples": 16384,
     "volumeBounces": 64,
     "width": 640,
     "height": 360
@@ -47,17 +47,17 @@
       "scatteringStrength": 0.4
     },
     {
-      "id": "exemplar-synthesis-8104",
+      "id": "exemplar-synthesis-8110",
       "kind": "synthesized-vdb",
-      "seed": 8104,
+      "seed": 8110,
       "axisConvention": "z-up",
       "scale": [0.9, 0.9, 0.9],
       "scatteringStrength": 0.4
     },
     {
-      "id": "exemplar-synthesis-8107",
+      "id": "exemplar-synthesis-8113",
       "kind": "synthesized-vdb",
-      "seed": 8107,
+      "seed": 8113,
       "axisConvention": "z-up",
       "scale": [0.9, 0.9, 0.9],
       "scatteringStrength": 0.4

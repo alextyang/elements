@@ -166,7 +166,7 @@ double sampleSource(const Source& source, double x, double y, double z)
 std::string deterministicUuid(const Config& config)
 {
     std::ostringstream identity;
-    identity << "exemplar-assembled-congestus-v3|" << config.seed << '|'
+    identity << "exemplar-eroded-congestus-v4|" << config.seed << '|'
              << config.width << '|' << config.depth << '|' << config.height
              << '|' << std::setprecision(17) << config.voxelSize;
     for (const auto& path : config.sources) identity << '|' << path.filename().string();
@@ -225,7 +225,7 @@ try {
     output->insertMeta("cloud:species",
         openvdb::StringMetadata("cumulus-congestus"));
     output->insertMeta("cloud:authoring",
-        openvdb::StringMetadata("exemplar-assembled-congestus-v3"));
+        openvdb::StringMetadata("exemplar-eroded-congestus-v4"));
     output->insertMeta("cloud:seed", openvdb::Int32Metadata(
         static_cast<std::int32_t>(config.seed)));
     auto accessor = output->getAccessor();
@@ -293,9 +293,12 @@ try {
                 const double mesoDetail = fbm(
                     px * 17.0, py * 19.0, pz * 15.0, config.seed + 431U);
                 const double detailScale =
-                    (0.24 + 1.52 * microDetail) * (0.68 + 0.64 * mesoDetail);
+                    (0.13 + 1.74 * microDetail) * (0.54 + 0.88 * mesoDetail);
+                const double shapedDensity = std::pow(assembledDensity, 1.45);
+                const double erosion = 0.052 * (1.0 - mesoDetail) +
+                    0.026 * (1.0 - microDetail);
                 const double density = std::clamp(
-                    assembledDensity * detailScale, 0.0, 1.0);
+                    shapedDensity * detailScale - erosion, 0.0, 1.0);
                 if (density <= 0.002) continue;
                 accessor.setValue(openvdb::Coord(x, y, z),
                     static_cast<float>(density));

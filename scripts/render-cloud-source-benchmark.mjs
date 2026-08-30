@@ -255,9 +255,14 @@ const main = async () => {
     const report = {
         schemaVersion: 1,
         benchmarkId: id,
-        generatorSourceSha256: sha256File(join(
-            repositoryRoot, "scripts/openvdb/cloud_vdb_author.cpp",
-        )),
+        generatorSourceSha256: {
+            hierarchicalPlume: sha256File(join(
+                repositoryRoot, "scripts/openvdb/cloud_vdb_author.cpp",
+            )),
+            exemplarSynthesis: sha256File(join(
+                repositoryRoot, "scripts/openvdb/cloud_vdb_synthesizer.cpp",
+            )),
+        },
         winningTransport: method,
         lighting: benchmark.lightingOverride,
         comparisonUrl: `/cloud-source-benchmarks/${id}/comparison.png`,

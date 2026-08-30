@@ -11,7 +11,7 @@ test("source benchmark fixes raw Mie transport and one camera", () => {
     assert.equal(benchmark.winningTransport.engine, "cycles");
     assert.equal(benchmark.winningTransport.phaseFunction, "mie");
     assert.equal(benchmark.winningTransport.denoiser, "none");
-    assert.ok(benchmark.winningTransport.samples >= 4096);
+    assert.ok(benchmark.winningTransport.samples >= 16384);
     assert.equal(benchmark.methodBenchmark,
         "data/cloud-render-benchmarks/cumulus-congestus.json");
 });
@@ -28,7 +28,8 @@ test("source benchmark compares truth to deterministic generative range", () => 
         synthesized.length);
     assert.match(runner, /cloud-vdb-author/);
     assert.match(runner, /cloud-vdb-synthesizer/);
-    assert.match(runner, /generatorSourceSha256/);
+    assert.match(runner, /hierarchicalPlume/);
+    assert.match(runner, /exemplarSynthesis/);
     assert.match(runner, /radialArtifact/);
     assert.doesNotMatch(runner, /imagegen|diffusion|openai/i);
 });
