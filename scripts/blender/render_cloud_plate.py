@@ -65,7 +65,8 @@ def cloud_volume_material(
     else:
         raise RuntimeError(f"Unsupported cloud phase function: {phase_model}")
     attribute = tree.nodes.new("ShaderNodeAttribute")
-    attribute.attribute_name = "density"
+    attribute.attribute_name = os.environ.get(
+        "CLOUD_DENSITY_GRID", "density")
     density_source = attribute.outputs["Fac"]
     if detail_strength > 0.0:
         coordinates = tree.nodes.new("ShaderNodeTexCoord")
@@ -429,11 +430,15 @@ def add_composed_storm_group(time_seconds, scene_definition):
             )
             add_mesh_isosurface_modifier(instance, material)
         else:
+            detail_strength = float(os.environ.get(
+                "CLOUD_STORM_DETAIL_STRENGTH",
+                str(specification.get("detailStrength", 0.0)),
+            ))
             instance.data.materials.append(cloud_volume_material(
                 f"{specification['id']} multiple-scattering medium",
                 scattering_strength * specification["scatteringMultiplier"],
                 bottom_fade=specification["bottomFade"],
-                detail_strength=specification.get("detailStrength", 0.0),
+                detail_strength=detail_strength,
             ))
     return instances[0]
 

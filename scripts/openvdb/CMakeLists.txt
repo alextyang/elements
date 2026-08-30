@@ -21,3 +21,8 @@ add_executable(cloud-vdb-synthesizer cloud_vdb_synthesizer.cpp)
 target_compile_features(cloud-vdb-synthesizer PRIVATE cxx_std_20)
 target_link_libraries(cloud-vdb-synthesizer PRIVATE OpenVDB::openvdb)
 target_compile_options(cloud-vdb-synthesizer PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(cloud-vdb-normalizer cloud_vdb_normalizer.cpp)
+target_compile_features(cloud-vdb-normalizer PRIVATE cxx_std_20)
+target_link_libraries(cloud-vdb-normalizer PRIVATE OpenVDB::openvdb)
+target_compile_options(cloud-vdb-normalizer PRIVATE -Wall -Wextra -Wpedantic)
