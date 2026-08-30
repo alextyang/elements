@@ -166,7 +166,7 @@ double sampleSource(const Source& source, double x, double y, double z)
 std::string deterministicUuid(const Config& config)
 {
     std::ostringstream identity;
-    identity << "exemplar-eroded-congestus-v4|" << config.seed << '|'
+    identity << "exemplar-profiled-congestus-v5|" << config.seed << '|'
              << config.width << '|' << config.depth << '|' << config.height
              << '|' << std::setprecision(17) << config.voxelSize;
     for (const auto& path : config.sources) identity << '|' << path.filename().string();
@@ -225,12 +225,47 @@ try {
     output->insertMeta("cloud:species",
         openvdb::StringMetadata("cumulus-congestus"));
     output->insertMeta("cloud:authoring",
-        openvdb::StringMetadata("exemplar-eroded-congestus-v4"));
+        openvdb::StringMetadata("exemplar-profiled-congestus-v5"));
     output->insertMeta("cloud:seed", openvdb::Int32Metadata(
         static_cast<std::int32_t>(config.seed)));
     auto accessor = output->getAccessor();
     const std::size_t primary = config.seed % sources.size();
     constexpr int componentCount = 5;
+    const int morphologyProfile = static_cast<int>((config.seed / 3U) % 4U);
+    output->insertMeta("cloud:morphology-profile",
+        openvdb::Int32Metadata(morphologyProfile));
+    std::array<double, componentCount> centerZ {
+        0.25, 0.43, 0.62, 0.79, 0.48};
+    std::array<double, componentCount> centerX {
+        0.48, 0.50, 0.53, 0.56, 0.44};
+    std::array<double, componentCount> extentX {
+        1.02, 0.72, 0.56, 0.39, 0.50};
+    std::array<double, componentCount> extentY {
+        0.96, 0.77, 0.64, 0.50, 0.58};
+    std::array<double, componentCount> extentZ {
+        0.52, 0.61, 0.55, 0.39, 0.44};
+    if (morphologyProfile == 0) {
+        centerZ = {0.22, 0.43, 0.64, 0.82, 0.51};
+        centerX = {0.48, 0.49, 0.51, 0.53, 0.43};
+        extentX = {0.88, 0.63, 0.48, 0.34, 0.40};
+        extentZ = {0.48, 0.62, 0.56, 0.38, 0.43};
+    } else if (morphologyProfile == 1) {
+        centerZ = {0.24, 0.39, 0.57, 0.73, 0.45};
+        centerX = {0.48, 0.42, 0.55, 0.61, 0.31};
+        extentX = {1.08, 0.78, 0.60, 0.43, 0.60};
+        extentY = {1.00, 0.81, 0.67, 0.52, 0.66};
+    } else if (morphologyProfile == 2) {
+        centerZ = {0.23, 0.42, 0.62, 0.81, 0.47};
+        centerX = {0.39, 0.44, 0.53, 0.64, 0.34};
+        extentX = {0.96, 0.68, 0.51, 0.35, 0.47};
+        extentZ = {0.50, 0.61, 0.54, 0.37, 0.43};
+    } else {
+        centerZ = {0.23, 0.42, 0.62, 0.78, 0.63};
+        centerX = {0.49, 0.42, 0.43, 0.45, 0.68};
+        extentX = {1.04, 0.62, 0.48, 0.34, 0.46};
+        extentY = {0.98, 0.71, 0.59, 0.47, 0.58};
+        extentZ = {0.50, 0.58, 0.53, 0.38, 0.54};
+    }
     std::uint64_t active = 0;
     double maximum = 0.0;
     for (int z = 0; z < config.height; ++z) {
@@ -247,24 +282,18 @@ try {
                     pz * 3.7, px * 4.5, py * 4.1, config.seed + 211U) - 0.5);
                 double assembledDensity = 0.0;
                 for (int component = 0; component < componentCount; ++component) {
-                    const std::size_t index = (primary + component) % sources.size();
+                    const std::size_t index =
+                        (primary + component + morphologyProfile) % sources.size();
                     const double angle = (lattice(
                         component, 7, 11, config.seed + 271U) - 0.5) * 0.46;
                     const double cosine = std::cos(angle);
                     const double sine = std::sin(angle);
-                    const std::array<double, componentCount> centerZ {
-                        0.25, 0.43, 0.62, 0.79, 0.48};
-                    const std::array<double, componentCount> extentX {
-                        1.02, 0.72, 0.56, 0.39, 0.50};
-                    const std::array<double, componentCount> extentY {
-                        0.96, 0.77, 0.64, 0.50, 0.58};
-                    const std::array<double, componentCount> extentZ {
-                        0.52, 0.61, 0.55, 0.39, 0.44};
-                    const double drift = 0.13 * (centerZ[component] - 0.25) +
-                        0.11 * (lattice(component, 37, 41,
+                    const double profileDrift = morphologyProfile == 2
+                        ? 0.12 * (centerZ[component] - 0.23) : 0.0;
+                    const double jitteredCenterX = centerX[component] +
+                        profileDrift + 0.08 * (lattice(component, 37, 41,
                             config.seed + 293U) - 0.5);
-                    const double centerX = 0.48 + drift;
-                    const double centerY = 0.50 + 0.08 * (lattice(
+                    const double jitteredCenterY = 0.50 + 0.08 * (lattice(
                         component, 43, 47, config.seed + 307U) - 0.5);
                     const double scaleX = extentX[component] * (0.91 + 0.18 *
                         lattice(component, 13, 17, config.seed + 277U));
@@ -272,8 +301,8 @@ try {
                         lattice(component, 19, 23, config.seed + 281U));
                     const double scaleZ = extentZ[component] * (0.91 + 0.18 *
                         lattice(component, 29, 31, config.seed + 283U));
-                    const double centeredX = px - centerX + warpX;
-                    const double centeredY = py - centerY + warpY;
+                    const double centeredX = px - jitteredCenterX + warpX;
+                    const double centeredY = py - jitteredCenterY + warpY;
                     const double qx = 0.5 +
                         (cosine * centeredX - sine * centeredY) / scaleX;
                     const double qy = 0.5 +
@@ -315,7 +344,9 @@ try {
     canonicalizeUuid(config.output, config);
     std::cout << "CLOUD_VDB_SYNTHESIZER_METRICS:{\"activeVoxels\":"
               << active << ",\"maxDensity\":" << maximum
-              << ",\"primarySource\":" << primary << ",\"output\":\""
+              << ",\"primarySource\":" << primary
+              << ",\"morphologyProfile\":" << morphologyProfile
+              << ",\"output\":\""
               << config.output.string() << "\"}\n";
     return active == 0 ? 2 : 0;
 } catch (const std::exception& error) {

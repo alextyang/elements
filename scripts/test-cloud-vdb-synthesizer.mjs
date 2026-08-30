@@ -10,7 +10,7 @@ test("synthesizer produces one deterministic fog VDB from multiple sources", () 
     assert.match(source, /sources\.size\(\) < 2/);
     assert.match(source, /GRID_FOG_VOLUME/);
     assert.match(source, /setName\("density"\)/);
-    assert.match(source, /exemplar-eroded-congestus-v4/);
+    assert.match(source, /exemplar-profiled-congestus-v5/);
     assert.match(source, /canonicalizeUuid/);
     assert.match(source, /PointSampler::sample/);
 });
@@ -20,6 +20,8 @@ test("synthesis is object-space and contains no render primitives", () => {
     assert.match(source, /assembledDensity/);
     assert.match(source, /primary = config\.seed % sources\.size\(\)/);
     assert.match(source, /componentCount = 5/);
+    assert.match(source, /morphologyProfile/);
+    assert.match(source, /cloud:morphology-profile/);
     assert.match(source, /microDetail/);
     assert.match(source, /mesoDetail/);
     assert.match(source, /shapedDensity/);
