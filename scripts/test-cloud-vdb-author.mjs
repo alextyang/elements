@@ -24,7 +24,7 @@ test("continuous OpenVDB author covers every WMO genus", () => {
     for (const genus of genera) {
         assert.match(source, new RegExp(`genus == \\\"${genus}\\\"`), genus);
     }
-    assert.match(source, /continuous-domain-warped-field-v2/);
+    assert.match(source, /continuous-domain-warped-field-v3/);
     assert.match(source, /GRID_FOG_VOLUME/);
     assert.match(source, /grid->setName\("density"\)/);
 });
@@ -52,6 +52,9 @@ test("every renderer species routes to a base or explicit morphology", () => {
 
 test("VDB author has scale-separated field families and no primitive emitter", () => {
     assert.match(source, /convectiveEnvelope/);
+    assert.match(source, /congestusPlumeDensity/);
+    assert.match(source, /superelliptic/);
+    assert.match(source, /boundaryBand/);
     assert.match(source, /stratiformEnvelope/);
     assert.match(source, /fibrousEnvelope/);
     assert.match(source, /warp\(/);

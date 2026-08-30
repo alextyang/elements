@@ -45,9 +45,10 @@ without a fixed ceiling. Visual acceptance is based on a contact sheet plus
 per-candidate image metrics; numerical convergence alone is never sufficient.
 
 The benchmark intentionally does not use generated images, neural appearance
-models, neural denoisers, or image-to-volume reconstruction. They conflict with
-the requirement for deterministic species control and auditable full-range
-morphology.
+models, or image-to-volume reconstruction. Open Image Denoise is evaluated as
+a reconstruction filter only; every winning candidate must also include a raw
+fixed-SPP companion proving that morphology exists in the VDB and transport
+samples rather than being synthesized by the filter.
 
 ## Research basis
 

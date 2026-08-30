@@ -205,6 +205,90 @@ double convectiveEnvelope(Vec3 p, std::uint32_t seed, bool deep, bool anvil)
     return field;
 }
 
+// A congestus is authored as one connected buoyant plume field. A few broad,
+// anisotropic superelliptic updraft regions establish meteorological scale;
+// they are not emitted particles and never reach the renderer independently.
+// Domain advection and boundary-local billowy/wispy erosion create the final
+// continuous fog field while the interior remains optically thick.
+double congestusPlumeDensity(Vec3 p, std::uint32_t seed)
+{
+    const double shear = 0.12 * smoothstep(0.16, 0.92, p.z) * p.z;
+    const Vec3 domain = warp(
+        {(p.x - shear) * 3.4, p.y * 3.7, p.z * 3.0}, seed + 601U, 0.46);
+    const Vec3 q {domain.x / 3.4, domain.y / 3.7, domain.z / 3.0};
+    const auto superelliptic = [](Vec3 value, Vec3 center, Vec3 radius,
+        double exponent) {
+        const double metric =
+            std::pow(std::abs((value.x - center.x) / radius.x), exponent) +
+            std::pow(std::abs((value.y - center.y) / radius.y), exponent) +
+            std::pow(std::abs((value.z - center.z) / radius.z), exponent);
+        return 1.0 - std::pow(metric, 1.0 / exponent);
+    };
+    const double variantX = lattice(7, 11, 13, seed + 603U) - 0.5;
+    const double variantY = lattice(17, 19, 23, seed + 605U) - 0.5;
+    const double variantHeight = lattice(29, 31, 37, seed + 607U) - 0.5;
+
+    // The shoulder updrafts overlap the dominant tower and a turbulent common
+    // base. Their union is voxelized once, so there are no separately rendered
+    // lobes, depth-sorted sprites, or repeating screen-space elements.
+    const double primary = superelliptic(
+        q, {-0.035 + 0.09 * variantX, 0.015 + 0.06 * variantY,
+            0.47 + 0.06 * variantHeight},
+        {0.255 + 0.035 * variantY, 0.230 + 0.025 * variantX,
+            0.420 + 0.09 * variantHeight}, 2.4);
+    const double leftShoulder = superelliptic(
+        q, {-0.225, -0.025, 0.32}, {0.270, 0.225, 0.285}, 2.6);
+    const double rightShoulder = superelliptic(
+        q, {0.205, 0.035, 0.30}, {0.285, 0.235, 0.265}, 2.5);
+    const double upperPulse = superelliptic(
+        q, {0.035 - 0.08 * variantX, -0.015 + 0.04 * variantY,
+            0.70 + 0.05 * variantHeight},
+        {0.195, 0.170, 0.215 + 0.04 * variantHeight}, 2.7);
+    const double sharedBase = superelliptic(
+        q, {-0.015, 0.0, 0.18}, {0.43, 0.36, 0.145}, 3.2);
+    double coherentField = std::max(
+        std::max(primary, upperPulse),
+        std::max(sharedBase, std::max(leftShoulder, rightShoulder)));
+
+    const double lowerWindow = smoothstep(0.065, 0.115, q.z);
+    const double upperWindow = 1.0 - smoothstep(0.91, 0.975, q.z);
+    const double window = lowerWindow * upperWindow;
+
+    // Separate billowy and wispy bands follow the production ordering used by
+    // dedicated cloud tools. The broad pass changes silhouette; the anisotropic
+    // fine pass breaks edges and evaporation zones without creating support in
+    // empty space.
+    const double boundaryBand = 1.0 - smoothstep(0.07, 0.34, coherentField);
+    const double macro = fbm(
+        {(q.x + 0.19) * 5.2, (q.y - 0.23) * 5.8, q.z * 4.5},
+        seed + 613U, 7);
+    const double billowy = fbm(
+        {(q.x + 0.31) * 11.0, (q.y - 0.27) * 12.5, q.z * 9.5},
+        seed + 631U, 7);
+    const double wispy = fbm(
+        {(q.x - 0.13) * 7.0, (q.y + 0.29) * 28.0,
+            (q.z + 0.07 * q.x) * 19.0}, seed + 641U, 6);
+    const double micro = fbm(
+        {(q.x + 0.41) * 53.0, (q.y - 0.37) * 61.0,
+            (q.z + 0.05 * q.y) * 47.0}, seed + 647U, 5);
+    coherentField += boundaryBand * (
+        1.55 * (macro - 0.50) + 1.10 * (billowy - 0.50) +
+        0.42 * (wispy - 0.52) + 0.72 * (micro - 0.50));
+    const double broadSupport = smoothstep(-0.46, -0.28,
+        std::max(std::max(primary, sharedBase),
+            std::max(leftShoulder, rightShoulder)));
+    const double support = smoothstep(-0.045, 0.145, coherentField) *
+        broadSupport * window;
+
+    const double interiorVariation = fbm(
+        {(q.x + 0.07) * 6.8, (q.y - 0.11) * 7.4, q.z * 6.1},
+        seed + 653U, 6);
+    const double fineVariation = fbm(
+        {q.x * 31.0, q.y * 35.0, q.z * 27.0}, seed + 659U, 5);
+    return clamp01(support * (0.25 + 0.95 * interiorVariation) *
+        (0.44 + 1.05 * fineVariation));
+}
+
 // A mature thunderstorm is a connected mesoscale system, not a pile of
 // spherical emitters.  This field grows convection out of a shared turbulent
 // boundary-layer shelf, bends the main updraft through vertical wind shear,
@@ -481,6 +565,8 @@ double densityFor(std::string_view genus, std::string_view species, Vec3 p,
     double field = 0.0;
     if (genus == "cumulonimbus") {
         field = stormComplexEnvelope(p, seed, contains(species, "incus"));
+    } else if (genus == "cumulus" && contains(species, "congestus")) {
+        return congestusPlumeDensity(p, seed);
     } else if (genus == "cumulus") {
         field = convectiveEnvelope(p, seed, false, false);
     } else if (genus == "stratus") {
@@ -563,7 +649,7 @@ Config parseArguments(int argc, char** argv)
 std::string deterministicUuid(const Config& config)
 {
     std::ostringstream identity;
-        identity << "continuous-domain-warped-field-v2|" << config.genus << '|'
+        identity << "continuous-domain-warped-field-v3|" << config.genus << '|'
              << config.species << '|' << config.seed << '|' << config.width
              << '|' << config.depth << '|' << config.height << '|'
              << std::setprecision(17) << config.voxelSize << '|'
@@ -622,7 +708,7 @@ try {
     grid->insertMeta("cloud:genus", openvdb::StringMetadata(config.genus));
     grid->insertMeta("cloud:species", openvdb::StringMetadata(config.species));
     grid->insertMeta("cloud:authoring", openvdb::StringMetadata(
-        "continuous-domain-warped-field-v2"));
+        "continuous-domain-warped-field-v3"));
     grid->insertMeta("cloud:seed", openvdb::Int32Metadata(
         static_cast<std::int32_t>(config.seed)));
     auto accessor = grid->getAccessor();
