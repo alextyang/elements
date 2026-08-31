@@ -1339,6 +1339,15 @@ vec3 cloud_scattering(
         0.48
     );
 
+    bool direct_basis = abs(u_cloud_output_mode - 3.0) < 0.25;
+    bool sky_basis = abs(u_cloud_output_mode - 4.0) < 0.25;
+    bool ground_basis = abs(u_cloud_output_mode - 5.0) < 0.25;
+    if (direct_basis || sky_basis || ground_basis) {
+        light_radiance = direct_basis ? vec3(1.0) : vec3(0.0);
+        neutral_sky = sky_basis ? vec3(1.0) : vec3(0.0);
+        neutral_ground = ground_basis ? vec3(1.0) : vec3(0.0);
+    }
+
     float height_light = smoother(0.08, 0.86, altitude_fraction);
     vec3 incident =
         light_radiance * direct_visibility * directional_gain *
@@ -1655,9 +1664,11 @@ export const CLOUD_COMPOSITE = `
             CLOUD_MAX_DISTANCE,
             clouds.distance
         ) * 0.001;
-        out_color = u_cloud_output_mode < 1.5
-            ? vec4(max(clouds.scattering, vec3(0.0)), first_depth_km)
-            : vec4(vec3(saturate(clouds.transmittance)), mean_depth_km);
+        bool transmittance_output =
+            abs(u_cloud_output_mode - 2.0) < 0.25;
+        out_color = transmittance_output
+            ? vec4(vec3(saturate(clouds.transmittance)), mean_depth_km)
+            : vec4(max(clouds.scattering, vec3(0.0)), first_depth_km);
         return;
     }
 

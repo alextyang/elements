@@ -658,7 +658,8 @@ interface WebGlCloudPlateCaptureResult {
     width: number;
     height: number;
     planes: readonly {
-        channel: "radiance" | "transmittance";
+        channel: "radiance" | "transmittance" |
+            "direct-response" | "sky-response" | "ground-response";
         sha256: string;
         byteLength: number;
         stagingPath: string;
@@ -1001,7 +1002,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 return {
                     dispose,
                     read: (
-                        outputMode: 1 | 2,
+                        outputMode: 1 | 2 | 3 | 4 | 5,
                         offlineSample: readonly [number, number, number],
                     ) => {
                         draw(
@@ -1056,6 +1057,9 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             const pixelCount = width * height;
             const radianceSum = new Float64Array(pixelCount * 3);
             const transmittanceSum = new Float64Array(pixelCount * 3);
+            const directResponseSum = new Float64Array(pixelCount * 3);
+            const skyResponseSum = new Float64Array(pixelCount * 3);
+            const groundResponseSum = new Float64Array(pixelCount * 3);
             const firstDepth = new Float32Array(pixelCount);
             firstDepth.fill(140);
             const meanDepthSum = new Float64Array(pixelCount);
@@ -1064,17 +1068,26 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 WebGlCloudPlateCaptureResult["planes"][number][] = [];
             const readback = createCloudPlateReadback();
             try {
+                const accumulateRgb = (
+                    values: Float32Array,
+                    target: Float64Array,
+                ) => {
+                    for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+                        const source = pixel * 4;
+                        const destination = pixel * 3;
+                        target[destination] += values[source];
+                        target[destination + 1] += values[source + 1];
+                        target[destination + 2] += values[source + 2];
+                    }
+                };
                 for (let sampleIndex = 0;
                     sampleIndex < sampleCount;
                     sampleIndex += 1) {
                     const sample = webGlOfflineSample(sampleIndex);
                     let values = readback.read(1, sample);
+                    accumulateRgb(values, radianceSum);
                     for (let pixel = 0; pixel < pixelCount; pixel += 1) {
                         const source = pixel * 4;
-                        const target = pixel * 3;
-                        radianceSum[target] += values[source];
-                        radianceSum[target + 1] += values[source + 1];
-                        radianceSum[target + 2] += values[source + 2];
                         firstDepth[pixel] = Math.min(
                             firstDepth[pixel],
                             values[source + 3],
@@ -1095,10 +1108,16 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                         meanDepthSum[pixel] += values[source + 3] * opacity;
                         meanDepthWeight[pixel] += opacity;
                     }
+                    accumulateRgb(readback.read(3, sample), directResponseSum);
+                    accumulateRgb(readback.read(4, sample), skyResponseSum);
+                    accumulateRgb(readback.read(5, sample), groundResponseSum);
                 }
 
                 const radiance = new Float32Array(pixelCount * 4);
                 const transmittance = new Float32Array(pixelCount * 4);
+                const directResponse = new Float32Array(pixelCount * 4);
+                const skyResponse = new Float32Array(pixelCount * 4);
+                const groundResponse = new Float32Array(pixelCount * 4);
                 for (let pixel = 0; pixel < pixelCount; pixel += 1) {
                     const source = pixel * 3;
                     const target = pixel * 4;
@@ -1115,11 +1134,24 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     transmittance[target + 3] = meanDepthWeight[pixel] > 1e-8
                         ? meanDepthSum[pixel] / meanDepthWeight[pixel]
                         : 140;
+                    for (const [sum, response] of [
+                        [directResponseSum, directResponse],
+                        [skyResponseSum, skyResponse],
+                        [groundResponseSum, groundResponse],
+                    ] as const) {
+                        response[target] = sum[source] / sampleCount;
+                        response[target + 1] = sum[source + 1] / sampleCount;
+                        response[target + 2] = sum[source + 2] / sampleCount;
+                        response[target + 3] = firstDepth[pixel];
+                    }
                 }
 
                 for (const [channel, values] of [
                     ["radiance", radiance],
                     ["transmittance", transmittance],
+                    ["direct-response", directResponse],
+                    ["sky-response", skyResponse],
+                    ["ground-response", groundResponse],
                 ] as const) {
                     const payload = packFloat32PlaneAsLittleEndianFloat16(
                         values,

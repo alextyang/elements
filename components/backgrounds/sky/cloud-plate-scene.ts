@@ -114,6 +114,9 @@ export interface CloudPlateSceneDefinition {
 export type CloudPlateChannel =
     | "radiance"
     | "transmittance"
+    | "direct-response"
+    | "sky-response"
+    | "ground-response"
     | "geometry"
     | "motion";
 
@@ -133,6 +136,9 @@ export interface CloudPlateTransportOperator {
     firstDepthKm: number;
     radiance: CloudPlateBinaryPlane;
     transmittance: CloudPlateBinaryPlane;
+    directResponse?: CloudPlateBinaryPlane;
+    skyResponse?: CloudPlateBinaryPlane;
+    groundResponse?: CloudPlateBinaryPlane;
     geometry?: CloudPlateBinaryPlane;
     motion?: CloudPlateBinaryPlane;
 }
@@ -340,6 +346,8 @@ export const validateCloudPlateAssetManifest = (
             }
             groupIds.add(operator.groupId);
             for (const plane of [operator.radiance, operator.transmittance,
+                operator.directResponse, operator.skyResponse,
+                operator.groundResponse,
                 operator.geometry, operator.motion].filter(Boolean) as
                 CloudPlateBinaryPlane[]) {
                 if (plane.format !== "rgba16float-le" ||

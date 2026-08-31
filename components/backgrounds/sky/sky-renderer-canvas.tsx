@@ -693,8 +693,9 @@ const createParameterData = (
     offlineCloudPlateAccumulation: boolean,
     cloudPlatePlayback: boolean,
     cloudPlateBlend: number,
+    cloudPlateRelightable: boolean,
 ) => {
-    const data = new Float32Array(54 * 4);
+    const data = new Float32Array(55 * 4);
     const cameraYaw = cameraYawRadiansFromViewAzimuth(radiance.viewAzimuth);
     setVector(data, 0, [width, height, cloudTime, frame]);
     setVector(data, 1, [
@@ -970,6 +971,7 @@ const createParameterData = (
         offlineCloudPlateAccumulation ? 1 : 0,
         cloudPlatePlayback ? 1 : 0,
     ]);
+    setVector(data, 54, [cloudPlateRelightable ? 1 : 0, 0, 0, 0]);
     return data;
 };
 
@@ -2486,7 +2488,7 @@ function WebGpuSkyCanvas({
             device.addEventListener?.("uncapturederror", uncapturedErrorHandler);
 
             const parameterBuffer = device.createBuffer({
-                size: 54 * 4 * Float32Array.BYTES_PER_ELEMENT,
+                size: 55 * 4 * Float32Array.BYTES_PER_ELEMENT,
                 usage: BUFFER.STORAGE | BUFFER.COPY_DST,
             });
             const directionalCloudVisibilityUniformBuffer = device.createBuffer({
@@ -2505,7 +2507,7 @@ function WebGpuSkyCanvas({
             // generation.
             const cloudLightParameterSnapshotBuffer = device.createBuffer({
                 label: "cloud light-volume immutable parameter snapshot",
-                size: 54 * 4 * Float32Array.BYTES_PER_ELEMENT,
+                size: 55 * 4 * Float32Array.BYTES_PER_ELEMENT,
                 usage: BUFFER.STORAGE | BUFFER.COPY_DST,
             });
             const layerBuffer = device.createBuffer({
@@ -3722,7 +3724,7 @@ function WebGpuSkyCanvas({
             const createNeutralCloudPlateTexture = () => {
                 const texture = device.createTexture({
                     label: "neutral streamed cloud plate",
-                    size: [1, 1, 2],
+                    size: [1, 1, 5],
                     format: "rgba16float",
                     usage: TEXTURE.TEXTURE_BINDING | TEXTURE.COPY_DST,
                 });
@@ -3738,6 +3740,14 @@ function WebGpuSkyCanvas({
                     {},
                     { width: 1, height: 1, depthOrArrayLayers: 1 },
                 );
+                for (let layer = 2; layer < 5; layer += 1) {
+                    device.queue.writeTexture(
+                        { texture, origin: { x: 0, y: 0, z: layer } },
+                        new Uint16Array([0, 0, 0, 0]),
+                        {},
+                        { width: 1, height: 1, depthOrArrayLayers: 1 },
+                    );
+                }
                 return texture;
             };
             let cloudPlateFirstTexture = createNeutralCloudPlateTexture();
@@ -3746,6 +3756,7 @@ function WebGpuSkyCanvas({
             let cloudPlateRequestedUrl = "";
             let cloudPlateRequestSerial = 0;
             let cloudPlatePlaybackActive = false;
+            let cloudPlateRelightable = false;
             let cloudPlateBlend = 0;
 
             const sha256Hex = async (bytes: ArrayBuffer) => Array.from(
@@ -3827,33 +3838,56 @@ function WebGpuSkyCanvas({
                             "Cloud plate playback currently requires one continuous group.",
                         );
                     }
+                    const { width: plateWidth, height: plateHeight } =
+                        state.manifest.render;
+                    const zeroResponse = () =>
+                        new Uint8Array(plateWidth * plateHeight * 8);
+                    const optionalResponse = (plane?: CloudPlateBinaryPlane) =>
+                        plane ? loadCloudPlatePlane(plane) :
+                            Promise.resolve(zeroResponse());
+                    const relightable = Boolean(
+                        firstOperator.directResponse && firstOperator.skyResponse &&
+                        firstOperator.groundResponse &&
+                        secondOperator.directResponse && secondOperator.skyResponse &&
+                        secondOperator.groundResponse,
+                    );
                     const planes = await Promise.all([
                         loadCloudPlatePlane(firstOperator.radiance),
                         loadCloudPlatePlane(firstOperator.transmittance),
+                        optionalResponse(firstOperator.directResponse),
+                        optionalResponse(firstOperator.skyResponse),
+                        optionalResponse(firstOperator.groundResponse),
                         loadCloudPlatePlane(secondOperator.radiance),
                         loadCloudPlatePlane(secondOperator.transmittance),
+                        optionalResponse(secondOperator.directResponse),
+                        optionalResponse(secondOperator.skyResponse),
+                        optionalResponse(secondOperator.groundResponse),
                     ]);
                     if (disposed || cloudPlatePlaybackState !== state ||
                         state.serial !== serial) return;
-                    const { width: plateWidth, height: plateHeight } =
-                        state.manifest.render;
                     const nextFirst = device.createTexture({
                         label: `cloud plate ${first.index}`,
-                        size: [plateWidth, plateHeight, 2],
+                        size: [plateWidth, plateHeight, 5],
                         format: "rgba16float",
                         usage: TEXTURE.TEXTURE_BINDING | TEXTURE.COPY_DST,
                     });
                     const nextSecond = device.createTexture({
                         label: `cloud plate ${second.index}`,
-                        size: [plateWidth, plateHeight, 2],
+                        size: [plateWidth, plateHeight, 5],
                         format: "rgba16float",
                         usage: TEXTURE.TEXTURE_BINDING | TEXTURE.COPY_DST,
                     });
                     [
                         [nextFirst, 0, planes[0]],
                         [nextFirst, 1, planes[1]],
-                        [nextSecond, 0, planes[2]],
-                        [nextSecond, 1, planes[3]],
+                        [nextFirst, 2, planes[2]],
+                        [nextFirst, 3, planes[3]],
+                        [nextFirst, 4, planes[4]],
+                        [nextSecond, 0, planes[5]],
+                        [nextSecond, 1, planes[6]],
+                        [nextSecond, 2, planes[7]],
+                        [nextSecond, 3, planes[8]],
+                        [nextSecond, 4, planes[9]],
                     ].forEach(([texture, layer, bytes]) => uploadCloudPlatePlane({
                         texture,
                         layer,
@@ -3874,6 +3908,7 @@ function WebGpuSkyCanvas({
                     state.loadedPair = key;
                     state.pendingPair = "";
                     cloudPlatePlaybackActive = true;
+                    cloudPlateRelightable = relightable;
                     canvas.dataset.cloudPlatePlayback = "ready";
                     canvas.dataset.cloudPlateScene = state.manifest.sceneId;
                     canvas.dataset.cloudPlateSceneHash = state.manifest.sceneHash;
@@ -3945,6 +3980,7 @@ function WebGpuSkyCanvas({
                     if (serial === cloudPlateRequestSerial) {
                         cloudPlatePlaybackState = null;
                         cloudPlatePlaybackActive = false;
+                        cloudPlateRelightable = false;
                         canvas.dataset.cloudPlatePlayback = "failed";
                         delete canvas.dataset.cloudPlateScene;
                         delete canvas.dataset.cloudPlateSceneHash;
@@ -5847,6 +5883,7 @@ function WebGpuSkyCanvas({
                     cloudPlateRequestedUrl = requestedCloudPlateUrl;
                     cloudPlatePlaybackState = null;
                     cloudPlatePlaybackActive = false;
+                    cloudPlateRelightable = false;
                     cloudPlateBlend = 0;
                     cloudPlateRequestSerial += 1;
                     if (requestedCloudPlateUrl) {
@@ -6190,6 +6227,7 @@ function WebGpuSkyCanvas({
                     offlineCloudPlateAccumulation,
                     cloudPlatePlaybackActive,
                     cloudPlateBlend,
+                    cloudPlateRelightable,
                 );
                 const parameters = strictCloudTransportTransaction
                     ? strictCloudTransportTransaction.frozenParameters

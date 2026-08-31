@@ -43,6 +43,9 @@ test("WebGL clouds expose an affine scene-linear plate operator", () => {
     assert.match(shader, /\* 0\.001/);
     assert.match(shader, /uniform vec3 u_cloud_offline_sample/);
     assert.match(shader, /fract\(u_cloud_offline_sample\.z\)/);
+    assert.match(shader, /direct_basis = abs\(u_cloud_output_mode - 3\.0\)/);
+    assert.match(shader, /sky_basis = abs\(u_cloud_output_mode - 4\.0\)/);
+    assert.match(shader, /ground_basis = abs\(u_cloud_output_mode - 5\.0\)/);
 });
 
 test("WebGL cloud transport exposes droplet, ice, and fill-light controls", () => {
@@ -150,6 +153,9 @@ test("AtmosphereCanvas exports little-endian rgba16float WebGL plates", () => {
     assert.match(atmosphere, /radianceSum\[source\]\s*\/\s*sampleCount/);
     assert.match(atmosphere,
         /meanDepthSum\[pixel\]\s*\/\s*meanDepthWeight\[pixel\]/);
+    assert.match(atmosphere, /"direct-response", directResponse/);
+    assert.match(atmosphere, /"sky-response", skyResponse/);
+    assert.match(atmosphere, /"ground-response", groundResponse/);
 });
 
 test("explicit WebGL2 mode has one volumetric owner and no CSS cloud doubles", () => {

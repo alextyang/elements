@@ -17154,6 +17154,27 @@ fn sample_cloud_plate_transport(uv: vec2<f32>) -> CompositeTransport {
         cloud_plate_first_texture, cloud_plate_sampler, uv, 0).rgb;
     let second_radiance = textureSample(
         cloud_plate_second_texture, cloud_plate_sampler, uv, 0).rgb;
+    let direct_response = mix(
+        textureSample(
+            cloud_plate_first_texture, cloud_plate_sampler, uv, 2).rgb,
+        textureSample(
+            cloud_plate_second_texture, cloud_plate_sampler, uv, 2).rgb,
+        amount,
+    );
+    let sky_response = mix(
+        textureSample(
+            cloud_plate_first_texture, cloud_plate_sampler, uv, 3).rgb,
+        textureSample(
+            cloud_plate_second_texture, cloud_plate_sampler, uv, 3).rgb,
+        amount,
+    );
+    let ground_response = mix(
+        textureSample(
+            cloud_plate_first_texture, cloud_plate_sampler, uv, 4).rgb,
+        textureSample(
+            cloud_plate_second_texture, cloud_plate_sampler, uv, 4).rgb,
+        amount,
+    );
     let first_transmittance = clamp(textureSample(
         cloud_plate_first_texture, cloud_plate_sampler, uv, 1).rgb,
         vec3<f32>(1e-6), vec3<f32>(1.0));
@@ -17168,8 +17189,19 @@ fn sample_cloud_plate_transport(uv: vec2<f32>) -> CompositeTransport {
         -log(second_transmittance),
         amount,
     );
+    let reference_radiance = mix(first_radiance, second_radiance, amount);
+    let live_source_radiance = max(vec3<f32>(0.0), p[15].rgb + p[16].rgb);
+    let relit_radiance =
+        direct_response * live_source_radiance +
+        sky_response * max(vec3<f32>(0.0), p[17].rgb) +
+        ground_response * max(vec3<f32>(0.0), p[18].rgb);
+    let plate_radiance = select(
+        reference_radiance,
+        relit_radiance,
+        p[54].x > 0.5,
+    );
     return CompositeTransport(
-        mix(first_radiance, second_radiance, amount),
+        max(vec3<f32>(0.0), plate_radiance),
         exp(-optical_depth),
     );
 }

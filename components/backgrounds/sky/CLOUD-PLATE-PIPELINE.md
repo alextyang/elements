@@ -13,10 +13,14 @@ sprite:
 composited radiance = cloud radiance + cloud transmittance * live sky radiance
 ```
 
-The two RGB fields are stored as little-endian RGBA16F planes. Radiance alpha
-carries first interaction depth and transmittance alpha carries mean interaction
-depth. Crossfades interpolate radiance linearly and transmittance in optical
-depth, preventing the gray screen halos produced by alpha blending.
+The two required RGB fields are stored as little-endian RGBA16F planes.
+Radiance alpha carries first interaction depth and transmittance alpha carries
+mean interaction depth. WebGL2 species plates additionally store unit-response
+planes for the direct source, upper-sky diffuse field, and ground diffuse
+field. At playback those three bases are multiplied by the live Sun/Moon,
+cloud-skylight, and ground-light spectra. Crossfades interpolate radiance and
+response linearly and transmittance in optical depth, preventing the gray
+screen halos produced by alpha blending.
 
 Every published file is SHA-256 verified. Manifests and their stable scene alias
 are replaced atomically, so interrupted jobs expose only complete frames. The
@@ -188,7 +192,9 @@ and content hashes before allocating GPU textures. Only the current and next
 frame pair is resident. The old 3-D cloud transport is suppressed as soon as a
 plate manifest is requested, including while the first pair loads.
 
-The current radiance plate is reference-lit but remains physically composable
-with the live sky through RGB transmittance. A later relightable basis extension
-can add direct-source and diffuse response planes without changing the affine
-transport or scene-group contract.
+Legacy two-plane radiance plates remain reference-lit and physically composable
+with the live sky through RGB transmittance. Five-plane WebGL2 plates are
+relightable: direct, upper-diffuse, and lower-diffuse responses reconstruct the
+cloud source term from the current physical lighting fields before the same
+affine composition. Camera direction remains fixed by contract; lighting
+intensity and spectrum are live.

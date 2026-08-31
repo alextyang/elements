@@ -222,6 +222,8 @@ export const cloudPlateTransportResidual = ({
     previousTransmittance,
     currentRadiance,
     currentTransmittance,
+    previousResponses = [],
+    currentResponses = [],
 }) => {
     const residual = (previous, current) => {
         if (previous.length !== current.length || previous.length % 8 !== 0) {
@@ -244,9 +246,14 @@ export const cloudPlateTransportResidual = ({
         }
         return Math.sqrt(squareError / Math.max(1, channels));
     };
+    if (previousResponses.length !== currentResponses.length) {
+        throw new Error("Cloud plate response bases have incompatible counts.");
+    }
     return Math.max(
         residual(previousRadiance, currentRadiance),
         residual(previousTransmittance, currentTransmittance),
+        ...currentResponses.map((plane, index) =>
+            residual(previousResponses[index], plane)),
     );
 };
 
@@ -387,7 +394,9 @@ const manifestFrameIsUsable = (repositoryRoot, frame) => {
     if (!Number.isInteger(frame?.index) || !Array.isArray(frame?.operators) ||
         frame.operators.length === 0) return false;
     return frame.operators.every((operator) =>
-        [operator.radiance, operator.transmittance].every((plane) => {
+        [operator.radiance, operator.transmittance,
+            operator.directResponse, operator.skyResponse,
+            operator.groundResponse].filter(Boolean).every((plane) => {
             if (!plane || !SHA256.test(plane.sha256 ?? "") ||
                 !plane.url?.startsWith("/generated/cloud-plates/")) return false;
             const path = join(repositoryRoot, "public", plane.url);
@@ -660,6 +669,9 @@ export const renderCloudPlateScene = async ({
                 rmSync(metricsPath, { force: true });
                 rmSync(join(frameDirectory, "radiance.rgba16f"), { force: true });
                 rmSync(join(frameDirectory, "transmittance.rgba16f"), { force: true });
+                rmSync(join(frameDirectory, "direct-response.rgba16f"), { force: true });
+                rmSync(join(frameDirectory, "sky-response.rgba16f"), { force: true });
+                rmSync(join(frameDirectory, "ground-response.rgba16f"), { force: true });
                 if (scene.render.backend === "blender-cycles-metal") {
                     await run(blenderExecutable, [
                         "--background",
@@ -739,6 +751,12 @@ export const renderCloudPlateScene = async ({
                         transmittance: readFileSync(join(
                             frameDirectory, "transmittance.rgba16f",
                         )),
+                        responses: scene.render.backend === "webgl2-local-gpu"
+                            ? ["direct-response", "sky-response", "ground-response"]
+                                .map((channel) => readFileSync(join(
+                                    frameDirectory, `${channel}.rgba16f`,
+                                )))
+                            : [],
                     };
                     if (!previousTransport) {
                         previousTransport = currentTransport;
@@ -755,6 +773,8 @@ export const renderCloudPlateScene = async ({
                         previousTransmittance: previousTransport.transmittance,
                         currentRadiance: currentTransport.radiance,
                         currentTransmittance: currentTransport.transmittance,
+                        previousResponses: previousTransport.responses,
+                        currentResponses: currentTransport.responses,
                     });
                     previousTransport = currentTransport;
                     writeJsonAtomic(metricsPath, {
@@ -830,6 +850,23 @@ export const renderCloudPlateScene = async ({
                 width,
                 height,
             });
+            const responsePlanes = scene.render.backend === "webgl2-local-gpu"
+                ? Object.fromEntries([
+                    ["directResponse", "direct-response"],
+                    ["skyResponse", "sky-response"],
+                    ["groundResponse", "ground-response"],
+                ].map(([field, channel]) => [field, planeDescriptor({
+                    channel,
+                    source: join(frameDirectory, `${channel}.rgba16f`),
+                    publicPath: join(
+                        publishedFrameDirectory,
+                        `${channel}.rgba16f`,
+                    ),
+                    publicUrl: `${publicUrlRoot}/${channel}.rgba16f`,
+                    width,
+                    height,
+                })]))
+                : {};
             copyAtomic(previewPath, join(publishedFrameDirectory, "preview.png"));
             copyAtomic(metricsPath, join(
                 publishedFrameDirectory, "capture-metrics.json",
@@ -850,6 +887,7 @@ export const renderCloudPlateScene = async ({
                         minimumFiniteDepthFromRadiancePlane(radianceSource),
                     radiance: radiancePlane,
                     transmittance: transmittancePlane,
+                    ...responsePlanes,
                 }],
             });
             publishManifest(completed.size === totalFrames ? "complete" : "partial");

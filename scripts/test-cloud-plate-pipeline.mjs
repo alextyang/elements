@@ -152,6 +152,17 @@ test("paired transport convergence compares radiance and transmittance RGB", () 
         currentRadiance: secondRadiance,
         currentTransmittance: secondTransmittance,
     }) > 0);
+    const previousResponse = Buffer.alloc(8);
+    const currentResponse = Buffer.alloc(8);
+    currentResponse.writeUInt16LE(0x3800, 0);
+    assert.ok(cloudPlateTransportResidual({
+        previousRadiance: firstRadiance,
+        previousTransmittance: firstTransmittance,
+        currentRadiance: firstRadiance,
+        currentTransmittance: firstTransmittance,
+        previousResponses: [previousResponse],
+        currentResponses: [currentResponse],
+    }) > 0);
 });
 
 test("thunderstorm production scene selects Cycles on Metal", () => {
@@ -177,6 +188,9 @@ test("congestus production scene selects converged WebGL2 plates", () => {
     const capture = readFileSync(join(
         process.cwd(), "scripts/capture-cloud-preview.sh",
     ), "utf8");
+    const route = readFileSync(join(
+        process.cwd(), "app/api/cloud-plates/capture-plane/route.ts",
+    ), "utf8");
     assert.equal(definition.render.backend, "webgl2-local-gpu");
     assert.equal(definition.fixedCamera.perspectiveId, "oblique-natural");
     assert.equal(definition.groups.length, 1);
@@ -188,6 +202,14 @@ test("congestus production scene selects converged WebGL2 plates", () => {
     assert.match(capture, /rendererPreference=\$\{capture_encoded_renderer\}/);
     assert.match(capture, /samples: \$capture_updates/);
     assert.match(capture, /data-sky-renderer="webgl2"/);
+    for (const channel of [
+        "direct-response",
+        "sky-response",
+        "ground-response",
+    ]) {
+        assert.match(route, new RegExp(`"${channel}"`));
+        assert.match(pipeline, new RegExp(`${channel}\\.rgba16f`));
+    }
 });
 
 test("thunderstorm uses a pinned continuous authored field without primitive cloud blobs", () => {
@@ -246,9 +268,18 @@ test("live playback composes verified plates as affine transport", () => {
     assert.match(renderer, /canvas\.dataset\.cloudPlateSceneHash\s*=\s*state\.manifest\.sceneHash/);
     assert.match(renderer, /canvas\.dataset\.cloudPlateExtent/);
     assert.match(renderer, /cloudPlateRequest.*Date\.now/);
+    assert.match(renderer, /size: \[plateWidth, plateHeight, 5\]/);
+    assert.match(renderer, /firstOperator\.directResponse/);
+    assert.match(renderer, /firstOperator\.skyResponse/);
+    assert.match(renderer, /firstOperator\.groundResponse/);
     assert.match(shader, /let cloud_plate_playback = p\[53\]\.w > 0\.5/);
     assert.match(shader, /let optical_depth = mix\([\s\S]*-log\(first_transmittance\)[\s\S]*-log\(second_transmittance\)/);
     assert.match(shader, /cloud_scattering \+ background \* cloud_transmittance/);
+    assert.match(shader, /cloud_plate_first_texture[\s\S]*uv, 2/);
+    assert.match(shader, /cloud_plate_first_texture[\s\S]*uv, 3/);
+    assert.match(shader, /cloud_plate_first_texture[\s\S]*uv, 4/);
+    assert.match(shader, /direct_response \* live_source_radiance/);
+    assert.match(shader, /p\[54\]\.x > 0\.5/);
 });
 
 test("an unconverged build cannot evict the stable live manifest", () => {

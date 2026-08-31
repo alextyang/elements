@@ -7,7 +7,13 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CHANNELS = new Set(["radiance", "transmittance"]);
+const CHANNELS = new Set([
+    "radiance",
+    "transmittance",
+    "direct-response",
+    "sky-response",
+    "ground-response",
+]);
 const SAFE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const authorized = (request: NextRequest) => {
