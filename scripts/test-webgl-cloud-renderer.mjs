@@ -112,6 +112,10 @@ test("WebGL cloud noise is volumetric and reproducible", () => {
     assert.match(noise, /detail: WebGLTexture/);
     assert.match(noise, /weather: WebGLTexture/);
     assert.match(noise, /curl: WebGLTexture/);
+    assert.match(noise, /const DETAIL_SIZE = 64/);
+    assert.match(noise, /gl\.LINEAR_MIPMAP_LINEAR/);
+    assert.match(noise, /gl\.generateMipmap\(gl\.TEXTURE_3D\)/);
+    assert.match(noise, /gl\.generateMipmap\(gl\.TEXTURE_2D\)/);
 });
 
 test("AtmosphereCanvas integrates the volume at the physical camera", () => {

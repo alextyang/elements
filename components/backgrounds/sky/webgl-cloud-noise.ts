@@ -26,7 +26,7 @@ export interface CloudNoiseTextures {
 }
 
 const BASE_SIZE = 128;
-const DETAIL_SIZE = 32;
+const DETAIL_SIZE = 64;
 const WEATHER_SIZE = 512;
 const CURL_SIZE = 128;
 
@@ -335,8 +335,20 @@ export function createCloudNoise(
         if (!texture) throw new Error("Unable to allocate cloud noise volume");
         created.push(texture);
         gl.bindTexture(gl.TEXTURE_3D, texture);
-        gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, size, size, size);
-        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        const levels = Math.floor(Math.log2(size)) + 1;
+        gl.texStorage3D(
+            gl.TEXTURE_3D,
+            levels,
+            gl.RGBA8,
+            size,
+            size,
+            size,
+        );
+        gl.texParameteri(
+            gl.TEXTURE_3D,
+            gl.TEXTURE_MIN_FILTER,
+            gl.LINEAR_MIPMAP_LINEAR,
+        );
         gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.REPEAT);
@@ -361,6 +373,8 @@ export function createCloudNoise(
             },
             size,
         );
+        gl.bindTexture(gl.TEXTURE_3D, texture);
+        gl.generateMipmap(gl.TEXTURE_3D);
         return texture;
     };
 
@@ -369,8 +383,13 @@ export function createCloudNoise(
         if (!texture) throw new Error("Unable to allocate cloud noise plane");
         created.push(texture);
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, size, size);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        const levels = Math.floor(Math.log2(size)) + 1;
+        gl.texStorage2D(gl.TEXTURE_2D, levels, gl.RGBA8, size, size);
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_MIN_FILTER,
+            gl.LINEAR_MIPMAP_LINEAR,
+        );
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
@@ -384,6 +403,8 @@ export function createCloudNoise(
             0,
         );
         runProgram(source, size, () => {}, 1);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.generateMipmap(gl.TEXTURE_2D);
         return texture;
     };
 
