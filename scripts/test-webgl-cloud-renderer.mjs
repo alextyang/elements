@@ -93,6 +93,7 @@ test("AtmosphereCanvas exports little-endian rgba16float WebGL plates", () => {
     assert.match(atmosphere, /const radicalInverse/);
     assert.match(atmosphere, /webGlOfflineSample\(sampleIndex\)/);
     assert.match(atmosphere, /const sampleCount = request\.samples \?\? 1/);
+    assert.match(atmosphere, /capture has no volumetric noise basis/);
     assert.match(atmosphere, /radianceSum\[source\]\s*\/\s*sampleCount/);
     assert.match(atmosphere,
         /meanDepthSum\[pixel\]\s*\/\s*meanDepthWeight\[pixel\]/);

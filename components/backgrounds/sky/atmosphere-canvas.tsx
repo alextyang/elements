@@ -1033,6 +1033,11 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 !request.token) {
                 throw new Error("Invalid WebGL cloud plate capture request.");
             }
+            if (!cloudNoise) {
+                throw new Error(
+                    "WebGL cloud plate capture has no volumetric noise basis.",
+                );
+            }
             const endpoint = request.endpoint ??
                 "/api/cloud-plates/capture-plane";
             const width = canvas.width;
