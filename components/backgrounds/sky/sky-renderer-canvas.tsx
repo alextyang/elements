@@ -8670,7 +8670,7 @@ export function SkyRendererCanvas({
     if (backend === "webgl2") {
         return (
             <>
-                <AtmosphereCanvas scene={radiance} />
+                <AtmosphereCanvas scene={radiance} sceneKey={sceneKey} />
                 <div className={styles.edgeColor} />
                 <div className={styles.horizon} />
                 <CelestialCanvas scene={celestial} paused={paused} />

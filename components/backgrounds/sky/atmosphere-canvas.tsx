@@ -641,9 +641,10 @@ const parseColor = (value: string): [number, number, number] => {
 
 interface AtmosphereCanvasProps {
     scene: SkyRadianceScene;
+    sceneKey?: string;
 }
 
-export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
+export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sceneRef = useRef(scene);
     const drawRef = useRef<(() => void) | null>(null);
@@ -784,6 +785,12 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             gl.uniform4fv(uniform("u_layer_phase"), packedClouds.phase);
             gl.uniform4fv(uniform("u_layer_scale"), packedClouds.scale);
             gl.uniform4fv(uniform("u_layer_drift"), packedClouds.drift);
+            gl.uniform4fv(
+                uniform("u_layer_morphology"),
+                packedClouds.morphology,
+            );
+            gl.uniform4fv(uniform("u_cloud_scene"), packedClouds.scene);
+            gl.uniform4fv(uniform("u_cloud_seed"), packedClouds.seed);
             gl.uniform3fv(
                 uniform("u_cloud_sun_radiance"), current.sunRadiance,
             );
@@ -796,8 +803,8 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
             );
             gl.uniform4f(
                 uniform("u_cloud_quality"),
-                64,
-                6,
+                384,
+                12,
                 1 / 70000,
                 cloudNoise && packedClouds.active ? 1 : 0,
             );
@@ -861,5 +868,12 @@ export function AtmosphereCanvas({ scene }: AtmosphereCanvasProps) {
         };
     }, []);
 
-    return <canvas ref={canvasRef} className={styles.radianceCanvas} />;
+    return (
+        <canvas
+            ref={canvasRef}
+            className={styles.radianceCanvas}
+            data-sky-renderer="webgl2"
+            data-cloud-scene-key={sceneKey}
+        />
+    );
 }

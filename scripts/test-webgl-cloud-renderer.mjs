@@ -8,6 +8,7 @@ const shader = read("../components/backgrounds/sky/webgl-cloud-shader.ts");
 const noise = read("../components/backgrounds/sky/webgl-cloud-noise.ts");
 const atmosphere = read("../components/backgrounds/sky/atmosphere-canvas.tsx");
 const renderer = read("../components/backgrounds/sky/sky-renderer-canvas.tsx");
+const benchmark = read("../app/cloud-photographs/cloud-photograph-benchmark.tsx");
 const license = read("../components/backgrounds/sky/PHOTON-LICENSE.txt");
 
 test("WebGL clouds use continuous world-space volume density", () => {
@@ -16,8 +17,27 @@ test("WebGL clouds use continuous world-space volume density", () => {
     assert.match(shader, /texture\(\s*u_cloud_base,/s);
     assert.match(shader, /texture\(\s*u_cloud_detail,/s);
     assert.match(shader, /cloud_ray_sphere\(origin, direction/);
-    assert.match(shader, /for \(int index = 0; index < 64/);
+    assert.match(shader, /for \(int index = 0; index < 384/);
+    assert.match(shader, /steps = clamp\(steps, 8, 384\)/);
+    assert.match(shader, /min\(span \/ float\(steps\), 25\.0\)/);
+    assert.match(shader, /for \(int i = 0; i < 12/);
+    assert.match(shader, /const float dither = 0\.5/);
+    assert.doesNotMatch(shader, /cloud_dither\(gl_FragCoord/);
+    assert.match(shader, /float local_support = smoother/);
+    assert.match(shader, /density \+= local_support \* layer\.towerAmount/);
+    assert.match(shader, /density \+= local_support \* layer\.anvilAmount/);
+    assert.doesNotMatch(shader, /density \+= layer\.(towerAmount|anvilAmount)/);
     assert.doesNotMatch(shader, /cloud-volume-atlas|atlasDeterministicVariant/);
+});
+
+test("Congestus is a finite continuous species field", () => {
+    assert.match(shader, /CLOUD_SPECIES_CODE/);
+    assert.match(shader, /u_layer_morphology/);
+    assert.match(shader, /float cloud_congestus_coverage\(/);
+    assert.match(shader, /float group_envelope = along_envelope \* normal_envelope/);
+    assert.match(shader, /float lineage = lineage_coarse/);
+    assert.match(shader, /float rising_threshold = mix/);
+    assert.doesNotMatch(shader, /ellipsoid|sphere_stamp|circle_stamp/i);
 });
 
 test("WebGL cloud noise is volumetric and reproducible", () => {
@@ -39,7 +59,9 @@ test("AtmosphereCanvas integrates the volume at the physical camera", () => {
     assert.match(atmosphere, /current\.viewElevation/);
     assert.match(atmosphere, /current\.verticalFov/);
     assert.match(atmosphere, /cameraYawRadiansFromViewAzimuth\(current\.viewAzimuth\)/);
-    assert.match(atmosphere, /uniform\("u_cloud_quality"\),\s*64,\s*6,/s);
+    assert.match(atmosphere, /uniform\("u_cloud_quality"\),\s*384,\s*12,/s);
+    assert.match(atmosphere, /data-sky-renderer="webgl2"/);
+    assert.match(atmosphere, /data-cloud-scene-key=\{sceneKey\}/);
 });
 
 test("explicit WebGL2 mode has one volumetric owner and no CSS cloud doubles", () => {
@@ -51,4 +73,10 @@ test("explicit WebGL2 mode has one volumetric owner and no CSS cloud doubles", (
     assert.match(branch, /<AtmosphereCanvas scene=\{radiance\}/);
     assert.doesNotMatch(branch, /styles\.clouds|styles\.mistLayer/);
     assert.match(license, /Copyright .* Benjamin Stott/);
+});
+
+test("fixed-camera photograph benchmark can explicitly select WebGL2", () => {
+    assert.match(benchmark, /search\.get\("rendererPreference"\)/);
+    assert.match(benchmark, /requestedRendererPreference as SkyRendererPreference/);
+    assert.match(benchmark, /preview:\s*\{[\s\S]*rendererPreference,/);
 });

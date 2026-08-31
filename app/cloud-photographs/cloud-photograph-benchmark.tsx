@@ -65,6 +65,7 @@ import { WEATHER_QUALIFICATION_PERSPECTIVES } from
     "@/components/backgrounds/sky/weather-qualification-matrix";
 import type {
     SkyDebugView,
+    SkyRendererPreference,
     SkyRendererStats,
 } from "@/components/backgrounds/sky/renderer-types";
 
@@ -278,6 +279,10 @@ export function CloudPhotographBenchmark() {
         ? requestedCloudTimeOffset : 0;
     const cloudPlateManifestUrl =
         search.get("cloudPlateManifest")?.trim() || undefined;
+    const requestedRendererPreference = search.get("rendererPreference");
+    const rendererPreference = ["auto", "webgpu", "webgl2", "fallback"].includes(
+        requestedRendererPreference ?? "",
+    ) ? requestedRendererPreference as SkyRendererPreference : undefined;
     const productionPerspective = approvedProductionPerspectiveId(
         requestedProductionPerspective,
     ) ?? DEFAULT_PRODUCTION_PERSPECTIVE_ID;
@@ -306,11 +311,20 @@ export function CloudPhotographBenchmark() {
     // Sky recalculates the full physical scene, and the renderer's synchronous
     // stats callback can enter a CPU-bound redraw feedback loop.
     const benchmark = useMemo(
-        () => applyProductionPerspectiveToCloudPhotographCase(
+        () => {
+            const perspectiveBenchmark = applyProductionPerspectiveToCloudPhotographCase(
             selectedBenchmark,
             productionPerspective,
-        ),
-        [selectedBenchmark, productionPerspective],
+            );
+            return rendererPreference ? {
+                ...perspectiveBenchmark,
+                preview: {
+                    ...perspectiveBenchmark.preview,
+                    rendererPreference,
+                },
+            } : perspectiveBenchmark;
+        },
+        [selectedBenchmark, productionPerspective, rendererPreference],
     );
     const productionCameraSignature = productionPerspectiveCameraSignature(
         productionPerspective,

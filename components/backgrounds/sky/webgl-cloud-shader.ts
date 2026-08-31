@@ -27,7 +27,22 @@
  * - Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique"
  */
 
-import { CLOUD_GENUS_LEVEL, type CloudScene } from "./cloud-scene";
+import {
+    CLOUD_GENUS_LEVEL,
+    CLOUD_SPECIES_CODE,
+    type CloudOrganization,
+    type CloudScene,
+} from "./cloud-scene";
+
+const CLOUD_ORGANIZATION_CODE: Record<CloudOrganization, number> = {
+    unorganized: 0,
+    isolated: 1,
+    streets: 2,
+    "open-cell": 3,
+    "closed-cell": 4,
+    frontal: 5,
+    banded: 6,
+};
 
 export interface PackedCloudLayers {
     geometry: Float32Array;
@@ -36,6 +51,9 @@ export interface PackedCloudLayers {
     phase: Float32Array;
     scale: Float32Array;
     drift: Float32Array;
+    morphology: Float32Array;
+    scene: Float32Array;
+    seed: Float32Array;
     /** True when at least one layer contributes. */
     active: boolean;
 }
@@ -58,6 +76,7 @@ export function packCloudLayers(
     const phase = new Float32Array(12);
     const scale = new Float32Array(12);
     const drift = new Float32Array(12);
+    const morphology = new Float32Array(12);
     let active = false;
 
     scene.layers.forEach((layer, index) => {
@@ -155,9 +174,30 @@ export function packCloudLayers(
         drift[offset + 1] = wrap(motion[offset + 1] * timeSeconds);
         drift[offset + 2] = 1 / (basePeriod * coarseMultiple);
         drift[offset + 3] = 1 / (basePeriod * fineMultiple);
+
+        morphology[offset] = CLOUD_SPECIES_CODE[layer.species];
+        morphology[offset + 1] = CLOUD_ORGANIZATION_CODE[layer.organization];
+        morphology[offset + 2] = layer.lifecycle;
+        morphology[offset + 3] = layer.organizationStrength;
     });
 
-    return { geometry, shape, motion, phase, scale, drift, active };
+    return {
+        geometry,
+        shape,
+        motion,
+        phase,
+        scale,
+        drift,
+        morphology,
+        scene: new Float32Array([
+            scene.convection,
+            scene.instability,
+            scene.humidity,
+            scene.totalOktas / 8,
+        ]),
+        seed: new Float32Array(scene.seed),
+        active,
+    };
 }
 
 export const CLOUD_UNIFORMS = `
@@ -178,6 +218,9 @@ uniform vec4 u_layer_motion[3];    // windX, windZ, shear, turbulence
 uniform vec4 u_layer_phase[3];     // iceFraction, precipitation, present, unused
 uniform vec4 u_layer_scale[3];     // baseScale, detailScale, windStretch, curlStrength
 uniform vec4 u_layer_drift[3];     // driftX, driftZ, unused, unused
+uniform vec4 u_layer_morphology[3];// species, organization, lifecycle, organization strength
+uniform vec4 u_cloud_scene;        // convection, instability, humidity, total coverage
+uniform vec4 u_cloud_seed;
 
 uniform vec3 u_cloud_sun_radiance;
 uniform vec3 u_cloud_moon_radiance;
@@ -280,6 +323,10 @@ struct CloudLayer {
     float towerAmount;
     float anvilAmount;
     float detailStrength;
+    float species;
+    float organization;
+    float lifecycle;
+    float organizationStrength;
     vec2 wind;
     float shear;
     float turbulence;
@@ -313,16 +360,6 @@ vec2 cloud_ray_sphere(vec3 origin, vec3 direction, float radius) {
 }
 
 /**
- * Interleaved gradient noise, a pure function of the pixel coordinate. Being
- * fixed in physical pixels it cannot shimmer between frames, so the march needs
- * no temporal history to stay stable.
- */
-float cloud_dither(vec2 coordinate) {
-    return fract(52.9829189 *
-        fract(dot(coordinate, vec2(0.06711056, 0.00583715))));
-}
-
-/**
  * Vertical shaping, following Photon's cumulus altitude shaping and extended
  * with convective tower and anvil terms so the same function serves all ten
  * genera. altitude_fraction is 0 at cloud base and 1 at cloud top.
@@ -332,6 +369,19 @@ float cloud_altitude_shaping(
     float altitude_fraction,
     CloudLayer layer
 ) {
+    // Morphology may redistribute condensate that already belongs to this
+    // weather system, but it must never create density in clear air. The old
+    // unconditional tower/anvil additions filled the entire spherical shell
+    // whenever a convective layer was present, producing the dark radial slab
+    // seen in fixed-camera captures.
+    float local_support = smoother(0.015, 0.28, saturate(density));
+
+    if (abs(layer.species - 19.0) < 0.5) {
+        float vertical_gate = smoothstep(0.0, 0.045, altitude_fraction) *
+            (1.0 - smoothstep(0.955, 1.0, altitude_fraction));
+        return max0(density) * vertical_gate;
+    }
+
     // Stratiform shaping: a slab with soft faces.
     if (layer.stratusBlend > 0.001) {
         density = mix(
@@ -350,13 +400,13 @@ float cloud_altitude_shaping(
         (0.6 - 0.3 * layer.stratusBlend) * (1.0 - layer.towerAmount * 0.75);
 
     // Convective towers hold density much higher up before cutting off.
-    density += layer.towerAmount * 0.28 *
+    density += local_support * layer.towerAmount * 0.28 *
         linear_step(0.1, 0.5, altitude_fraction) *
         (1.0 - linear_step(0.85, 1.0, altitude_fraction));
 
     // The anvil is ice spreading along the tropopause once the tower can rise
     // no further, so it flares outward and then stops abruptly.
-    density += layer.anvilAmount * 0.5 *
+    density += local_support * layer.anvilAmount * 0.5 *
         linear_step(0.55, 0.78, altitude_fraction) *
         (1.0 - linear_step(0.88, 1.0, altitude_fraction));
 
@@ -375,8 +425,210 @@ float cloud_altitude_shaping(
  * the Worley erosion in cloud_density. Trying to get cell structure from the
  * coverage map instead produces large smooth blobs.
  */
-float cloud_local_coverage(vec3 position3, CloudLayer layer) {
-    vec2 position = position3.xz;
+vec2 cloud_rotate2(vec2 point, float angle) {
+    float cosine = cos(angle);
+    float sine = sin(angle);
+    return vec2(
+        point.x * cosine - point.y * sine,
+        point.x * sine + point.y * cosine
+    );
+}
+
+/**
+ * One finite, connected congestus group built from a scalar thermal field.
+ *
+ * The broad owner is an irregular corridor in Earth-local metres, not a union
+ * of cloud primitives. Low altitude keeps that corridor connected. With
+ * height, a rising threshold retains only persistent maxima in rotated,
+ * domain-warped noise, creating parented turrets. A spatially varying vertical
+ * pulse widens and narrows those maxima into successive cauliflower crowns.
+ */
+float cloud_congestus_coverage(
+    vec3 world_position,
+    CloudLayer layer,
+    float altitude_fraction
+) {
+    float h = saturate(altitude_fraction);
+
+    // Production has one physical camera. The group remains world-space, but
+    // its stable authored owner is placed relative to that one heading so the
+    // fixed photograph camera sees the whole base-to-crown development.
+    vec2 forward = vec2(sin(u_camera.w), cos(u_camera.w));
+    vec2 across = vec2(forward.y, -forward.x);
+    float group_range = mix(6350.0, 7100.0, u_cloud_seed.y);
+    vec2 group_center = forward * group_range +
+        across * ((u_cloud_seed.x - 0.5) * 620.0);
+    vec2 owner = world_position.xz - group_center;
+
+    // One low-frequency, non-radial warp breaks the domain boundary and bends
+    // the connected updraft family without stamping independent lobes.
+    vec2 warp_coordinate = cloud_rotate2(owner, 0.41);
+    vec2 warp = texture(
+        u_cloud_base,
+        vec3(
+            warp_coordinate.x / 9200.0 + u_cloud_seed.z * 3.7,
+            world_position.y / 9200.0 + u_cloud_seed.w * 2.9,
+            warp_coordinate.y / 9200.0 + u_cloud_seed.x * 4.3
+        )
+    ).ba * 2.0 - 1.0;
+    owner += across * warp.x * (260.0 + layer.turbulence * 210.0) +
+        forward * warp.y * (180.0 + layer.turbulence * 140.0);
+
+    float along = dot(owner, across);
+    float normal = dot(owner, forward);
+    float half_length = mix(2450.0, 2950.0, layer.organizationStrength);
+    float half_width = mix(1450.0, 1900.0, u_cloud_scene.x);
+    float edge = 350.0;
+    float centerline = half_width * (
+        0.075 * sin(along / max(1.0, half_length) * PI * 1.17 +
+            u_cloud_seed.z * 6.0) +
+        0.040 * sin(along / max(1.0, half_length) * PI * 2.63 +
+            u_cloud_seed.w * 8.0)
+    );
+    float width_variation = 0.82 +
+        0.10 * sin(along / max(1.0, half_length) * PI * 1.71 +
+            u_cloud_seed.x * 5.0) +
+        0.08 * texture(
+            u_cloud_weather,
+            vec2(along / 17000.0 + u_cloud_seed.y, u_cloud_seed.z)
+        ).r;
+    float height_taper = smoother(0.16, 0.94, h);
+    float height_length = half_length * mix(1.0, 0.80, height_taper);
+    float height_width = half_width * mix(1.0, 0.64, height_taper);
+    float along_envelope = 1.0 - smoothstep(
+        height_length - edge,
+        height_length + edge,
+        abs(along)
+    );
+    float normal_envelope = 1.0 - smoothstep(
+        height_width * width_variation - edge,
+        height_width * width_variation + edge,
+        abs(normal - centerline)
+    );
+    float group_envelope = along_envelope * normal_envelope;
+    if (group_envelope < 1e-4) return 0.0;
+
+    vec2 owner_a = cloud_rotate2(owner, 0.73);
+    vec2 owner_b = cloud_rotate2(owner, -0.46);
+    vec3 thermal_a = vec3(
+        owner_a.x / 7600.0 + u_cloud_seed.x * 2.1,
+        world_position.y / 7600.0 + u_cloud_seed.z * 1.7,
+        owner_a.y / 7600.0 + u_cloud_seed.w * 2.6
+    );
+    vec3 thermal_b = vec3(
+        owner_b.x / 3900.0 + u_cloud_seed.w * 3.2,
+        world_position.y / 5200.0 + u_cloud_seed.x * 2.4,
+        owner_b.y / 3900.0 + u_cloud_seed.y * 2.8
+    );
+    vec3 crown_coordinate = vec3(
+        owner_a.x / 2050.0 + u_cloud_seed.y * 4.1,
+        world_position.y / 2550.0 + u_cloud_seed.w * 3.3,
+        owner_a.y / 2050.0 + u_cloud_seed.z * 3.9
+    );
+    float macro = texture(u_cloud_base, thermal_a).r;
+    float ancestry = texture(u_cloud_base, thermal_b).r;
+    float cells = texture(u_cloud_base, crown_coordinate).g;
+    float clefts = texture(
+        u_cloud_detail,
+        crown_coordinate * 0.57 + vec3(0.31, 0.17, 0.43)
+    ).r;
+
+    // A height-invariant slice is the thermal ancestry. It protects a few
+    // roots as the altitude threshold rises; 3D noise still moves and erodes
+    // their surfaces, but the crowns remain visibly parented to the base.
+    float lineage_coarse = texture(
+        u_cloud_base,
+        vec3(
+            owner_a.x / 5200.0 + u_cloud_seed.y * 2.2,
+            u_cloud_seed.z * 4.7 + 0.19,
+            owner_a.y / 5200.0 + u_cloud_seed.x * 2.9
+        )
+    ).r;
+    float lineage_fine = texture(
+        u_cloud_base,
+        vec3(
+            owner_b.x / 2450.0 + u_cloud_seed.w * 3.8,
+            u_cloud_seed.x * 5.1 + 0.37,
+            owner_b.y / 2450.0 + u_cloud_seed.z * 3.3
+        )
+    ).g;
+    float lineage = lineage_coarse * 0.67 + lineage_fine * 0.33;
+
+    // A separable world-space bias selects a dominant updraft while retaining
+    // the same connected field. It is deliberately not a radial distance.
+    float dominant =
+        (1.0 - smoothstep(0.18, 0.82, abs(along) / half_length)) *
+        (1.0 - smoothstep(0.10, 0.78,
+            abs(normal - centerline) / half_width));
+    float normalized_along = along / max(1.0, half_length);
+    float updraft_bands = saturate(
+        0.50 +
+        0.31 * cos(PI * (2.35 * normalized_along +
+            u_cloud_seed.x * 0.73)) +
+        0.18 * cos(PI * (4.60 * normalized_along -
+            u_cloud_seed.z * 0.91))
+    );
+    float potential =
+        macro * 0.19 + ancestry * 0.20 + cells * 0.16 +
+        lineage * 0.28 + clefts * 0.04 + dominant * 0.16 +
+        updraft_bands * 0.14 * smoother(0.20, 0.92, h);
+
+    // World-space buoyancy cells replace a synchronized sine over height. The
+    // old global phase made every updraft widen at the same altitude and read
+    // as horizontal geological strata. These rotated 3D samples keep roughly
+    // three successive growth stages, but phase them independently by plume.
+    vec3 pulse_coordinate_a = vec3(
+        owner_b.x / 3100.0 + u_cloud_seed.z * 3.1,
+        world_position.y / 1450.0 + layer.lifecycle * 1.7,
+        owner_b.y / 3100.0 + u_cloud_seed.x * 2.7
+    );
+    vec3 pulse_coordinate_b = vec3(
+        owner_a.x / 1750.0 + u_cloud_seed.w * 4.0,
+        world_position.y / 980.0 + u_cloud_seed.y * 3.4,
+        owner_a.y / 1750.0 + u_cloud_seed.z * 3.6
+    );
+    float buoyant_pulse =
+        texture(u_cloud_base, pulse_coordinate_a).b * 0.68 +
+        texture(u_cloud_base, pulse_coordinate_b).g * 0.32;
+    float rising_threshold = mix(0.45, 0.70, pow(h, 0.65));
+    rising_threshold -= (buoyant_pulse - 0.5) * mix(0.07, 0.13, h);
+    rising_threshold -= dominant * mix(0.020, 0.120, h);
+    rising_threshold -= (layer.coverageLow - 0.45) * 0.16;
+    float turrets = smoothstep(
+        rising_threshold - 0.085,
+        rising_threshold + 0.075,
+        potential
+    );
+
+    // The condensation base is a shared connected owner. It hands off to the
+    // ancestry field through the lower third of the volume, so every surviving
+    // crown remains attached rather than becoming a row of floating blobs.
+    float base_noise = macro * 0.58 + ancestry * 0.30 + cells * 0.12;
+    float connected_base = smoothstep(0.24, 0.63, base_noise + 0.20) *
+        (1.0 - smoothstep(0.05, 0.14, h));
+    float top_gate = 1.0 - smoothstep(
+        mix(0.89, 0.94, u_cloud_scene.y),
+        1.0,
+        h
+    );
+    return saturate(max(connected_base, turrets * top_gate) * group_envelope);
+}
+
+float cloud_local_coverage(
+    vec3 world_position3,
+    vec3 sample_position3,
+    CloudLayer layer,
+    float altitude_fraction
+) {
+    if (abs(layer.species - 19.0) < 0.5) {
+        return cloud_congestus_coverage(
+            world_position3,
+            layer,
+            altitude_fraction
+        );
+    }
+
+    vec2 position = sample_position3.xz;
     // Coverage frequencies, raised from Photon's 500 km / 37 km.
     //
     // Those values suit a first-person game view. Elements renders the whole
@@ -414,7 +666,7 @@ float cloud_local_coverage(vec3 position3, CloudLayer layer) {
     // camera never looks straight up through the deck.
     float cells = texture(
         u_cloud_base,
-        position3 * (layer.baseScale * 0.25)
+        sample_position3 * (layer.baseScale * 0.25)
     ).r;
     noise.y = noise.y * 0.62 + cells * 0.38;
 
@@ -450,8 +702,9 @@ float cloud_local_coverage(vec3 position3, CloudLayer layer) {
  * the volume returns a near-constant value.
  */
 float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
-    vec3 sample_position =
+    vec3 world_position =
         vec3(position.x, position.y - PLANET_RADIUS, position.z);
+    vec3 sample_position = world_position;
 
     // Bulk advection is pre-wrapped on the CPU into the tile period; only the
     // small shear offset, which tilts the layer downwind with height, is added
@@ -472,20 +725,33 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
             across * across_wind;
     }
 
-    float density = cloud_local_coverage(sample_position, layer);
+    float density = cloud_local_coverage(
+        world_position,
+        sample_position,
+        layer,
+        altitude_fraction
+    );
     density = cloud_altitude_shaping(density, altitude_fraction, layer);
     if (density < 1e-4) return 0.0;
 
     // Worley erosion. This is where cloud-scale structure is created: the two
     // frequencies carve the coverage field into billows and then into wisps.
-    float worley_0 = texture(
+    float morphology_base_scale = abs(layer.species - 19.0) < 0.5
+        ? 1.0 / 3000.0
+        : layer.baseScale;
+    float morphology_detail_scale = abs(layer.species - 19.0) < 0.5
+        ? 1.0 / 520.0
+        : layer.detailScale;
+    vec4 morphology_base = texture(
         u_cloud_base,
-        sample_position * layer.baseScale
-    ).g;
-    float worley_1 = texture(
+        sample_position * morphology_base_scale
+    );
+    vec3 morphology_detail = texture(
         u_cloud_detail,
-        sample_position * layer.detailScale
-    ).r;
+        sample_position * morphology_detail_scale
+    ).rgb;
+    float worley_0 = morphology_base.g;
+    float worley_1 = morphology_detail.r;
 
     // Curl deformation, concentrated near edges where turbulent mixing acts.
     if (layer.curlStrength > 0.001) {
@@ -498,7 +764,7 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
             texture(
                 u_cloud_detail,
                 (sample_position + vec3(curl.x, 0.0, curl.y) * 120.0) *
-                    layer.detailScale
+                    morphology_detail_scale
             ).r,
             layer.curlStrength * 0.6
         );
@@ -514,9 +780,56 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
         vec2(sqr(layer.stratusBlend), layer.stratusBlend)
     ) * layer.detailStrength;
 
-    density -= detail_weights.x * sqr(worley_0) * dampen(saturate(1.0 - density));
-    density -= detail_weights.y * sqr(worley_1) * dampen(saturate(1.0 - density)) *
-        detail_fade;
+    if (abs(layer.species - 19.0) < 0.5) {
+        vec3 rotated_base_coordinate = vec3(
+            sample_position.z * 0.79 + sample_position.x * 0.32,
+            sample_position.y * 1.13,
+            -sample_position.x * 0.79 + sample_position.z * 0.32
+        ) * (morphology_base_scale * 1.29) +
+            vec3(u_cloud_seed.z, u_cloud_seed.x, u_cloud_seed.w) * 3.1;
+        vec3 rotated_detail_coordinate = vec3(
+            sample_position.z * 0.61 - sample_position.x * 0.74,
+            sample_position.y * 0.91,
+            sample_position.x * 0.61 + sample_position.z * 0.74
+        ) * (morphology_detail_scale * 1.37) +
+            vec3(u_cloud_seed.w, u_cloud_seed.y, u_cloud_seed.x) * 4.3;
+        vec3 rotated_base = texture(
+            u_cloud_base,
+            rotated_base_coordinate
+        ).gba;
+        vec3 rotated_detail = texture(
+            u_cloud_detail,
+            rotated_detail_coordinate
+        ).rgb;
+        float base_fbm = dot(
+            morphology_base.gba,
+            vec3(0.625, 0.25, 0.125)
+        );
+        float detail_fbm = dot(
+            morphology_detail,
+            vec3(0.625, 0.25, 0.125)
+        );
+        base_fbm = mix(
+            base_fbm,
+            dot(rotated_base, vec3(0.625, 0.25, 0.125)),
+            0.38
+        );
+        detail_fbm = mix(
+            detail_fbm,
+            dot(rotated_detail, vec3(0.625, 0.25, 0.125)),
+            0.44
+        );
+        float boundary = 1.0 - smoothstep(0.38, 0.90, density);
+        density -= boundary * layer.detailStrength * (
+            0.22 * (1.0 - base_fbm) +
+            0.14 * (1.0 - detail_fbm) * mix(0.72, 1.18, altitude_fraction)
+        );
+    } else {
+        density -= detail_weights.x * sqr(worley_0) *
+            dampen(saturate(1.0 - density));
+        density -= detail_weights.y * sqr(worley_1) *
+            dampen(saturate(1.0 - density)) * detail_fade;
+    }
 
     // Wispy at the bottom, hard-edged at the top.
     density = max0(density);
@@ -526,7 +839,9 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
         vec2(sqr(layer.stratusBlend))
     );
     density = lift(density, mix(edge_sharpening.x, edge_sharpening.y, altitude_fraction));
-    density *= 0.1 + 0.9 * smoothstep(0.2, 0.7, altitude_fraction);
+    density *= abs(layer.species - 19.0) < 0.5
+        ? 0.52 + 0.48 * smoothstep(0.08, 0.72, altitude_fraction)
+        : 0.1 + 0.9 * smoothstep(0.2, 0.7, altitude_fraction);
 
     return density;
 }
@@ -541,18 +856,19 @@ float cloud_optical_depth(
     float dither,
     int step_count
 ) {
-    const float step_growth = 2.0;
-    float step_length = 0.1 * layer.thickness / float(max(step_count, 1));
-
-    vec3 ray_position = ray_origin;
-    vec3 step_vector = ray_direction * step_length;
+    vec2 outer = cloud_ray_sphere(ray_origin, ray_direction, top_radius);
+    vec2 inner = cloud_ray_sphere(ray_origin, ray_direction, base_radius);
+    float exit_distance = outer.y;
+    if (inner.x > 1.0) exit_distance = min(exit_distance, inner.x);
+    if (inner.y > 1.0) exit_distance = min(exit_distance, inner.y);
+    exit_distance = min(exit_distance, layer.thickness * 8.0);
+    float step_length = exit_distance / float(max(step_count, 1));
     float optical_depth = 0.0;
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 12; i++) {
         if (i >= step_count) break;
-        step_vector *= step_growth;
-        step_length *= step_growth;
-        vec3 point = ray_position + step_vector * dither;
+        vec3 point = ray_origin + ray_direction *
+            ((float(i) + dither) * step_length);
         float radius = length(point);
         float altitude_fraction =
             (radius - base_radius) / max(1.0, top_radius - base_radius);
@@ -560,7 +876,6 @@ float cloud_optical_depth(
             optical_depth +=
                 cloud_density(point, layer, altitude_fraction) * step_length;
         }
-        ray_position += step_vector;
     }
 
     return optical_depth;
@@ -581,49 +896,71 @@ vec3 cloud_scattering(
     float sky_optical_depth,
     float ground_optical_depth,
     float step_transmittance,
+    float altitude_fraction,
     float cos_theta,
     vec3 light_radiance,
     vec3 sky_radiance,
     vec3 ground_radiance
 ) {
-    vec3 scattering = vec3(0.0);
+    float light_tau = layer.extinction * light_optical_depth;
+    float sky_tau = layer.extinction * sky_optical_depth;
+    float ground_tau = layer.extinction * ground_optical_depth;
+    float direct_visibility = exp(-light_tau);
+    float multiple_visibility = exp(-light_tau * 0.22);
+    float sky_visibility = exp(-sky_tau * 0.42);
+    float ground_visibility = exp(-ground_tau * 0.55);
 
-    float scatter_amount = layer.extinction;
-    float extinct_amount = layer.extinction;
-
-    float scattering_integral_times_density =
-        (1.0 - step_transmittance) / layer.extinction;
-
-    float powder_effect = clouds_powder_effect(
+    // Normalize the directional lobe against isotropic scattering before it
+    // controls display energy. The phase still supplies a tight forward peak,
+    // while side-lit liquid cloud retains the broad bright response created by
+    // higher orders rather than collapsing into blue ambient shadow.
+    float phase_response = clamp(
+        clouds_phase_single(cos_theta) / ISOTROPIC_PHASE,
+        0.04,
+        4.0
+    );
+    float directional_gain = mix(
+        0.24,
+        1.0,
+        smoother(0.04, 1.35, phase_response)
+    );
+    float powder = clouds_powder_effect(
         density + density * layer.stratusBlend,
         cos_theta
     );
-    float scattering_falloff = 0.55 * mix(
-        lift(saturate(layer.extinction / 0.1), 0.33),
-        1.0,
-        cos_theta * 0.5 + 0.5
+
+    float sky_luminance = dot(
+        sky_radiance,
+        vec3(0.2126, 0.7152, 0.0722)
+    );
+    float ground_luminance = dot(
+        ground_radiance,
+        vec3(0.2126, 0.7152, 0.0722)
+    );
+    vec3 neutral_sky = mix(
+        sky_radiance,
+        vec3(sky_luminance),
+        0.62
+    );
+    vec3 neutral_ground = mix(
+        ground_radiance,
+        vec3(ground_luminance),
+        0.48
     );
 
-    float phase = clouds_phase_single(cos_theta);
-    vec3 phase_g = pow(vec3(0.6, 0.9, 0.3), vec3(1.0 + light_optical_depth));
+    float height_light = smoother(0.08, 0.86, altitude_fraction);
+    vec3 incident =
+        light_radiance * direct_visibility * directional_gain *
+            mix(0.34, 0.46, powder) * mix(0.76, 1.08, height_light) +
+        light_radiance * multiple_visibility *
+            mix(0.062, 0.112, height_light) +
+        neutral_sky * sky_visibility * mix(0.20, 0.31, height_light) +
+        neutral_ground * ground_visibility * 0.07;
 
-    for (int i = 0; i < 8; i++) {
-        scattering += light_radiance * scatter_amount *
-            exp(-extinct_amount * light_optical_depth) * phase;
-        scattering += ground_radiance * scatter_amount *
-            exp(-extinct_amount * ground_optical_depth) * ISOTROPIC_PHASE;
-        scattering += sky_radiance * scatter_amount *
-            exp(-extinct_amount * sky_optical_depth) * ISOTROPIC_PHASE;
-
-        scatter_amount *= scattering_falloff * powder_effect;
-        extinct_amount *= 0.4;
-        phase_g *= 0.8;
-
-        powder_effect = mix(powder_effect, sqrt(powder_effect), 0.5);
-        phase = clouds_phase_multi(cos_theta, phase_g);
-    }
-
-    return scattering * scattering_integral_times_density;
+    // This is the exact homogeneous-segment integral for unit single-scatter
+    // albedo after the incident field above has been bounded into named,
+    // non-overlapping contributions.
+    return max(incident, vec3(0.0)) * (1.0 - step_transmittance);
 }
 
 /** Marches one spherical cloud shell. */
@@ -661,7 +998,7 @@ CloudResult cloud_march_layer(
         u_cloud_quality.x * 0.5,
         abs(direction.y)
     ));
-    steps = clamp(steps, 8, 64);
+    steps = clamp(steps, 8, 384);
     int light_steps = int(u_cloud_quality.y);
 
     float span = far - near;
@@ -676,7 +1013,9 @@ CloudResult cloud_march_layer(
     // exactly where the artifact is worst. Capping keeps the near field
     // properly sampled; rays that then run out of steps are truncated far away,
     // where aerial perspective has already removed most of the contrast.
-    float step_length = min(span / float(steps), layer.thickness * 0.16);
+    float step_length = abs(layer.species - 19.0) < 0.5
+        ? min(span / float(steps), 25.0)
+        : min(span / float(steps), layer.thickness * 0.16);
     float travelled = near + step_length * dither;
 
     float first_hit = -1.0;
@@ -692,7 +1031,7 @@ CloudResult cloud_march_layer(
         : u_cloud_sun_radiance;
     float cos_theta = moon_dominant ? moon_cosine : sun_cosine;
 
-    for (int index = 0; index < 64; index++) {
+    for (int index = 0; index < 384; index++) {
         if (index >= steps) break;
         if (result.transmittance < 0.005) break;
 
@@ -745,7 +1084,7 @@ CloudResult cloud_march_layer(
 
         vec3 luminance = cloud_scattering(
             layer, density, light_depth, sky_depth, ground_depth,
-            step_transmittance, cos_theta,
+            step_transmittance, altitude_fraction, cos_theta,
             light_radiance, u_cloud_ambient, u_cloud_ground_light
         );
 
@@ -775,6 +1114,7 @@ CloudLayer cloud_layer_from_uniforms(int index) {
     vec4 phase = u_layer_phase[index];
     vec4 scale = u_layer_scale[index];
     vec4 drift = u_layer_drift[index];
+    vec4 morphology = u_layer_morphology[index];
 
     // Extinction per metre, resolved on the CPU against layer thickness.
     float extinction = geometry.w;
@@ -782,6 +1122,7 @@ CloudLayer cloud_layer_from_uniforms(int index) {
     return CloudLayer(
         geometry.x, geometry.y, geometry.z, phase.w,
         shape.x, shape.y, shape.z, shape.w,
+        morphology.x, morphology.y, morphology.z, morphology.w,
         motion.xy, motion.z, motion.w,
         phase.x, phase.y, phase.z,
         scale.x, scale.y, scale.z, scale.w,
@@ -806,7 +1147,12 @@ CloudResult cloud_render(
     if (u_cloud_quality.w < 0.5) return total;
 
     vec3 origin = vec3(0.0, PLANET_RADIUS + observer_height, 0.0);
-    float dither = cloud_dither(gl_FragCoord.xy);
+    // This renderer resolves a static full-resolution frame and does not have
+    // temporal reconstruction to integrate per-pixel jitter. A screen-space
+    // random offset therefore survives as visible crosshatch and radial bands.
+    // Midpoint quadrature is deterministic in world space; the higher sample
+    // count below resolves the resulting depth intervals without that noise.
+    const float dither = 0.5;
 
     for (int index = 0; index < 3; index++) {
         CloudLayer layer = cloud_layer_from_uniforms(index);
