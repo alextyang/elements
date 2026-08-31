@@ -9,6 +9,7 @@ import {
     packCloudLayers,
 } from "./webgl-cloud-shader";
 import { createCloudNoise } from "./webgl-cloud-noise";
+import { cloudSourceFloat16Bits } from "./cloud-fibratus-source-field";
 import type { CloudScene } from "./cloud-scene";
 import type { HydrometeorSceneOverrides } from "./hydrometeor-system";
 import type { GroundAlbedoRgb } from "./atmospheric-composition";
@@ -644,6 +645,52 @@ interface AtmosphereCanvasProps {
     sceneKey?: string;
 }
 
+interface WebGlCloudPlateCaptureRequest {
+    sceneId: string;
+    frame: number;
+    token: string;
+    endpoint?: string;
+}
+
+interface WebGlCloudPlateCaptureResult {
+    width: number;
+    height: number;
+    planes: readonly {
+        channel: "radiance" | "transmittance";
+        sha256: string;
+        byteLength: number;
+        stagingPath: string;
+    }[];
+}
+
+type WebGlCloudPlateCaptureCanvas = HTMLCanvasElement & {
+    __elementsCloudPlateCapture?: (
+        request: WebGlCloudPlateCaptureRequest,
+    ) => Promise<WebGlCloudPlateCaptureResult>;
+};
+
+const packFloat32PlaneAsLittleEndianFloat16 = (
+    values: Float32Array,
+    width: number,
+    height: number,
+) => {
+    const buffer = new ArrayBuffer(values.length * 2);
+    const view = new DataView(buffer);
+    const rowValues = width * 4;
+    for (let y = 0; y < height; y += 1) {
+        const sourceRow = (height - 1 - y) * rowValues;
+        const targetRow = y * rowValues;
+        for (let x = 0; x < rowValues; x += 1) {
+            view.setUint16(
+                (targetRow + x) * 2,
+                cloudSourceFloat16Bits(values[sourceRow + x]),
+                true,
+            );
+        }
+    }
+    return buffer;
+};
+
 export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sceneRef = useRef(scene);
@@ -657,11 +704,12 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return undefined;
+        const captureCanvas = canvas as WebGlCloudPlateCaptureCanvas;
         const gl = canvas.getContext("webgl2", {
             alpha: false,
             antialias: false,
             depth: false,
-            powerPreference: "low-power",
+            powerPreference: "high-performance",
             premultipliedAlpha: false,
         });
         if (!gl) return undefined;
@@ -706,8 +754,13 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             ["u_haze", "haze"],
         ] as const;
 
-        const draw = () => {
-            if (document.hidden) return;
+        const draw = (
+            outputMode = 0,
+            framebuffer: WebGLFramebuffer | null = null,
+            outputWidth?: number,
+            outputHeight?: number,
+        ) => {
+            if (document.hidden && outputMode === 0) return;
             const current = sceneRef.current;
             const bounds = canvas.getBoundingClientRect();
             // Match Retina density on ordinary displays so faint lunar
@@ -719,13 +772,21 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 8_500_000 / Math.max(1, bounds.width * bounds.height),
             );
             const pixelRatio = Math.min(nativePixelRatio, pixelBudgetRatio);
-            const width = Math.max(1, Math.round(bounds.width * pixelRatio));
-            const height = Math.max(1, Math.round(bounds.height * pixelRatio));
-            if (canvas.width !== width || canvas.height !== height) {
+            const width = outputWidth ?? Math.max(
+                1,
+                Math.round(bounds.width * pixelRatio),
+            );
+            const height = outputHeight ?? Math.max(
+                1,
+                Math.round(bounds.height * pixelRatio),
+            );
+            if (framebuffer === null &&
+                (canvas.width !== width || canvas.height !== height)) {
                 canvas.width = width;
                 canvas.height = height;
             }
 
+            gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
             gl.viewport(0, 0, width, height);
             gl.disable(gl.BLEND);
             gl.disable(gl.DEPTH_TEST);
@@ -808,6 +869,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 1 / 70000,
                 cloudNoise && packedClouds.active ? 1 : 0,
             );
+            gl.uniform1f(uniform("u_cloud_output_mode"), outputMode);
             gl.uniform1f(
                 uniform("u_cloud_time"),
                 (current.cloudTime + current.cloudTimeOffset) % 100000,
@@ -849,9 +911,131 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         };
 
-        drawRef.current = draw;
+        const readCloudPlatePlane = (outputMode: 1 | 2) => {
+            if (!gl.getExtension("EXT_color_buffer_float")) {
+                throw new Error(
+                    "WebGL cloud plate export requires EXT_color_buffer_float.",
+                );
+            }
+            const width = canvas.width;
+            const height = canvas.height;
+            const texture = gl.createTexture();
+            const framebuffer = gl.createFramebuffer();
+            if (!texture || !framebuffer) {
+                if (texture) gl.deleteTexture(texture);
+                if (framebuffer) gl.deleteFramebuffer(framebuffer);
+                throw new Error("Unable to allocate WebGL cloud plate target.");
+            }
+            try {
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texImage2D(
+                    gl.TEXTURE_2D,
+                    0,
+                    gl.RGBA32F,
+                    width,
+                    height,
+                    0,
+                    gl.RGBA,
+                    gl.FLOAT,
+                    null,
+                );
+                gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                gl.framebufferTexture2D(
+                    gl.FRAMEBUFFER,
+                    gl.COLOR_ATTACHMENT0,
+                    gl.TEXTURE_2D,
+                    texture,
+                    0,
+                );
+                if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !==
+                    gl.FRAMEBUFFER_COMPLETE) {
+                    throw new Error("WebGL cloud plate framebuffer is incomplete.");
+                }
+                draw(outputMode, framebuffer, width, height);
+                const values = new Float32Array(width * height * 4);
+                gl.readPixels(
+                    0,
+                    0,
+                    width,
+                    height,
+                    gl.RGBA,
+                    gl.FLOAT,
+                    values,
+                );
+                const error = gl.getError();
+                if (error !== gl.NO_ERROR) {
+                    throw new Error(
+                        `WebGL cloud plate readback failed with ${error}.`,
+                    );
+                }
+                return packFloat32PlaneAsLittleEndianFloat16(
+                    values,
+                    width,
+                    height,
+                );
+            } finally {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.deleteFramebuffer(framebuffer);
+                gl.deleteTexture(texture);
+            }
+        };
+
+        captureCanvas.__elementsCloudPlateCapture = async (request) => {
+            if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.sceneId) ||
+                !Number.isInteger(request.frame) || request.frame < 0 ||
+                !request.token) {
+                throw new Error("Invalid WebGL cloud plate capture request.");
+            }
+            const endpoint = request.endpoint ??
+                "/api/cloud-plates/capture-plane";
+            const width = canvas.width;
+            const height = canvas.height;
+            const planeResults:
+                WebGlCloudPlateCaptureResult["planes"][number][] = [];
+            try {
+                for (const [channel, outputMode] of [
+                    ["radiance", 1],
+                    ["transmittance", 2],
+                ] as const) {
+                    const payload = readCloudPlatePlane(outputMode);
+                    const query = new URLSearchParams({
+                        scene: request.sceneId,
+                        frame: String(request.frame),
+                        channel,
+                        width: String(width),
+                        height: String(height),
+                    });
+                    const response = await fetch(`${endpoint}?${query}`, {
+                        method: "POST",
+                        headers: {
+                            "content-type": "application/octet-stream",
+                            "x-cloud-plate-capture-token": request.token,
+                        },
+                        body: payload,
+                    });
+                    if (!response.ok) {
+                        throw new Error(
+                            `WebGL cloud plate ${channel} upload failed: ` +
+                            `${response.status} ${await response.text()}`,
+                        );
+                    }
+                    planeResults.push(await response.json() as
+                        WebGlCloudPlateCaptureResult["planes"][number]);
+                }
+            } finally {
+                draw();
+            }
+            return { width, height, planes: planeResults };
+        };
+        captureCanvas.dataset.cloudPlateExport = "available";
+
+        drawRef.current = () => draw();
         draw();
-        const resizeObserver = new ResizeObserver(draw);
+        const resizeObserver = new ResizeObserver(() => draw());
         resizeObserver.observe(canvas);
         const visibilityHandler = () => {
             if (!document.hidden) draw();
@@ -860,6 +1044,8 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
 
         return () => {
             drawRef.current = null;
+            delete captureCanvas.__elementsCloudPlateCapture;
+            delete captureCanvas.dataset.cloudPlateExport;
             resizeObserver.disconnect();
             document.removeEventListener("visibilitychange", visibilityHandler);
             cloudNoise?.dispose();

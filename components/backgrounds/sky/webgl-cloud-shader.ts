@@ -227,6 +227,7 @@ uniform vec3 u_cloud_moon_radiance;
 uniform vec3 u_cloud_ambient;
 uniform vec3 u_cloud_ground_light;
 uniform vec4 u_cloud_quality;      // viewSteps, lightSteps, aerialScale, enabled
+uniform float u_cloud_output_mode; // 0 final, 1 raw radiance/depth, 2 transmittance/depth
 uniform float u_cloud_time;
 uniform float u_cloud_fog;
 uniform float u_cloud_noctilucent;
@@ -347,6 +348,7 @@ struct CloudResult {
     vec3 scattering;
     float transmittance;
     float distance;
+    float firstDistance;
 };
 
 /** Returns (near, far) parametric hits, or (-1, -1) when the ray misses. */
@@ -1015,7 +1017,9 @@ CloudResult cloud_march_layer(
     float moon_cosine,
     float dither
 ) {
-    CloudResult result = CloudResult(vec3(0.0), 1.0, CLOUD_MAX_DISTANCE);
+    CloudResult result = CloudResult(
+        vec3(0.0), 1.0, CLOUD_MAX_DISTANCE, CLOUD_MAX_DISTANCE
+    );
     if (layer.present < 0.5) return result;
 
     float base_radius = PLANET_RADIUS + layer.baseAltitude;
@@ -1144,6 +1148,9 @@ CloudResult cloud_march_layer(
     result.distance = weight_sum > 0.0
         ? weighted_distance / weight_sum
         : (first_hit > 0.0 ? first_hit : CLOUD_MAX_DISTANCE);
+    result.firstDistance = first_hit > 0.0
+        ? first_hit
+        : CLOUD_MAX_DISTANCE;
 
     return result;
 }
@@ -1184,7 +1191,9 @@ CloudResult cloud_render(
     float moon_cosine,
     float observer_height
 ) {
-    CloudResult total = CloudResult(vec3(0.0), 1.0, CLOUD_MAX_DISTANCE);
+    CloudResult total = CloudResult(
+        vec3(0.0), 1.0, CLOUD_MAX_DISTANCE, CLOUD_MAX_DISTANCE
+    );
     if (u_cloud_quality.w < 0.5) return total;
 
     vec3 origin = vec3(0.0, PLANET_RADIUS + observer_height, 0.0);
@@ -1194,6 +1203,8 @@ CloudResult cloud_render(
     // Midpoint quadrature is deterministic in world space; the higher sample
     // count below resolves the resulting depth intervals without that noise.
     const float dither = 0.5;
+    float weighted_distance = 0.0;
+    float distance_weight = 0.0;
 
     for (int index = 0; index < 3; index++) {
         CloudLayer layer = cloud_layer_from_uniforms(index);
@@ -1203,10 +1214,24 @@ CloudResult cloud_render(
             sun_cosine, moon_cosine, dither
         );
 
+        float layer_contribution = total.transmittance *
+            (1.0 - layer_result.transmittance);
         total.scattering += total.transmittance * layer_result.scattering;
         total.transmittance *= layer_result.transmittance;
-        total.distance = min(total.distance, layer_result.distance);
+        total.firstDistance = min(
+            total.firstDistance,
+            layer_result.firstDistance
+        );
+        if (layer_contribution > 1e-6 &&
+            layer_result.distance < CLOUD_MAX_DISTANCE) {
+            weighted_distance += layer_result.distance * layer_contribution;
+            distance_weight += layer_contribution;
+        }
     }
+
+    total.distance = distance_weight > 1e-6
+        ? weighted_distance / distance_weight
+        : CLOUD_MAX_DISTANCE;
 
     return total;
 }
@@ -1248,6 +1273,25 @@ export const CLOUD_COMPOSITE = `
         view, sun_direction, moon_direction, sun_cosine, moon_cosine,
         observer_altitude * 2500.0
     );
+
+    // Offline plate export preserves the cloud as an affine scene-linear
+    // transport operator. Depth is stored in kilometres to match the WebGPU
+    // packet ABI and remain exactly representable in rgba16float. Empty pixels
+    // use the same 140 km finite sentinel as the live transport path.
+    if (u_cloud_output_mode > 0.5) {
+        float first_depth_km = min(
+            CLOUD_MAX_DISTANCE,
+            clouds.firstDistance
+        ) * 0.001;
+        float mean_depth_km = min(
+            CLOUD_MAX_DISTANCE,
+            clouds.distance
+        ) * 0.001;
+        out_color = u_cloud_output_mode < 1.5
+            ? vec4(max(clouds.scattering, vec3(0.0)), first_depth_km)
+            : vec4(vec3(saturate(clouds.transmittance)), mean_depth_km);
+        return;
+    }
 
     // Aerial perspective. Distant cloud loses contrast toward the sky radiance
     // between it and the viewer, which is what makes a horizon deck recede.

@@ -30,6 +30,15 @@ test("WebGL clouds use continuous world-space volume density", () => {
     assert.doesNotMatch(shader, /cloud-volume-atlas|atlasDeterministicVariant/);
 });
 
+test("WebGL clouds expose an affine scene-linear plate operator", () => {
+    assert.match(shader, /uniform float u_cloud_output_mode/);
+    assert.match(shader, /float firstDistance/);
+    assert.match(shader, /clouds\.firstDistance/);
+    assert.match(shader, /max\(clouds\.scattering, vec3\(0\.0\)\)/);
+    assert.match(shader, /vec3\(saturate\(clouds\.transmittance\)\)/);
+    assert.match(shader, /\* 0\.001/);
+});
+
 test("Congestus is a finite continuous species field", () => {
     assert.match(shader, /CLOUD_SPECIES_CODE/);
     assert.match(shader, /u_layer_morphology/);
@@ -66,6 +75,18 @@ test("AtmosphereCanvas integrates the volume at the physical camera", () => {
     assert.match(atmosphere, /uniform\("u_cloud_quality"\),\s*384,\s*12,/s);
     assert.match(atmosphere, /data-sky-renderer="webgl2"/);
     assert.match(atmosphere, /data-cloud-scene-key=\{sceneKey\}/);
+});
+
+test("AtmosphereCanvas exports little-endian rgba16float WebGL plates", () => {
+    assert.match(atmosphere, /powerPreference: "high-performance"/);
+    assert.match(atmosphere, /EXT_color_buffer_float/);
+    assert.match(atmosphere, /gl\.RGBA32F/);
+    assert.match(atmosphere, /gl\.readPixels\(/);
+    assert.match(atmosphere, /cloudSourceFloat16Bits/);
+    assert.match(atmosphere, /view\.setUint16\([\s\S]*true,/);
+    assert.match(atmosphere, /__elementsCloudPlateCapture/);
+    assert.match(atmosphere, /dataset\.cloudPlateExport = "available"/);
+    assert.match(atmosphere, /\/api\/cloud-plates\/capture-plane/);
 });
 
 test("explicit WebGL2 mode has one volumetric owner and no CSS cloud doubles", () => {
