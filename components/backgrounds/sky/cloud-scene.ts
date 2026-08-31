@@ -222,6 +222,43 @@ export const CLOUD_GENUS_LEVEL: Record<CloudGenus, CloudLevel> = {
     cumulonimbus: "low",
 };
 
+/**
+ * Explicit continuous-field controls shared by authored scenes and the
+ * converged WebGL plate renderer. Values omitted here are supplied by the
+ * canonical species recipe and its deterministic topology exemplar.
+ */
+export interface CloudMorphologyControls {
+    elementScaleKm?: number;
+    verticalAspect?: number;
+    supportBand?: number;
+    erosionStrength?: number;
+    lineageDepth?: number;
+    macroElementCount?: number;
+    branchOrCrestCount?: number;
+    shearCoupling?: number;
+    sedimentationCoupling?: number;
+    cellularClosure?: number;
+    anisotropy?: number;
+    baseConnectivity?: number;
+    crownExpansion?: number;
+    fragmentation?: number;
+    fibreCurl?: number;
+    waveAmplitude?: number;
+}
+
+/** Exact material/transport controls for authored reference and plate scenes. */
+export interface CloudOpticalControls {
+    singleScatteringAlbedo?: number;
+    liquidAsymmetry?: number;
+    iceAsymmetry?: number;
+    draineAlpha?: number;
+    multipleScatteringExtinction?: number;
+    multipleScatteringStrength?: number;
+    skyFillStrength?: number;
+    groundFillStrength?: number;
+    powderStrength?: number;
+}
+
 export interface CloudLayerState {
     genus: CloudGenus;
     /** Explicit WMO morphology; `generic` is used by unconstrained daily skies. */
@@ -263,6 +300,10 @@ export interface CloudLayerState {
     lifecycle: number;
     /** Strength of organization and clustering, 0-1. */
     organizationStrength: number;
+    /** Optional exact field controls; recipe defaults remain authoritative. */
+    morphology?: CloudMorphologyControls;
+    /** Optional exact scattering controls; physical defaults remain active. */
+    optics?: CloudOpticalControls;
 }
 
 export type CloudLayerIndex = 0 | 1 | 2;
@@ -543,6 +584,8 @@ export interface LayerRequest {
     organization?: CloudOrganization;
     lifecycle?: number;
     organizationStrength?: number;
+    morphology?: CloudMorphologyControls;
+    optics?: CloudOpticalControls;
 }
 
 /** Builds one physically consistent layer from a genus and a coverage. */
@@ -625,6 +668,10 @@ export function createLayer(request: LayerRequest): CloudLayerState {
         ),
         lifecycle: clamp(request.lifecycle ?? 0.5),
         organizationStrength: clamp(request.organizationStrength ?? 0.45),
+        morphology: request.morphology
+            ? { ...request.morphology }
+            : undefined,
+        optics: request.optics ? { ...request.optics } : undefined,
     };
 }
 

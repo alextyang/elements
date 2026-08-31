@@ -871,6 +871,16 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 uniform("u_layer_morphology"),
                 packedClouds.morphology,
             );
+            gl.uniform4fv(uniform("u_layer_topology"), packedClouds.topology);
+            gl.uniform4fv(uniform("u_layer_anatomy"), packedClouds.anatomy);
+            gl.uniform4fv(uniform("u_layer_dynamics"), packedClouds.dynamics);
+            gl.uniform4fv(uniform("u_layer_formation"), packedClouds.formation);
+            gl.uniform4fv(
+                uniform("u_layer_microstructure"),
+                packedClouds.microstructure,
+            );
+            gl.uniform4fv(uniform("u_layer_optics"), packedClouds.optics);
+            gl.uniform4fv(uniform("u_layer_lighting"), packedClouds.lighting);
             gl.uniform4fv(uniform("u_cloud_scene"), packedClouds.scene);
             gl.uniform4fv(uniform("u_cloud_seed"), packedClouds.seed);
             gl.uniform3fv(

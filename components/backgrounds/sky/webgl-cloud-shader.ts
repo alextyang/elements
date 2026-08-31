@@ -33,6 +33,7 @@ import {
     type CloudOrganization,
     type CloudScene,
 } from "./cloud-scene";
+import { packWebGlCloudMorphology } from "./webgl-cloud-morphology";
 
 const CLOUD_ORGANIZATION_CODE: Record<CloudOrganization, number> = {
     unorganized: 0,
@@ -52,6 +53,13 @@ export interface PackedCloudLayers {
     scale: Float32Array;
     drift: Float32Array;
     morphology: Float32Array;
+    topology: Float32Array;
+    anatomy: Float32Array;
+    dynamics: Float32Array;
+    formation: Float32Array;
+    microstructure: Float32Array;
+    optics: Float32Array;
+    lighting: Float32Array;
     scene: Float32Array;
     seed: Float32Array;
     /** True when at least one layer contributes. */
@@ -77,6 +85,7 @@ export function packCloudLayers(
     const scale = new Float32Array(12);
     const drift = new Float32Array(12);
     const morphology = new Float32Array(12);
+    const controlledMorphology = packWebGlCloudMorphology(scene);
     let active = false;
 
     scene.layers.forEach((layer, index) => {
@@ -189,6 +198,7 @@ export function packCloudLayers(
         scale,
         drift,
         morphology,
+        ...controlledMorphology,
         scene: new Float32Array([
             scene.convection,
             scene.instability,
@@ -219,6 +229,13 @@ uniform vec4 u_layer_phase[3];     // iceFraction, precipitation, present, unuse
 uniform vec4 u_layer_scale[3];     // baseScale, detailScale, windStretch, curlStrength
 uniform vec4 u_layer_drift[3];     // driftX, driftZ, unused, unused
 uniform vec4 u_layer_morphology[3];// species, organization, lifecycle, organization strength
+uniform vec4 u_layer_topology[3];  // macro topology, material, element km, vertical aspect
+uniform vec4 u_layer_anatomy[3];   // support band, erosion, lineage depth, macro count
+uniform vec4 u_layer_dynamics[3];  // branch count, shear, sedimentation, cellular closure
+uniform vec4 u_layer_formation[3]; // anisotropy, base connectivity, crown expansion, fragmentation
+uniform vec4 u_layer_microstructure[3];// fibre curl, wave amplitude, powder, reserved
+uniform vec4 u_layer_optics[3];    // SSA, liquid g, ice g, Draine alpha
+uniform vec4 u_layer_lighting[3];  // multi extinction/strength, sky/ground fill
 uniform vec4 u_cloud_scene;        // convection, instability, humidity, total coverage
 uniform vec4 u_cloud_seed;
 
@@ -282,11 +299,34 @@ float klein_nishina_phase(float nu, float e) {
  * broad Henyey-Greenstein lobe. Photon notes the max() is not physical but
  * reads well, and the result is the silver lining on a backlit cloud edge.
  */
-float clouds_phase_single(float cos_theta) {
-    float forwards_a = klein_nishina_phase(cos_theta, 2600.0);
-    float forwards_b = hg_phase(cos_theta, 0.8);
-    return 0.8 * max(forwards_a, forwards_b) +
-        0.2 * hg_phase(cos_theta, -0.2);
+float draine_phase(float cos_theta, float g, float alpha) {
+    float gg = g * g;
+    float normalization = 4.0 * PI *
+        (1.0 + alpha * (1.0 + 2.0 * gg) / 3.0);
+    return (1.0 - gg) * (1.0 + alpha * cos_theta * cos_theta) /
+        max(1e-5, normalization *
+            pow1d5(1.0 + gg - 2.0 * g * cos_theta));
+}
+
+float clouds_phase_single(
+    float cos_theta,
+    float ice_fraction,
+    float liquid_g,
+    float ice_g,
+    float draine_alpha
+) {
+    // Jendersie & d'Eon's HG + Draine mixture retains the water-droplet Mie
+    // forward half far better than HG alone. Ice is broader and keeps a weak
+    // backward lobe; phase composition follows the physical layer fraction.
+    float liquid =
+        0.18 * hg_phase(cos_theta, min(0.96, liquid_g + 0.12)) +
+        0.72 * draine_phase(cos_theta, liquid_g, draine_alpha) +
+        0.10 * hg_phase(cos_theta, -0.22);
+    float ice =
+        0.74 * hg_phase(cos_theta, min(0.94, ice_g + 0.10)) +
+        0.18 * draine_phase(cos_theta, ice_g, draine_alpha * 0.56) +
+        0.08 * hg_phase(cos_theta, -0.18);
+    return mix(liquid, ice, saturate(ice_fraction));
 }
 
 /** Multiple-scattering phase: forward lobe, forward peak, backward lobe. */
@@ -329,6 +369,33 @@ struct CloudLayer {
     float organization;
     float lifecycle;
     float organizationStrength;
+    float macroTopology;
+    float materialModel;
+    float elementScaleKm;
+    float verticalAspect;
+    float supportBand;
+    float erosionStrength;
+    float lineageDepth;
+    float macroElementCount;
+    float branchOrCrestCount;
+    float shearCoupling;
+    float sedimentationCoupling;
+    float cellularClosure;
+    float anisotropy;
+    float baseConnectivity;
+    float crownExpansion;
+    float fragmentation;
+    float fibreCurl;
+    float waveAmplitude;
+    float powderStrength;
+    float singleScatteringAlbedo;
+    float liquidAsymmetry;
+    float iceAsymmetry;
+    float draineAlpha;
+    float multipleScatteringExtinction;
+    float multipleScatteringStrength;
+    float skyFillStrength;
+    float groundFillStrength;
     vec2 wind;
     float shear;
     float turbulence;
@@ -452,15 +519,16 @@ float cloud_congestus_coverage(
     float altitude_fraction
 ) {
     float h = saturate(altitude_fraction);
+    float element_metres = max(800.0, layer.elementScaleKm * 1000.0);
 
     // Production has one physical camera. The group remains world-space, but
     // its stable authored owner is placed relative to that one heading so the
     // fixed photograph camera sees the whole base-to-crown development.
     vec2 forward = vec2(sin(u_camera.w), cos(u_camera.w));
     vec2 across = vec2(forward.y, -forward.x);
-    float group_range = mix(7900.0, 8500.0, u_cloud_seed.y);
+    float group_range = element_metres * mix(2.19, 2.36, u_cloud_seed.y);
     vec2 group_center = forward * group_range +
-        across * ((u_cloud_seed.x - 0.5) * 620.0);
+        across * ((u_cloud_seed.x - 0.5) * element_metres * 0.172);
     vec2 owner = world_position.xz - group_center;
 
     // One low-frequency, non-radial warp breaks the domain boundary and bends
@@ -469,19 +537,25 @@ float cloud_congestus_coverage(
     vec2 warp = texture(
         u_cloud_base,
         vec3(
-            warp_coordinate.x / 9200.0 + u_cloud_seed.z * 3.7,
-            world_position.y / 9200.0 + u_cloud_seed.w * 2.9,
-            warp_coordinate.y / 9200.0 + u_cloud_seed.x * 4.3
+            warp_coordinate.x / (element_metres * 2.55) + u_cloud_seed.z * 3.7,
+            world_position.y / (element_metres * 2.55) + u_cloud_seed.w * 2.9,
+            warp_coordinate.y / (element_metres * 2.55) + u_cloud_seed.x * 4.3
         )
     ).ba * 2.0 - 1.0;
-    owner += across * warp.x * (260.0 + layer.turbulence * 210.0) +
-        forward * warp.y * (180.0 + layer.turbulence * 140.0);
+    owner += across * warp.x * element_metres *
+        (0.072 + layer.turbulence * 0.058 + layer.shearCoupling * 0.035) +
+        forward * warp.y * element_metres *
+        (0.050 + layer.turbulence * 0.039 + layer.shearCoupling * 0.025);
 
     float along = dot(owner, across);
     float normal = dot(owner, forward);
-    float half_length = mix(3000.0, 3400.0, layer.organizationStrength);
-    float half_width = mix(800.0, 1050.0, u_cloud_scene.x);
-    float edge = 350.0;
+    float half_length = element_metres * mix(
+        0.83,
+        0.94,
+        layer.organizationStrength
+    );
+    float half_width = element_metres * mix(0.22, 0.29, u_cloud_scene.x);
+    float edge = element_metres * mix(0.075, 0.12, layer.supportBand);
     float centerline = half_width * (
         0.075 * sin(along / max(1.0, half_length) * PI * 1.17 +
             u_cloud_seed.z * 6.0) +
@@ -499,9 +573,9 @@ float cloud_congestus_coverage(
     float crown_expansion = smoother(0.48, 0.76, h) *
         (1.0 - smoother(0.91, 1.0, h));
     float height_length = half_length * mix(1.0, 0.82, height_taper) *
-        (1.0 + crown_expansion * 0.10);
+        (1.0 + crown_expansion * layer.crownExpansion * 0.18);
     float height_width = half_width * mix(1.0, 0.70, height_taper) *
-        (1.0 + crown_expansion * 0.06);
+        (1.0 + crown_expansion * layer.crownExpansion * 0.11);
     float along_envelope = 1.0 - smoothstep(
         height_length - edge,
         height_length + edge,
@@ -518,19 +592,19 @@ float cloud_congestus_coverage(
     vec2 owner_a = cloud_rotate2(owner, 0.73);
     vec2 owner_b = cloud_rotate2(owner, -0.46);
     vec3 thermal_a = vec3(
-        owner_a.x / 7600.0 + u_cloud_seed.x * 2.1,
-        world_position.y / 7600.0 + u_cloud_seed.z * 1.7,
-        owner_a.y / 7600.0 + u_cloud_seed.w * 2.6
+        owner_a.x / (element_metres * 2.11) + u_cloud_seed.x * 2.1,
+        world_position.y / (element_metres * 2.11) + u_cloud_seed.z * 1.7,
+        owner_a.y / (element_metres * 2.11) + u_cloud_seed.w * 2.6
     );
     vec3 thermal_b = vec3(
-        owner_b.x / 3900.0 + u_cloud_seed.w * 3.2,
-        world_position.y / 5200.0 + u_cloud_seed.x * 2.4,
-        owner_b.y / 3900.0 + u_cloud_seed.y * 2.8
+        owner_b.x / (element_metres * 1.083) + u_cloud_seed.w * 3.2,
+        world_position.y / (element_metres * 1.44) + u_cloud_seed.x * 2.4,
+        owner_b.y / (element_metres * 1.083) + u_cloud_seed.y * 2.8
     );
     vec3 crown_coordinate = vec3(
-        owner_a.x / 2050.0 + u_cloud_seed.y * 4.1,
-        world_position.y / 2550.0 + u_cloud_seed.w * 3.3,
-        owner_a.y / 2050.0 + u_cloud_seed.z * 3.9
+        owner_a.x / (element_metres * 0.569) + u_cloud_seed.y * 4.1,
+        world_position.y / (element_metres * 0.708) + u_cloud_seed.w * 3.3,
+        owner_a.y / (element_metres * 0.569) + u_cloud_seed.z * 3.9
     );
     float macro = texture(u_cloud_base, thermal_a).r;
     float ancestry = texture(u_cloud_base, thermal_b).r;
@@ -546,17 +620,17 @@ float cloud_congestus_coverage(
     float lineage_coarse = texture(
         u_cloud_base,
         vec3(
-            owner_a.x / 5200.0 + u_cloud_seed.y * 2.2,
+            owner_a.x / (element_metres * 1.44) + u_cloud_seed.y * 2.2,
             u_cloud_seed.z * 4.7 + 0.19,
-            owner_a.y / 5200.0 + u_cloud_seed.x * 2.9
+            owner_a.y / (element_metres * 1.44) + u_cloud_seed.x * 2.9
         )
     ).r;
     float lineage_fine = texture(
         u_cloud_base,
         vec3(
-            owner_b.x / 2450.0 + u_cloud_seed.w * 3.8,
+            owner_b.x / (element_metres * 0.681) + u_cloud_seed.w * 3.8,
             u_cloud_seed.x * 5.1 + 0.37,
-            owner_b.y / 2450.0 + u_cloud_seed.z * 3.3
+            owner_b.y / (element_metres * 0.681) + u_cloud_seed.z * 3.3
         )
     ).g;
     float lineage = lineage_coarse * 0.67 + lineage_fine * 0.33;
@@ -576,15 +650,21 @@ float cloud_congestus_coverage(
         (macro - 0.5) * mix(0.04, 0.18, h) +
         (cells - 0.5) * 0.09 * smoother(0.35, 0.90, h);
     float family_expansion = smoother(0.30, 0.84, h);
+    float family_separation = mix(
+        0.27,
+        0.38,
+        saturate((layer.branchOrCrestCount - 1.0) / 8.0)
+    );
+    float family_crown_width = mix(0.65, 1.25, layer.crownExpansion);
     float family_a = 1.0 - smoothstep(
-        mix(0.035, 0.12, family_expansion),
-        mix(0.13, 0.31, family_expansion),
-        abs(rising_along + 0.31)
+        mix(0.035, 0.12 * family_crown_width, family_expansion),
+        mix(0.13, 0.31 * family_crown_width, family_expansion),
+        abs(rising_along + family_separation)
     );
     float family_b = 1.0 - smoothstep(
-        mix(0.045, 0.14, family_expansion),
-        mix(0.14, 0.35, family_expansion),
-        abs(rising_along - 0.27)
+        mix(0.045, 0.14 * family_crown_width, family_expansion),
+        mix(0.14, 0.35 * family_crown_width, family_expansion),
+        abs(rising_along - family_separation * 0.87)
     );
     float family = max(family_a, 0.92 * family_b) * cross_focus;
     float lower_group = dominant *
@@ -593,7 +673,8 @@ float cloud_congestus_coverage(
         macro * 0.22 + ancestry * 0.18 +
         cells * mix(0.16, 0.24, crown_expansion) +
         lineage * 0.30 + clefts * 0.05 +
-        dominant * 0.05 + lower_group * 0.08;
+        dominant * 0.05 + lower_group * 0.08 -
+        layer.fragmentation * (1.0 - clefts) * 0.08;
 
     // World-space buoyancy cells replace a synchronized sine over height. The
     // old global phase made every updraft widen at the same altitude and read
@@ -621,8 +702,8 @@ float cloud_congestus_coverage(
         mix(0.02, 0.130, crown_focus);
     rising_threshold -= family * mix(0.005, 0.115, crown_focus);
     float turrets = smoothstep(
-        rising_threshold - 0.085,
-        rising_threshold + 0.075,
+        rising_threshold - layer.supportBand * 0.18,
+        rising_threshold + layer.supportBand * 0.16,
         potential
     );
 
@@ -630,9 +711,10 @@ float cloud_congestus_coverage(
     // ancestry field through the lower third of the volume, so every surviving
     // crown remains attached rather than becoming a row of floating blobs.
     float base_noise = macro * 0.58 + ancestry * 0.30 + cells * 0.12;
-    float connected_base = smoothstep(0.46, 0.68, base_noise) *
+    float connected_base = layer.baseConnectivity *
+        smoothstep(0.46, 0.68, base_noise) *
         (1.0 - smoothstep(0.035, 0.075, h));
-    float base_bridge = 0.025 *
+    float base_bridge = 0.025 * layer.baseConnectivity *
         (1.0 - smoothstep(0.018, 0.045, h));
     float top_persistence = smoother(
         0.38,
@@ -640,7 +722,7 @@ float cloud_congestus_coverage(
         lineage * 0.74 + family * 0.26
     );
     float local_top = mix(
-        0.84,
+        mix(0.76, 0.88, layer.crownExpansion),
         mix(0.955, 0.99, u_cloud_scene.y),
         top_persistence
     );
@@ -653,6 +735,222 @@ float cloud_congestus_coverage(
         max(max(base_bridge, connected_base), turrets * top_gate) *
             group_envelope
     );
+}
+
+/**
+ * Species topology after broad meteorological coverage has been resolved.
+ * Every coordinate is Earth-local and wind aligned. These are continuous
+ * scalar fields: no camera-facing sprites, screen radii, primitive unions, or
+ * finite lobe stamps participate in the density decision.
+ */
+float cloud_topology_coverage(
+    vec3 sample_position,
+    CloudLayer layer,
+    float h,
+    float broad_coverage
+) {
+    float period = max(80.0, layer.elementScaleKm * 1000.0);
+    vec2 wind_axis = normalize(layer.wind + vec2(0.173, 0.271));
+    vec2 cross_axis = vec2(-wind_axis.y, wind_axis.x);
+    float anisotropy = max(0.1, layer.anisotropy);
+    float along = dot(sample_position.xz, wind_axis) /
+        (period * max(1.0, anisotropy));
+    float across = dot(sample_position.xz, cross_axis) / period;
+    float vertical = sample_position.y /
+        max(40.0, period * max(0.01, layer.verticalAspect));
+    vec3 coordinate = vec3(
+        along + u_cloud_seed.x * 3.1,
+        vertical + u_cloud_seed.z * 2.7,
+        across + u_cloud_seed.w * 3.9
+    );
+    vec4 macro_sample = texture(u_cloud_base, coordinate * 0.31);
+    vec4 cell_sample = texture(u_cloud_base, coordinate);
+    vec3 detail_sample = texture(
+        u_cloud_detail,
+        coordinate * mix(1.4, 3.6, layer.erosionStrength)
+    ).rgb;
+    float macro = macro_sample.r * 0.62 + macro_sample.g * 0.38;
+    float cell = cell_sample.r * 0.54 + cell_sample.g * 0.30 +
+        cell_sample.b * 0.16;
+    float detail = dot(detail_sample, vec3(0.625, 0.25, 0.125));
+    float fragmentation_threshold = mix(
+        0.30,
+        0.72,
+        layer.fragmentation
+    );
+
+    // 1: ice-streamer-field. Source swaths are stretched along wind while
+    // differential sedimentation and shear curve individual fallstreaks.
+    if (abs(layer.macroTopology - 1.0) < 0.5) {
+        float fall = (1.0 - h) * layer.sedimentationCoupling;
+        vec3 fibre_coordinate = vec3(
+            along + fall * layer.shearCoupling * 1.7,
+            vertical * 0.42 + along * layer.fibreCurl * 0.31,
+            across * mix(1.8, 4.8, layer.fibreCurl) +
+                fall * (macro_sample.b - 0.5)
+        );
+        vec3 fibres = texture(u_cloud_detail, fibre_coordinate).rgb;
+        float fibre = dot(fibres, vec3(0.58, 0.29, 0.13));
+        float source_swath = smoother(0.30, 0.72, macro + cell * 0.18);
+        return broad_coverage * source_swath * smoother(
+            mix(0.34, 0.62, layer.fragmentation),
+            0.88,
+            fibre
+        ) * mix(0.52, 1.0, smoother(0.04, 0.78, h));
+    }
+
+    // 2: layered veil. The support remains continuous and laminar; only weak
+    // frontal undulation and fibrous modulation alter local optical thickness.
+    if (abs(layer.macroTopology - 2.0) < 0.5) {
+        float frontal_wave = 0.5 + 0.5 * cos(
+            6.2831853 * (across * 0.24 + along * 0.07) +
+            (macro_sample.b - 0.5) * layer.waveAmplitude
+        );
+        return broad_coverage * mix(
+            0.72,
+            1.0,
+            macro * 0.65 + frontal_wave * 0.35
+        );
+    }
+
+    // 3: cellular-cloudlet-field. Cellular closure continuously selects
+    // dense centres (closed cells) or connected rims around dry cores (open).
+    if (abs(layer.macroTopology - 3.0) < 0.5) {
+        float closed_cell = smoother(0.34, 0.78, cell_sample.g);
+        float open_rim = 1.0 - smoother(
+            0.12,
+            0.42,
+            abs(cell_sample.g - 0.46)
+        );
+        float open_weight = 1.0 - smoother(
+            -0.78,
+            -0.08,
+            layer.cellularClosure
+        );
+        float cellular = mix(closed_cell, open_rim, open_weight);
+        return broad_coverage * mix(
+            0.16,
+            1.0,
+            cellular * mix(0.72, 1.0, macro)
+        );
+    }
+
+    // 4: wave-lens-train. Condensation follows a finite weather-supported
+    // gravity-wave packet; the lens is a laminar vertical band, not an ellipse.
+    if (abs(layer.macroTopology - 4.0) < 0.5) {
+        float phase = 6.2831853 * along *
+            mix(0.65, 1.65, layer.waveAmplitude) +
+            (macro_sample.b - 0.5) * 1.8;
+        float crest = smoother(0.38, 0.86, 0.5 + 0.5 * cos(phase));
+        float lens_band = exp(-abs(h - 0.5) /
+            max(0.025, layer.supportBand * 0.32));
+        return broad_coverage * crest * lens_band * mix(0.72, 1.0, macro);
+    }
+
+    // 5: castellated-deck. Unequal turrets retain a shared lower support but
+    // survive aloft only above persistent cellular maxima.
+    if (abs(layer.macroTopology - 5.0) < 0.5) {
+        float common_base = layer.baseConnectivity *
+            (1.0 - smoother(0.12, 0.32, h));
+        float rising_threshold = mix(0.38, 0.76, pow(h, 0.72));
+        float turrets = smoother(
+            rising_threshold - layer.supportBand * 0.22,
+            rising_threshold + layer.supportBand * 0.18,
+            cell * 0.58 + macro * 0.30 + detail * 0.12
+        );
+        return broad_coverage * max(common_base, turrets);
+    }
+
+    // 6: floccus-field. Detached tufts occupy a narrow head band and feed
+    // sedimentation tails below without inventing a common base.
+    if (abs(layer.macroTopology - 6.0) < 0.5) {
+        float head_height = mix(0.42, 0.68, macro_sample.a);
+        float head = exp(-abs(h - head_height) /
+            max(0.045, layer.supportBand * 0.42));
+        float tail = smoother(0.18, 0.64, cell) *
+            (1.0 - smoother(head_height, min(1.0, head_height + 0.06), h)) *
+            layer.sedimentationCoupling;
+        float tufts = smoother(fragmentation_threshold, 0.88,
+            cell * 0.56 + macro * 0.30 + detail * 0.14);
+        return broad_coverage * tufts * max(head, tail * 0.54);
+    }
+
+    // 7/8: precipitating or boundary-layer sheets. Keep one continuous
+    // inversion/frontal owner while allowing broad, low-amplitude thickness.
+    if (abs(layer.macroTopology - 7.0) < 0.5 ||
+        abs(layer.macroTopology - 8.0) < 0.5) {
+        float laminar = mix(0.78, 1.0, macro * 0.72 + detail * 0.28);
+        return broad_coverage * laminar;
+    }
+
+    // 9: fragment-field. Dry-air erosion creates genuinely disconnected
+    // remnants; no floor or shared silhouette survives the threshold.
+    if (abs(layer.macroTopology - 9.0) < 0.5) {
+        float shred = macro * 0.42 + cell * 0.36 + detail * 0.22;
+        return broad_coverage * smoother(
+            fragmentation_threshold,
+            min(0.96, fragmentation_threshold + layer.supportBand),
+            shred
+        );
+    }
+
+    // 10: thermal-field for humilis and mediocris. Congestus uses its finite
+    // group path above. Height raises the survival threshold through one
+    // persistent 2-D ancestry slice, preserving parented rising parcels.
+    if (abs(layer.macroTopology - 10.0) < 0.5) {
+        float ancestry = texture(
+            u_cloud_base,
+            vec3(coordinate.x, u_cloud_seed.y * 5.7, coordinate.z)
+        ).r;
+        float base = layer.baseConnectivity *
+            (1.0 - smoother(0.08, 0.20, h));
+        float threshold = mix(
+            0.38,
+            mix(0.60, 0.78, 1.0 - layer.crownExpansion),
+            pow(h, 0.72)
+        );
+        float thermal = smoother(
+            threshold - layer.supportBand * 0.22,
+            threshold + layer.supportBand * 0.18,
+            ancestry * 0.48 + macro * 0.27 + cell * 0.25
+        );
+        return broad_coverage * max(base, thermal);
+    }
+
+    // 11: deep-storm-complex. Rooted convection is continuous through the
+    // mixed-phase column; detrainment broadens only the upper crown/anvil.
+    if (abs(layer.macroTopology - 11.0) < 0.5) {
+        float ancestry = texture(
+            u_cloud_base,
+            vec3(coordinate.x * 0.43, u_cloud_seed.y * 4.3,
+                coordinate.z * 0.43)
+        ).r;
+        float root = layer.baseConnectivity *
+            (1.0 - smoother(0.10, 0.30, h));
+        float column_threshold = mix(0.34, 0.68, pow(h, 0.62));
+        float column = smoother(
+            column_threshold - layer.supportBand * 0.24,
+            column_threshold + layer.supportBand * 0.16,
+            ancestry * 0.46 + macro * 0.34 + cell * 0.20
+        );
+        float outflow = smoother(0.62, 0.88, h) *
+            layer.crownExpansion * smoother(0.32, 0.76,
+                macro_sample.b * 0.62 + macro * 0.38);
+        return broad_coverage * max(root, max(column, outflow));
+    }
+
+    // 12: roll-tube. A wind-aligned circulation wave carries one connected,
+    // vertically narrow condensation band with tapered weather-map ends.
+    if (abs(layer.macroTopology - 12.0) < 0.5) {
+        float roll_phase = 6.2831853 * across +
+            (macro_sample.b - 0.5) * layer.waveAmplitude;
+        float crest = smoother(0.40, 0.86, 0.5 + 0.5 * cos(roll_phase));
+        float vertical_band = exp(-abs(h - mix(0.42, 0.58, macro)) /
+            max(0.035, layer.supportBand * 0.34));
+        return broad_coverage * crest * vertical_band;
+    }
+
+    return broad_coverage;
 }
 
 float cloud_local_coverage(
@@ -730,7 +1028,17 @@ float cloud_local_coverage(
         coverage_st = coverage_st / (coverage_st + 1.0);
     }
 
-    return mix(coverage_cu, coverage_st, layer.stratusBlend);
+    float broad_coverage = mix(
+        coverage_cu,
+        coverage_st,
+        layer.stratusBlend
+    );
+    return cloud_topology_coverage(
+        sample_position3,
+        layer,
+        altitude_fraction,
+        broad_coverage
+    );
 }
 
 /**
@@ -777,12 +1085,16 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
 
     // Worley erosion. This is where cloud-scale structure is created: the two
     // frequencies carve the coverage field into billows and then into wisps.
+    float controlled_element_metres = max(
+        80.0,
+        layer.elementScaleKm * 1000.0
+    );
     float morphology_base_scale = abs(layer.species - 19.0) < 0.5
         ? 1.0 / 3000.0
-        : layer.baseScale;
+        : 1.0 / clamp(controlled_element_metres * 0.45, 240.0, 12000.0);
     float morphology_detail_scale = abs(layer.species - 19.0) < 0.5
         ? 1.0 / 520.0
-        : layer.detailScale;
+        : 1.0 / clamp(controlled_element_metres * 0.08, 70.0, 1600.0);
     vec4 morphology_base = texture(
         u_cloud_base,
         sample_position * morphology_base_scale
@@ -795,7 +1107,11 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
     float worley_1 = morphology_detail.r;
 
     // Curl deformation, concentrated near edges where turbulent mixing acts.
-    if (layer.curlStrength > 0.001) {
+    float effective_curl = max(
+        layer.curlStrength,
+        layer.fibreCurl * 0.72
+    );
+    if (effective_curl > 0.001) {
         vec2 curl = texture(
             u_cloud_curl,
             sample_position.xz * layer.baseScale * 0.35
@@ -807,7 +1123,7 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
                 (sample_position + vec3(curl.x, 0.0, curl.y) * 120.0) *
                     morphology_detail_scale
             ).r,
-            layer.curlStrength * 0.6
+            effective_curl * 0.6
         );
     }
 
@@ -815,11 +1131,18 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
         0.20 * smoothstep(0.85, 1.0, 1.0 - altitude_fraction) -
         0.35 * smoothstep(0.05, 0.5, altitude_fraction) + 0.6;
 
+    float material_erosion = layer.materialModel < 2.5
+        ? 0.64
+        : layer.materialModel < 4.5
+            ? 0.86
+            : layer.materialModel < 6.5
+                ? 0.32
+                : 0.92;
     vec2 detail_weights = mix(
         vec2(0.33, 0.40),
         vec2(0.07, 0.10),
         vec2(sqr(layer.stratusBlend), layer.stratusBlend)
-    ) * layer.detailStrength;
+    ) * layer.erosionStrength * material_erosion;
 
     if (abs(layer.species - 19.0) < 0.5) {
         vec3 rotated_base_coordinate = vec3(
@@ -861,7 +1184,7 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
             0.44
         );
         float boundary = 1.0 - smoothstep(0.38, 0.90, density);
-        density -= boundary * layer.detailStrength * (
+        density -= boundary * layer.erosionStrength * (
             0.22 * (1.0 - base_fbm) +
             0.14 * (1.0 - detail_fbm) * mix(0.72, 1.18, altitude_fraction)
         );
@@ -879,13 +1202,28 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
         vec2(2.0, 7.0),
         vec2(sqr(layer.stratusBlend))
     );
-    float edge_amount = abs(layer.species - 19.0) < 0.5
-        ? mix(-0.08, -0.24, smoother(0.12, 0.84, altitude_fraction))
-        : mix(edge_sharpening.x, edge_sharpening.y, altitude_fraction);
+    bool cumuliform_edge = abs(layer.macroTopology - 5.0) < 0.5 ||
+        abs(layer.macroTopology - 6.0) < 0.5 ||
+        abs(layer.macroTopology - 9.0) < 0.5 ||
+        abs(layer.macroTopology - 10.0) < 0.5 ||
+        abs(layer.macroTopology - 11.0) < 0.5;
+    bool laminar_edge = abs(layer.macroTopology - 2.0) < 0.5 ||
+        abs(layer.macroTopology - 4.0) < 0.5 ||
+        abs(layer.macroTopology - 7.0) < 0.5 ||
+        abs(layer.macroTopology - 8.0) < 0.5 ||
+        abs(layer.macroTopology - 12.0) < 0.5;
+    float edge_amount = cumuliform_edge
+        ? mix(-0.05, -0.34, smoother(0.12, 0.84, altitude_fraction)) *
+            mix(0.55, 1.0, layer.erosionStrength)
+        : laminar_edge
+            ? mix(0.35, 1.15, altitude_fraction)
+            : mix(edge_sharpening.x, edge_sharpening.y, altitude_fraction);
     density = lift(density, edge_amount);
-    density *= abs(layer.species - 19.0) < 0.5
-        ? 0.52 + 0.48 * smoothstep(0.08, 0.72, altitude_fraction)
-        : 0.1 + 0.9 * smoothstep(0.2, 0.7, altitude_fraction);
+    density *= laminar_edge
+        ? 0.76 + 0.24 * smoothstep(0.04, 0.62, altitude_fraction)
+        : cumuliform_edge
+            ? 0.48 + 0.52 * smoothstep(0.08, 0.72, altitude_fraction)
+            : 0.18 + 0.82 * smoothstep(0.16, 0.68, altitude_fraction);
 
     return density;
 }
@@ -950,7 +1288,9 @@ vec3 cloud_scattering(
     float sky_tau = layer.extinction * sky_optical_depth;
     float ground_tau = layer.extinction * ground_optical_depth;
     float direct_visibility = exp(-light_tau);
-    float multiple_visibility = exp(-light_tau * 0.34);
+    float multiple_visibility = exp(
+        -light_tau * layer.multipleScatteringExtinction
+    );
     float sky_visibility = exp(-sky_tau * 0.62);
     float ground_visibility = exp(-ground_tau * 0.55);
 
@@ -959,7 +1299,14 @@ vec3 cloud_scattering(
     // while side-lit liquid cloud retains the broad bright response created by
     // higher orders rather than collapsing into blue ambient shadow.
     float phase_response = clamp(
-        clouds_phase_single(cos_theta) / ISOTROPIC_PHASE,
+        clouds_phase_single(
+            cos_theta,
+            layer.iceFraction,
+            layer.liquidAsymmetry,
+            layer.iceAsymmetry,
+            layer.draineAlpha
+        ) /
+            ISOTROPIC_PHASE,
         0.04,
         4.0
     );
@@ -968,10 +1315,10 @@ vec3 cloud_scattering(
         1.0,
         smoother(0.04, 1.35, phase_response)
     );
-    float powder = clouds_powder_effect(
+    float powder = pow(max(1e-3, clouds_powder_effect(
         density + density * layer.stratusBlend,
         cos_theta
-    );
+    )), layer.powderStrength);
 
     float sky_luminance = dot(
         sky_radiance,
@@ -997,14 +1344,18 @@ vec3 cloud_scattering(
         light_radiance * direct_visibility * directional_gain *
             mix(0.34, 0.46, powder) * mix(0.76, 1.08, height_light) +
         light_radiance * multiple_visibility *
-            mix(0.040, 0.076, height_light) +
-        neutral_sky * sky_visibility * mix(0.11, 0.18, height_light) +
-        neutral_ground * ground_visibility * 0.035;
+            mix(0.040, 0.076, height_light) *
+            layer.multipleScatteringStrength +
+        neutral_sky * sky_visibility * mix(0.11, 0.18, height_light) *
+            layer.skyFillStrength +
+        neutral_ground * ground_visibility * 0.035 *
+            layer.groundFillStrength;
 
     // This is the exact homogeneous-segment integral for unit single-scatter
     // albedo after the incident field above has been bounded into named,
     // non-overlapping contributions.
-    return max(incident, vec3(0.0)) * (1.0 - step_transmittance);
+    return max(incident, vec3(0.0)) * (1.0 - step_transmittance) *
+        layer.singleScatteringAlbedo;
 }
 
 /** Marches one spherical cloud shell. */
@@ -1164,6 +1515,13 @@ CloudLayer cloud_layer_from_uniforms(int index) {
     vec4 scale = u_layer_scale[index];
     vec4 drift = u_layer_drift[index];
     vec4 morphology = u_layer_morphology[index];
+    vec4 topology = u_layer_topology[index];
+    vec4 anatomy = u_layer_anatomy[index];
+    vec4 dynamics = u_layer_dynamics[index];
+    vec4 formation = u_layer_formation[index];
+    vec4 microstructure = u_layer_microstructure[index];
+    vec4 optics = u_layer_optics[index];
+    vec4 lighting = u_layer_lighting[index];
 
     // Extinction per metre, resolved on the CPU against layer thickness.
     float extinction = geometry.w;
@@ -1172,6 +1530,13 @@ CloudLayer cloud_layer_from_uniforms(int index) {
         geometry.x, geometry.y, geometry.z, phase.w,
         shape.x, shape.y, shape.z, shape.w,
         morphology.x, morphology.y, morphology.z, morphology.w,
+        topology.x, topology.y, topology.z, topology.w,
+        anatomy.x, anatomy.y, anatomy.z, anatomy.w,
+        dynamics.x, dynamics.y, dynamics.z, dynamics.w,
+        formation.x, formation.y, formation.z, formation.w,
+        microstructure.x, microstructure.y, microstructure.z,
+        optics.x, optics.y, optics.z, optics.w,
+        lighting.x, lighting.y, lighting.z, lighting.w,
         motion.xy, motion.z, motion.w,
         phase.x, phase.y, phase.z,
         scale.x, scale.y, scale.z, scale.w,

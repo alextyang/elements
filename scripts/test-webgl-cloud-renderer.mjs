@@ -9,6 +9,9 @@ const noise = read("../components/backgrounds/sky/webgl-cloud-noise.ts");
 const atmosphere = read("../components/backgrounds/sky/atmosphere-canvas.tsx");
 const renderer = read("../components/backgrounds/sky/sky-renderer-canvas.tsx");
 const benchmark = read("../app/cloud-photographs/cloud-photograph-benchmark.tsx");
+const cloudScene = read("../components/backgrounds/sky/cloud-scene.ts");
+const cloudStateMap = read("../components/backgrounds/sky/cloud-state-map.ts");
+const morphology = read("../components/backgrounds/sky/webgl-cloud-morphology.ts");
 const license = read("../components/backgrounds/sky/PHOTON-LICENSE.txt");
 
 test("WebGL clouds use continuous world-space volume density", () => {
@@ -42,6 +45,17 @@ test("WebGL clouds expose an affine scene-linear plate operator", () => {
     assert.match(shader, /fract\(u_cloud_offline_sample\.z\)/);
 });
 
+test("WebGL cloud transport exposes droplet, ice, and fill-light controls", () => {
+    assert.match(shader, /float draine_phase\(/);
+    assert.match(shader, /clouds_phase_single\([\s\S]*liquid_g[\s\S]*ice_g/);
+    assert.match(shader, /layer\.singleScatteringAlbedo/);
+    assert.match(shader, /layer\.multipleScatteringExtinction/);
+    assert.match(shader, /layer\.multipleScatteringStrength/);
+    assert.match(shader, /layer\.skyFillStrength/);
+    assert.match(shader, /layer\.groundFillStrength/);
+    assert.match(shader, /layer\.powderStrength/);
+});
+
 test("Congestus is a finite continuous species field", () => {
     assert.match(shader, /CLOUD_SPECIES_CODE/);
     assert.match(shader, /u_layer_morphology/);
@@ -51,9 +65,44 @@ test("Congestus is a finite continuous species field", () => {
     assert.match(shader, /float family_a = 1\.0 - smoothstep/);
     assert.match(shader, /rising_threshold \+= \(1\.0 - family\)/);
     assert.match(shader, /float base_bridge = 0\.025/);
-    assert.match(shader, /mix\(-0\.08, -0\.24/);
+    assert.match(shader, /mix\(-0\.05, -0\.34/);
     assert.match(shader, /float rising_threshold = mix/);
     assert.doesNotMatch(shader, /ellipsoid|sphere_stamp|circle_stamp/i);
+});
+
+test("every explicit species compiles to controllable WebGL topology", () => {
+    const speciesCodeBlock = cloudScene.match(
+        /CLOUD_SPECIES_CODE:[\s\S]*?= \{([\s\S]*?)\n\};/,
+    )?.[1] ?? "";
+    const species = [...speciesCodeBlock.matchAll(/"([^"]+)":\s*\d+/g)]
+        .map((match) => match[1]);
+    assert.equal(species.length, 32);
+    for (const name of species) {
+        assert.match(cloudStateMap, new RegExp(`"${name}":\\s*recipe\\(`));
+    }
+    assert.match(morphology, /WEBGL_CLOUD_MACRO_TOPOLOGY_CODE/);
+    assert.match(morphology, /WEBGL_CLOUD_MATERIAL_MODEL_CODE/);
+    assert.match(morphology, /CLOUD_TOPOLOGY_EXEMPLARS/);
+    assert.match(morphology, /layer\.morphology/);
+    assert.match(morphology, /layer\.optics/);
+    for (const uniform of [
+        "u_layer_topology",
+        "u_layer_anatomy",
+        "u_layer_dynamics",
+        "u_layer_formation",
+        "u_layer_microstructure",
+        "u_layer_optics",
+        "u_layer_lighting",
+    ]) {
+        assert.match(shader, new RegExp(`uniform vec4 ${uniform}\\[3\\]`));
+        assert.match(atmosphere, new RegExp(`uniform\\("${uniform}"\\)`));
+    }
+    assert.match(shader, /float cloud_topology_coverage\(/);
+    for (let topology = 1; topology <= 12; topology += 1) {
+        assert.match(shader, new RegExp(
+            `abs\\(layer\\.macroTopology - ${topology}\\.0\\) < 0\\.5`,
+        ));
+    }
 });
 
 test("WebGL cloud noise is volumetric and reproducible", () => {
