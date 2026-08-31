@@ -377,7 +377,7 @@ float cloud_altitude_shaping(
     float local_support = smoother(0.015, 0.28, saturate(density));
 
     if (abs(layer.species - 19.0) < 0.5) {
-        float vertical_gate = smoothstep(0.0, 0.045, altitude_fraction) *
+        float vertical_gate = smoothstep(0.0, 0.012, altitude_fraction) *
             (1.0 - smoothstep(0.955, 1.0, altitude_fraction));
         return max0(density) * vertical_gate;
     }
@@ -455,7 +455,7 @@ float cloud_congestus_coverage(
     // fixed photograph camera sees the whole base-to-crown development.
     vec2 forward = vec2(sin(u_camera.w), cos(u_camera.w));
     vec2 across = vec2(forward.y, -forward.x);
-    float group_range = mix(6350.0, 7100.0, u_cloud_seed.y);
+    float group_range = mix(7900.0, 8500.0, u_cloud_seed.y);
     vec2 group_center = forward * group_range +
         across * ((u_cloud_seed.x - 0.5) * 620.0);
     vec2 owner = world_position.xz - group_center;
@@ -476,8 +476,8 @@ float cloud_congestus_coverage(
 
     float along = dot(owner, across);
     float normal = dot(owner, forward);
-    float half_length = mix(2450.0, 2950.0, layer.organizationStrength);
-    float half_width = mix(1450.0, 1900.0, u_cloud_scene.x);
+    float half_length = mix(3000.0, 3400.0, layer.organizationStrength);
+    float half_width = mix(800.0, 1050.0, u_cloud_scene.x);
     float edge = 350.0;
     float centerline = half_width * (
         0.075 * sin(along / max(1.0, half_length) * PI * 1.17 +
@@ -493,8 +493,12 @@ float cloud_congestus_coverage(
             vec2(along / 17000.0 + u_cloud_seed.y, u_cloud_seed.z)
         ).r;
     float height_taper = smoother(0.16, 0.94, h);
-    float height_length = half_length * mix(1.0, 0.80, height_taper);
-    float height_width = half_width * mix(1.0, 0.64, height_taper);
+    float crown_expansion = smoother(0.48, 0.76, h) *
+        (1.0 - smoother(0.91, 1.0, h));
+    float height_length = half_length * mix(1.0, 0.82, height_taper) *
+        (1.0 + crown_expansion * 0.10);
+    float height_width = half_width * mix(1.0, 0.70, height_taper) *
+        (1.0 + crown_expansion * 0.06);
     float along_envelope = 1.0 - smoothstep(
         height_length - edge,
         height_length + edge,
@@ -560,18 +564,33 @@ float cloud_congestus_coverage(
         (1.0 - smoothstep(0.18, 0.82, abs(along) / half_length)) *
         (1.0 - smoothstep(0.10, 0.78,
             abs(normal - centerline) / half_width));
-    float normalized_along = along / max(1.0, half_length);
-    float updraft_bands = saturate(
-        0.50 +
-        0.31 * cos(PI * (2.35 * normalized_along +
-            u_cloud_seed.x * 0.73)) +
-        0.18 * cos(PI * (4.60 * normalized_along -
-            u_cloud_seed.z * 0.91))
+    float cross_focus = 1.0 - smoothstep(
+        0.20,
+        0.78,
+        abs(normal - centerline) / half_width
     );
+    float rising_along = along / max(1.0, half_length) +
+        (macro - 0.5) * mix(0.04, 0.18, h) +
+        (cells - 0.5) * 0.09 * smoother(0.35, 0.90, h);
+    float family_expansion = smoother(0.30, 0.84, h);
+    float family_a = 1.0 - smoothstep(
+        mix(0.035, 0.12, family_expansion),
+        mix(0.13, 0.31, family_expansion),
+        abs(rising_along + 0.31)
+    );
+    float family_b = 1.0 - smoothstep(
+        mix(0.045, 0.14, family_expansion),
+        mix(0.14, 0.35, family_expansion),
+        abs(rising_along - 0.27)
+    );
+    float family = max(family_a, 0.92 * family_b) * cross_focus;
+    float lower_group = dominant *
+        (1.0 - smoother(0.34, 0.66, h));
     float potential =
-        macro * 0.19 + ancestry * 0.20 + cells * 0.16 +
-        lineage * 0.28 + clefts * 0.04 + dominant * 0.16 +
-        updraft_bands * 0.14 * smoother(0.20, 0.92, h);
+        macro * 0.22 + ancestry * 0.18 +
+        cells * mix(0.16, 0.24, crown_expansion) +
+        lineage * 0.30 + clefts * 0.05 +
+        dominant * 0.05 + lower_group * 0.08;
 
     // World-space buoyancy cells replace a synchronized sine over height. The
     // old global phase made every updraft widen at the same altitude and read
@@ -590,10 +609,14 @@ float cloud_congestus_coverage(
     float buoyant_pulse =
         texture(u_cloud_base, pulse_coordinate_a).b * 0.68 +
         texture(u_cloud_base, pulse_coordinate_b).g * 0.32;
-    float rising_threshold = mix(0.45, 0.70, pow(h, 0.65));
+    float rising_threshold = mix(0.56, 0.68, pow(h, 0.76));
     rising_threshold -= (buoyant_pulse - 0.5) * mix(0.07, 0.13, h);
-    rising_threshold -= dominant * mix(0.020, 0.120, h);
+    rising_threshold -= dominant * mix(0.010, 0.050, h);
     rising_threshold -= (layer.coverageLow - 0.45) * 0.16;
+    float crown_focus = smoother(0.24, 0.76, h);
+    rising_threshold += (1.0 - family) *
+        mix(0.02, 0.130, crown_focus);
+    rising_threshold -= family * mix(0.005, 0.115, crown_focus);
     float turrets = smoothstep(
         rising_threshold - 0.085,
         rising_threshold + 0.075,
@@ -604,14 +627,29 @@ float cloud_congestus_coverage(
     // ancestry field through the lower third of the volume, so every surviving
     // crown remains attached rather than becoming a row of floating blobs.
     float base_noise = macro * 0.58 + ancestry * 0.30 + cells * 0.12;
-    float connected_base = smoothstep(0.24, 0.63, base_noise + 0.20) *
-        (1.0 - smoothstep(0.05, 0.14, h));
+    float connected_base = smoothstep(0.46, 0.68, base_noise) *
+        (1.0 - smoothstep(0.035, 0.075, h));
+    float base_bridge = 0.025 *
+        (1.0 - smoothstep(0.018, 0.045, h));
+    float top_persistence = smoother(
+        0.38,
+        0.76,
+        lineage * 0.74 + family * 0.26
+    );
+    float local_top = mix(
+        0.84,
+        mix(0.955, 0.99, u_cloud_scene.y),
+        top_persistence
+    );
     float top_gate = 1.0 - smoothstep(
-        mix(0.89, 0.94, u_cloud_scene.y),
-        1.0,
+        local_top - 0.035,
+        local_top + 0.012,
         h
     );
-    return saturate(max(connected_base, turrets * top_gate) * group_envelope);
+    return saturate(
+        max(max(base_bridge, connected_base), turrets * top_gate) *
+            group_envelope
+    );
 }
 
 float cloud_local_coverage(
@@ -838,7 +876,10 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
         vec2(2.0, 7.0),
         vec2(sqr(layer.stratusBlend))
     );
-    density = lift(density, mix(edge_sharpening.x, edge_sharpening.y, altitude_fraction));
+    float edge_amount = abs(layer.species - 19.0) < 0.5
+        ? mix(-0.08, -0.24, smoother(0.12, 0.84, altitude_fraction))
+        : mix(edge_sharpening.x, edge_sharpening.y, altitude_fraction);
+    density = lift(density, edge_amount);
     density *= abs(layer.species - 19.0) < 0.5
         ? 0.52 + 0.48 * smoothstep(0.08, 0.72, altitude_fraction)
         : 0.1 + 0.9 * smoothstep(0.2, 0.7, altitude_fraction);
@@ -906,8 +947,8 @@ vec3 cloud_scattering(
     float sky_tau = layer.extinction * sky_optical_depth;
     float ground_tau = layer.extinction * ground_optical_depth;
     float direct_visibility = exp(-light_tau);
-    float multiple_visibility = exp(-light_tau * 0.22);
-    float sky_visibility = exp(-sky_tau * 0.42);
+    float multiple_visibility = exp(-light_tau * 0.34);
+    float sky_visibility = exp(-sky_tau * 0.62);
     float ground_visibility = exp(-ground_tau * 0.55);
 
     // Normalize the directional lobe against isotropic scattering before it
@@ -953,9 +994,9 @@ vec3 cloud_scattering(
         light_radiance * direct_visibility * directional_gain *
             mix(0.34, 0.46, powder) * mix(0.76, 1.08, height_light) +
         light_radiance * multiple_visibility *
-            mix(0.062, 0.112, height_light) +
-        neutral_sky * sky_visibility * mix(0.20, 0.31, height_light) +
-        neutral_ground * ground_visibility * 0.07;
+            mix(0.040, 0.076, height_light) +
+        neutral_sky * sky_visibility * mix(0.11, 0.18, height_light) +
+        neutral_ground * ground_visibility * 0.035;
 
     // This is the exact homogeneous-segment integral for unit single-scatter
     // albedo after the incident field above has been bounded into named,

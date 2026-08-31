@@ -36,6 +36,10 @@ test("Congestus is a finite continuous species field", () => {
     assert.match(shader, /float cloud_congestus_coverage\(/);
     assert.match(shader, /float group_envelope = along_envelope \* normal_envelope/);
     assert.match(shader, /float lineage = lineage_coarse/);
+    assert.match(shader, /float family_a = 1\.0 - smoothstep/);
+    assert.match(shader, /rising_threshold \+= \(1\.0 - family\)/);
+    assert.match(shader, /float base_bridge = 0\.025/);
+    assert.match(shader, /mix\(-0\.08, -0\.24/);
     assert.match(shader, /float rising_threshold = mix/);
     assert.doesNotMatch(shader, /ellipsoid|sphere_stamp|circle_stamp/i);
 });
