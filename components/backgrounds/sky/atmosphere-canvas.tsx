@@ -237,7 +237,8 @@ ${CLOUD_FUNCTIONS}
 
 void main() {
     // WebGL has a bottom-left texture origin; convert to the screen's top-left.
-    vec2 uv = vec2(v_uv.x, 1.0 - v_uv.y);
+    vec2 uv = vec2(v_uv.x, 1.0 - v_uv.y) +
+        u_cloud_offline_sample.xy / u_resolution;
     float y = uv.y;
     float night = u_optics.x;
     float aerosol = u_optics.y;
@@ -648,6 +649,7 @@ interface AtmosphereCanvasProps {
 interface WebGlCloudPlateCaptureRequest {
     sceneId: string;
     frame: number;
+    samples?: number;
     token: string;
     endpoint?: string;
 }
@@ -690,6 +692,24 @@ const packFloat32PlaneAsLittleEndianFloat16 = (
     }
     return buffer;
 };
+
+const radicalInverse = (indexInput: number, base: number) => {
+    let index = indexInput;
+    let inverse = 1 / base;
+    let result = 0;
+    while (index > 0) {
+        result += (index % base) * inverse;
+        index = Math.floor(index / base);
+        inverse /= base;
+    }
+    return result;
+};
+
+const webGlOfflineSample = (index: number) => [
+    radicalInverse(index + 1, 2) - 0.5,
+    radicalInverse(index + 1, 3) - 0.5,
+    radicalInverse(index + 1, 5),
+] as const;
 
 export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -759,6 +779,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             framebuffer: WebGLFramebuffer | null = null,
             outputWidth?: number,
             outputHeight?: number,
+            offlineSample: readonly [number, number, number] = [0, 0, 0.5],
         ) => {
             if (document.hidden && outputMode === 0) return;
             const current = sceneRef.current;
@@ -870,6 +891,12 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 cloudNoise && packedClouds.active ? 1 : 0,
             );
             gl.uniform1f(uniform("u_cloud_output_mode"), outputMode);
+            gl.uniform3f(
+                uniform("u_cloud_offline_sample"),
+                offlineSample[0],
+                offlineSample[1],
+                offlineSample[2],
+            );
             gl.uniform1f(
                 uniform("u_cloud_time"),
                 (current.cloudTime + current.cloudTimeOffset) % 100000,
@@ -911,7 +938,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         };
 
-        const readCloudPlatePlane = (outputMode: 1 | 2) => {
+        const createCloudPlateReadback = () => {
             if (!gl.getExtension("EXT_color_buffer_float")) {
                 throw new Error(
                     "WebGL cloud plate export requires EXT_color_buffer_float.",
@@ -926,6 +953,11 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 if (framebuffer) gl.deleteFramebuffer(framebuffer);
                 throw new Error("Unable to allocate WebGL cloud plate target.");
             }
+            const dispose = () => {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.deleteFramebuffer(framebuffer);
+                gl.deleteTexture(texture);
+            };
             try {
                 gl.bindTexture(gl.TEXTURE_2D, texture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -955,38 +987,49 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     gl.FRAMEBUFFER_COMPLETE) {
                     throw new Error("WebGL cloud plate framebuffer is incomplete.");
                 }
-                draw(outputMode, framebuffer, width, height);
                 const values = new Float32Array(width * height * 4);
-                gl.readPixels(
-                    0,
-                    0,
-                    width,
-                    height,
-                    gl.RGBA,
-                    gl.FLOAT,
-                    values,
-                );
-                const error = gl.getError();
-                if (error !== gl.NO_ERROR) {
-                    throw new Error(
-                        `WebGL cloud plate readback failed with ${error}.`,
-                    );
-                }
-                return packFloat32PlaneAsLittleEndianFloat16(
-                    values,
-                    width,
-                    height,
-                );
-            } finally {
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                gl.deleteFramebuffer(framebuffer);
-                gl.deleteTexture(texture);
+                return {
+                    dispose,
+                    read: (
+                        outputMode: 1 | 2,
+                        offlineSample: readonly [number, number, number],
+                    ) => {
+                        draw(
+                            outputMode,
+                            framebuffer,
+                            width,
+                            height,
+                            offlineSample,
+                        );
+                        gl.readPixels(
+                            0,
+                            0,
+                            width,
+                            height,
+                            gl.RGBA,
+                            gl.FLOAT,
+                            values,
+                        );
+                        const error = gl.getError();
+                        if (error !== gl.NO_ERROR) {
+                            throw new Error(
+                                `WebGL cloud plate readback failed with ${error}.`,
+                            );
+                        }
+                        return values;
+                    },
+                };
+            } catch (error) {
+                dispose();
+                throw error;
             }
         };
 
         captureCanvas.__elementsCloudPlateCapture = async (request) => {
             if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.sceneId) ||
                 !Number.isInteger(request.frame) || request.frame < 0 ||
+                !Number.isSafeInteger(request.samples ?? 1) ||
+                (request.samples ?? 1) < 1 ||
                 !request.token) {
                 throw new Error("Invalid WebGL cloud plate capture request.");
             }
@@ -994,14 +1037,80 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 "/api/cloud-plates/capture-plane";
             const width = canvas.width;
             const height = canvas.height;
+            const sampleCount = request.samples ?? 1;
+            const pixelCount = width * height;
+            const radianceSum = new Float64Array(pixelCount * 3);
+            const transmittanceSum = new Float64Array(pixelCount * 3);
+            const firstDepth = new Float32Array(pixelCount);
+            firstDepth.fill(140);
+            const meanDepthSum = new Float64Array(pixelCount);
+            const meanDepthWeight = new Float64Array(pixelCount);
             const planeResults:
                 WebGlCloudPlateCaptureResult["planes"][number][] = [];
+            const readback = createCloudPlateReadback();
             try {
-                for (const [channel, outputMode] of [
-                    ["radiance", 1],
-                    ["transmittance", 2],
+                for (let sampleIndex = 0;
+                    sampleIndex < sampleCount;
+                    sampleIndex += 1) {
+                    const sample = webGlOfflineSample(sampleIndex);
+                    let values = readback.read(1, sample);
+                    for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+                        const source = pixel * 4;
+                        const target = pixel * 3;
+                        radianceSum[target] += values[source];
+                        radianceSum[target + 1] += values[source + 1];
+                        radianceSum[target + 2] += values[source + 2];
+                        firstDepth[pixel] = Math.min(
+                            firstDepth[pixel],
+                            values[source + 3],
+                        );
+                    }
+                    values = readback.read(2, sample);
+                    for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+                        const source = pixel * 4;
+                        const target = pixel * 3;
+                        transmittanceSum[target] += values[source];
+                        transmittanceSum[target + 1] += values[source + 1];
+                        transmittanceSum[target + 2] += values[source + 2];
+                        const meanTransmittance = Math.max(0, Math.min(1,
+                            (values[source] + values[source + 1] +
+                                values[source + 2]) / 3,
+                        ));
+                        const opacity = 1 - meanTransmittance;
+                        meanDepthSum[pixel] += values[source + 3] * opacity;
+                        meanDepthWeight[pixel] += opacity;
+                    }
+                }
+
+                const radiance = new Float32Array(pixelCount * 4);
+                const transmittance = new Float32Array(pixelCount * 4);
+                for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+                    const source = pixel * 3;
+                    const target = pixel * 4;
+                    radiance[target] = radianceSum[source] / sampleCount;
+                    radiance[target + 1] = radianceSum[source + 1] / sampleCount;
+                    radiance[target + 2] = radianceSum[source + 2] / sampleCount;
+                    radiance[target + 3] = firstDepth[pixel];
+                    transmittance[target] =
+                        transmittanceSum[source] / sampleCount;
+                    transmittance[target + 1] =
+                        transmittanceSum[source + 1] / sampleCount;
+                    transmittance[target + 2] =
+                        transmittanceSum[source + 2] / sampleCount;
+                    transmittance[target + 3] = meanDepthWeight[pixel] > 1e-8
+                        ? meanDepthSum[pixel] / meanDepthWeight[pixel]
+                        : 140;
+                }
+
+                for (const [channel, values] of [
+                    ["radiance", radiance],
+                    ["transmittance", transmittance],
                 ] as const) {
-                    const payload = readCloudPlatePlane(outputMode);
+                    const payload = packFloat32PlaneAsLittleEndianFloat16(
+                        values,
+                        width,
+                        height,
+                    );
                     const query = new URLSearchParams({
                         scene: request.sceneId,
                         frame: String(request.frame),
@@ -1027,6 +1136,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                         WebGlCloudPlateCaptureResult["planes"][number]);
                 }
             } finally {
+                readback.dispose();
                 draw();
             }
             return { width, height, planes: planeResults };

@@ -21,7 +21,8 @@ test("WebGL clouds use continuous world-space volume density", () => {
     assert.match(shader, /steps = clamp\(steps, 8, 384\)/);
     assert.match(shader, /min\(span \/ float\(steps\), 25\.0\)/);
     assert.match(shader, /for \(int i = 0; i < 12/);
-    assert.match(shader, /const float dither = 0\.5/);
+    assert.match(shader, /u_cloud_output_mode > 0\.5[\s\S]*u_cloud_offline_sample\.z/);
+    assert.match(shader, /: 0\.5;/);
     assert.doesNotMatch(shader, /cloud_dither\(gl_FragCoord/);
     assert.match(shader, /float local_support = smoother/);
     assert.match(shader, /density \+= local_support \* layer\.towerAmount/);
@@ -37,6 +38,8 @@ test("WebGL clouds expose an affine scene-linear plate operator", () => {
     assert.match(shader, /max\(clouds\.scattering, vec3\(0\.0\)\)/);
     assert.match(shader, /vec3\(saturate\(clouds\.transmittance\)\)/);
     assert.match(shader, /\* 0\.001/);
+    assert.match(shader, /uniform vec3 u_cloud_offline_sample/);
+    assert.match(shader, /fract\(u_cloud_offline_sample\.z\)/);
 });
 
 test("Congestus is a finite continuous species field", () => {
@@ -87,6 +90,12 @@ test("AtmosphereCanvas exports little-endian rgba16float WebGL plates", () => {
     assert.match(atmosphere, /__elementsCloudPlateCapture/);
     assert.match(atmosphere, /dataset\.cloudPlateExport = "available"/);
     assert.match(atmosphere, /\/api\/cloud-plates\/capture-plane/);
+    assert.match(atmosphere, /const radicalInverse/);
+    assert.match(atmosphere, /webGlOfflineSample\(sampleIndex\)/);
+    assert.match(atmosphere, /const sampleCount = request\.samples \?\? 1/);
+    assert.match(atmosphere, /radianceSum\[source\]\s*\/\s*sampleCount/);
+    assert.match(atmosphere,
+        /meanDepthSum\[pixel\]\s*\/\s*meanDepthWeight\[pixel\]/);
 });
 
 test("explicit WebGL2 mode has one volumetric owner and no CSS cloud doubles", () => {

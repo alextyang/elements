@@ -68,7 +68,8 @@ export const validateCloudPlateScene = (scene) => {
         render.width < 64 || render.height < 64 ||
         !Number.isInteger(render.minimumTransportSamples) ||
         render.minimumTransportSamples < 64 ||
-        !["native-metal", "blender-cycles-metal"].includes(render.backend)) {
+        !["native-metal", "webgl2-local-gpu", "blender-cycles-metal"].includes(
+            render.backend)) {
         failures.push("invalid-render-contract");
     }
     if (!(render.convergenceTarget > 0) || render.convergenceTarget > 1) {
@@ -489,7 +490,9 @@ export const renderCloudPlateScene = async ({
         : undefined;
     const backendVersion = blenderExecutable
         ? blenderVersion(blenderExecutable)
-        : "browser-webgpu";
+        : scene.render.backend === "webgl2-local-gpu"
+            ? "browser-webgl2"
+            : "browser-webgpu";
     const verifiedAssets = blenderExecutable
         ? verifiedCloudVdbAssets(repositoryRoot)
         : undefined;
@@ -707,6 +710,10 @@ export const renderCloudPlateScene = async ({
                             ...process.env,
                             CLOUD_PREVIEW_URL: baseUrl,
                             CLOUD_PREVIEW_CAPTURE_MODE: "native-metal-headless",
+                            CLOUD_PREVIEW_RENDERER_PREFERENCE:
+                                scene.render.backend === "webgl2-local-gpu"
+                                    ? "webgl2"
+                                    : "webgpu",
                             CLOUD_PREVIEW_TRANSPORT_UPDATES: String(frameSamples),
                             CLOUD_PREVIEW_SKIP_IMAGE_QUALIFICATION: "1",
                             CLOUD_PREVIEW_CAPTURE_METRICS_PATH: metricsPath,
@@ -723,7 +730,8 @@ export const renderCloudPlateScene = async ({
                     });
                 }
                 const metrics = JSON.parse(readFileSync(metricsPath, "utf8"));
-                if (scene.render.backend === "blender-cycles-metal") {
+                if (scene.render.backend === "blender-cycles-metal" ||
+                    scene.render.backend === "webgl2-local-gpu") {
                     const currentTransport = {
                         radiance: readFileSync(join(
                             frameDirectory, "radiance.rgba16f",

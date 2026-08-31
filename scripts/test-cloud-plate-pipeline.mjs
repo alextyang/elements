@@ -167,6 +167,29 @@ test("thunderstorm production scene selects Cycles on Metal", () => {
     assert.deepEqual(validateCloudPlateScene(definition), []);
 });
 
+test("congestus production scene selects converged WebGL2 plates", () => {
+    const definition = JSON.parse(readFileSync(join(
+        process.cwd(), "data/cloud-plate-scenes/cumulus-congestus-webgl.json",
+    ), "utf8"));
+    const pipeline = readFileSync(join(
+        process.cwd(), "scripts/lib/cloud-plate-pipeline.mjs",
+    ), "utf8");
+    const capture = readFileSync(join(
+        process.cwd(), "scripts/capture-cloud-preview.sh",
+    ), "utf8");
+    assert.equal(definition.render.backend, "webgl2-local-gpu");
+    assert.equal(definition.fixedCamera.perspectiveId, "oblique-natural");
+    assert.equal(definition.groups.length, 1);
+    assert.equal(new Set(definition.groups[0].components.map(
+        ({ continuityVolumeId }) => continuityVolumeId)).size, 1);
+    assert.deepEqual(validateCloudPlateScene(definition), []);
+    assert.match(pipeline, /CLOUD_PREVIEW_RENDERER_PREFERENCE:[\s\S]*"webgl2"/);
+    assert.match(pipeline, /backend === "webgl2-local-gpu"/);
+    assert.match(capture, /rendererPreference=\$\{capture_encoded_renderer\}/);
+    assert.match(capture, /samples: \$capture_updates/);
+    assert.match(capture, /data-sky-renderer="webgl2"/);
+});
+
 test("thunderstorm uses a pinned continuous authored field without primitive cloud blobs", () => {
     const assets = JSON.parse(readFileSync(join(
         process.cwd(), "data/cloud-plate-assets/wdas-cloud.json",

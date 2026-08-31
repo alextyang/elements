@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "cumulus-congestus-webgl",
+  "label": "Continuous cumulus congestus group",
+  "description": "One fixed-camera, continuously connected cumulus congestus group rendered by the WebGL2 volumetric path into an affine radiance and transmittance plate.",
+  "fixedCamera": {
+    "perspectiveId": "oblique-natural",
+    "horizontalFovDegrees": 64,
+    "verticalFovDegrees": 43.52,
+    "viewElevationDegrees": 27
+  },
+  "source": {
+    "captureParameter": "case",
+    "caseId": "cu-congestus--day-oblique-natural"
+  },
+  "timeline": {
+    "durationSeconds": 120,
+    "frameIntervalSeconds": 20,
+    "loop": true,
+    "crossfadeSeconds": 20
+  },
+  "render": {
+    "width": 1024,
+    "height": 640,
+    "minimumTransportSamples": 256,
+    "convergenceTarget": 0.002,
+    "minimumVolumeBounces": 12,
+    "denoiser": "none",
+    "pathGuiding": "none",
+    "phaseFunction": "henyey-greenstein",
+    "worldModel": "nishita",
+    "backend": "webgl2-local-gpu"
+  },
+  "groups": [
+    {
+      "id": "congestus-group",
+      "label": "Connected congestus updraft family",
+      "kind": "continuous-deep-convection",
+      "continuity": "shared-volume",
+      "components": [
+        {
+          "id": "congestus-towers",
+          "kind": "cloud-species",
+          "role": "successive parented cauliflower towers over one condensation base",
+          "genus": "cumulus",
+          "species": "cumulus-congestus",
+          "continuityVolumeId": "congestus-volume-0",
+          "transportOrder": 10,
+          "contribution": 1
+        }
+      ]
+    }
+  ]
+}

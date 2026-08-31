@@ -5,6 +5,7 @@ export const CLOUD_PLATE_ASSET_SCHEMA_VERSION = 1 as const;
 
 export type CloudPlateRenderBackend =
     | "native-metal"
+    | "webgl2-local-gpu"
     | "blender-cycles-metal";
 
 export type CloudPlateGroupKind =
@@ -207,7 +208,7 @@ export const validateCloudPlateScene = (
         scene.render.minimumTransportSamples < 64) {
         failures.push("insufficient-offline-samples");
     }
-    if (!["native-metal", "blender-cycles-metal"].includes(
+    if (!["native-metal", "webgl2-local-gpu", "blender-cycles-metal"].includes(
         scene.render.backend,
     )) {
         failures.push("unsupported-render-backend");
@@ -309,7 +310,7 @@ export const validateCloudPlateAssetManifest = (
     if (!Array.isArray(manifest.groups) || manifest.groups.length === 0) {
         failures.push("asset-has-no-cloud-groups");
     }
-    if (!["native-metal", "blender-cycles-metal"].includes(
+    if (!["native-metal", "webgl2-local-gpu", "blender-cycles-metal"].includes(
         manifest.backend,
     )) {
         failures.push("unsupported-asset-backend");

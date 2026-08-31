@@ -74,6 +74,34 @@ ignored, while exact generator and asset checksums are pinned under
 
 ## Local GPU worker
 
+### WebGL2 converged species plates
+
+`cumulus-congestus-webgl` uses the restored WebGL2 volume marcher as an offline
+local-GPU backend. The live fixed-camera shader and the plate author therefore
+share the exact species density, optical-depth, lighting, and camera contracts;
+the offline path changes sampling quality, not morphology ownership.
+
+Each requested sample uses a three-dimensional low-discrepancy sequence: two
+coordinates jitter the fixed camera inside one output pixel and the third
+shifts ray-depth quadrature in world space. Radiance is averaged linearly,
+transmittance is averaged as area transport, first depth takes the nearest
+finite event, and mean depth is opacity weighted. The capture remains a raw
+scene-linear affine operator throughout; it never passes through display tone
+mapping, RGB dither, PNG alpha blending, or a generated-image stage.
+
+The runner renders N samples, repeats the exact frame at 2N, and measures RMS
+across both RGB transport planes. It keeps doubling without a renderer quality
+ceiling until the authored convergence target passes. A small canary is:
+
+```sh
+npm run cloud:plates:render -- --scene cumulus-congestus-webgl \
+  --frame 0 --samples 64 --width 320 --height 200 \
+  --convergence-target 0.02
+```
+
+The production definition retains the sole `oblique-natural` camera and one
+shared-volume congestus group. No other camera is rendered or optimized.
+
 Bootstrap the checksum-pinned source volumes once:
 
 ```sh

@@ -228,6 +228,7 @@ uniform vec3 u_cloud_ambient;
 uniform vec3 u_cloud_ground_light;
 uniform vec4 u_cloud_quality;      // viewSteps, lightSteps, aerialScale, enabled
 uniform float u_cloud_output_mode; // 0 final, 1 raw radiance/depth, 2 transmittance/depth
+uniform vec3 u_cloud_offline_sample;// subpixel x/y and depth phase
 uniform float u_cloud_time;
 uniform float u_cloud_fog;
 uniform float u_cloud_noctilucent;
@@ -1202,7 +1203,9 @@ CloudResult cloud_render(
     // random offset therefore survives as visible crosshatch and radial bands.
     // Midpoint quadrature is deterministic in world space; the higher sample
     // count below resolves the resulting depth intervals without that noise.
-    const float dither = 0.5;
+    float dither = u_cloud_output_mode > 0.5
+        ? fract(u_cloud_offline_sample.z)
+        : 0.5;
     float weighted_distance = 0.0;
     float distance_weight = 0.0;
 

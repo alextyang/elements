@@ -24,6 +24,7 @@ capture_plate_frame="${CLOUD_PLATE_FRAME_INDEX:-}"
 capture_plate_token="${CLOUD_PLATE_CAPTURE_TOKEN:-local-cloud-plate-capture}"
 capture_plate_width="${CLOUD_PLATE_WIDTH:-}"
 capture_plate_height="${CLOUD_PLATE_HEIGHT:-}"
+capture_renderer_preference="${CLOUD_PREVIEW_RENDERER_PREFERENCE:-}"
 capture_native_config="$capture_root/scripts/config/cloud-preview-native-playwright.json"
 capture_native_headless_config="$capture_root/scripts/config/cloud-preview-native-headless-playwright.json"
 capture_adapter_policy="$capture_root/components/backgrounds/sky/cloud-transport-adapter-policy.mjs"
@@ -47,6 +48,14 @@ capture_failure_transcript_limit=131072
 
 if [[ "$capture_parameter" != "case" && "$capture_parameter" != "weather" ]]; then
     echo "capture parameter must be case or weather" >&2
+    exit 2
+fi
+if [[ -n "$capture_renderer_preference" &&
+    "$capture_renderer_preference" != "auto" &&
+    "$capture_renderer_preference" != "webgpu" &&
+    "$capture_renderer_preference" != "webgl2" &&
+    "$capture_renderer_preference" != "fallback" ]]; then
+    echo "CLOUD_PREVIEW_RENDERER_PREFERENCE is invalid." >&2
     exit 2
 fi
 case "$capture_debug" in
@@ -177,6 +186,11 @@ capture_encoded_case="$(node -p 'encodeURIComponent(process.argv[1])' "$capture_
 capture_encoded_perspective="$(node -p 'encodeURIComponent(process.argv[1])' "$capture_perspective")"
 capture_encoded_debug="$(node -p 'encodeURIComponent(process.argv[1])' "$capture_debug")"
 capture_url="$capture_base_url/cloud-photographs?$capture_parameter=$capture_encoded_case&capture=render&debug=$capture_encoded_debug&productionPerspective=$capture_encoded_perspective&cloudTimeOffset=$capture_cloud_time_offset"
+if [[ -n "$capture_renderer_preference" ]]; then
+    capture_encoded_renderer="$(node -p 'encodeURIComponent(process.argv[1])' \
+        "$capture_renderer_preference")"
+    capture_url="${capture_url}&rendererPreference=${capture_encoded_renderer}"
+fi
 if [[ -n "$capture_plate_scene" ]]; then
     capture_url="${capture_url}&cloudPlateCapture=1"
 fi
@@ -486,6 +500,7 @@ capture_run_output="$(
             productionPerspective:
                 $(node -p 'JSON.stringify(process.argv[1])' "$capture_perspective"),
         };
+        const webglPlate = $([[ -n "$capture_plate_scene" && "$capture_renderer_preference" == "webgl2" ]] && printf true || printf false);
         const lightingDiagnostic = target.debugView.startsWith('lighting-');
         const persistent = $([[ -n "$capture_persistent_session" ]] && printf true || printf false);
         const canSwitch = persistent && $([[ "$capture_disable_case_switch" == "1" || "$capture_debug" != "final" ]] && printf false || printf true) && await page.evaluate(() =>
@@ -510,6 +525,71 @@ capture_run_output="$(
                     (persistent ? '&captureSession=persistent' : ''),
                 { waitUntil: 'domcontentloaded', timeout: remaining() }
             );
+        }
+        if (webglPlate) {
+            const webglRequest = {
+                sceneKey: target.caseId,
+                width: $([[ -n "$capture_plate_scene" ]] && printf '%s' "$capture_plate_width" || printf 0),
+                height: $([[ -n "$capture_plate_scene" ]] && printf '%s' "$capture_plate_height" || printf 0),
+            };
+            await page.waitForFunction((request) => {
+                const canvas = document.querySelector(
+                    '[data-benchmark-render] canvas[data-sky-renderer="webgl2"]'
+                );
+                return canvas?.getAttribute('data-cloud-scene-key') ===
+                        request.sceneKey &&
+                    canvas?.getAttribute('data-cloud-plate-export') ===
+                        'available' &&
+                    canvas.width === request.width &&
+                    canvas.height === request.height &&
+                    typeof canvas.__elementsCloudPlateCapture === 'function';
+            }, webglRequest, { timeout: remaining() });
+            const cloudPlateExport = await page.evaluate((request) => {
+                const canvas = document.querySelector(
+                    '[data-benchmark-render] canvas[data-sky-renderer="webgl2"]'
+                );
+                return canvas.__elementsCloudPlateCapture(request);
+            }, {
+                sceneId:
+                    $(node -p 'JSON.stringify(process.argv[1])' "$capture_plate_scene"),
+                frame: Number(
+                    $(node -p 'JSON.stringify(process.argv[1])' "$capture_plate_frame")
+                ),
+                samples: $capture_updates,
+                token:
+                    $(node -p 'JSON.stringify(process.argv[1])' "$capture_plate_token"),
+            });
+            await page.locator('[data-benchmark-render]').screenshot({
+                path: $(node -p 'JSON.stringify(process.argv[1])' "$capture_output"),
+                scale: 'device',
+                type: 'png',
+                timeout: remaining(),
+            });
+            const state = {
+                sceneKey: target.caseId,
+                debugView: target.debugView,
+                productionPerspective: target.productionPerspective,
+                productionCameraSignature: await page.locator(
+                    '[data-benchmark-case]'
+                ).getAttribute('data-production-camera-signature'),
+                renderer: 'webgl2',
+                updates: $capture_updates,
+                convergenceDelta: null,
+                cloudPlateExport,
+                viewport: {
+                    width: await page.evaluate(() => window.innerWidth),
+                    height: await page.evaluate(() => window.innerHeight),
+                    devicePixelRatio: await page.evaluate(() =>
+                        window.devicePixelRatio || 1),
+                },
+            };
+            const encodedState = await page.evaluate((value) => {
+                const bytes = new TextEncoder().encode(JSON.stringify(value));
+                let binary = '';
+                for (const byte of bytes) binary += String.fromCharCode(byte);
+                return btoa(binary);
+            }, state);
+            return 'CLOUD_PREVIEW_CAPTURE_METRICS_B64:' + encodedState;
         }
         await output.waitFor({ state: 'attached', timeout: remaining() });
         const readinessPredicate = (request) => {
