@@ -756,10 +756,11 @@ const systemCountFor = (
         return 1;
     }
     if (species === "cirrocumulus-stratiformis") {
-        // The atlas source is one complete finite gravity-wave grain packet.
-        // Repeating that packet produces visibly cloned mackerel-sky islands;
-        // coverage belongs to the packet's authored moisture domains.
-        return 1;
+        // One source slot is a finite grain colony, not a whole 5-okta sky.
+        // Use three unequal world-space colonies at the photographic amount;
+        // placement and exemplar selection keep them aperiodic rather than
+        // cloning a screen-space mackerel grid.
+        return Math.min(4, 2 + Math.ceil(amount * 2));
     }
     if (species === "stratocumulus-stratiformis") {
         // One atlas owner is already a complete mesoscale formation. Repeating
@@ -1199,6 +1200,7 @@ const createSystemPlacements = (
         // strata at genuine 8--10 km high-cloud altitude.
         : species === "cirrus-uncinus" ? 0.16
         : species === "cirrus-spissatus" ? 0.18
+        : species === "cirrocumulus-stratiformis" ? 0.245
         : topology === "ice-streamer-field"
         ? 0.035
         : layerIndex === 2 && (topology === "cellular-cloudlet-field" ||
@@ -1229,7 +1231,8 @@ const createSystemPlacements = (
         }
     }
     if (species === "altocumulus-floccus" ||
-        species === "cirrus-spissatus") {
+        species === "cirrus-spissatus" ||
+        species === "cirrocumulus-stratiformis") {
         // Preserve the selected aperiodic bearing while materializing the
         // species' foreground radial stratum exactly. Candidate density is
         // intentionally finite; otherwise a nearby angle match can quantize
@@ -1455,6 +1458,7 @@ const createSystemPlacements = (
             ? species === "cirrus-uncinus" ? [0.30, 0.50]
                 : species === "cirrus-spissatus" ? [0.40, 0.48, 0.56, 0.64]
                 : [0.14, 0.36]
+            : species === "cirrocumulus-stratiformis" ? [0.245, 0.36, 0.46]
             : species === "cirrocumulus-castellanus" ? [0.22, 0.24, 0.32, 0.42]
             : species === "altocumulus-floccus" ? [0.21, 0.37, 0.52]
             : species === "altocumulus-lenticularis" ||
@@ -1503,6 +1507,9 @@ const createSystemPlacements = (
             }
         }
         if (!best) break;
+        if (species === "cirrocumulus-stratiformis") {
+            best.rangeScale = targetRange;
+        }
         if (species === "cumulus-congestus" && companionIndex === 0) {
             // The broad protected support of the dominant owner can overlap
             // the nearest companion in angular projection even when their
@@ -1941,8 +1948,8 @@ const extentFor = (
                 // 30--90 km frontal formation while exposing one irregular
                 // leading/trailing edge instead of a spherical shell.
                 const fibratus = species === "cirrostratus-fibratus";
-                majorRadiusKm = fibratus ? 34 : 44;
-                minorRadiusKm = fibratus ? 14 : 20;
+                majorRadiusKm = fibratus ? 70 : 220;
+                minorRadiusKm = fibratus ? 32 : 150;
                 break;
             }
             const immediateDeck = layer.coverage >= 0.72;
@@ -2010,12 +2017,16 @@ const extentFor = (
             break;
         case "cellular-cloudlet-field":
             majorRadiusKm = clamp(
-                Math.max(layerIndex === 0 ? 7.5 : layerIndex === 1 ? 6 : 6.5,
+                Math.max(species === "cirrocumulus-stratiformis" ? 8.5 :
+                    layerIndex === 0 ? 7.5 : layerIndex === 1 ? 6 : 6.5,
                     scale * (2.5 + layer.coverage * 3.2)) * (0.72 + random() * 0.56),
-                4.5,
-                38,
+                species === "cirrocumulus-stratiformis" ? 8.5 : 4.5,
+                species === "cirrocumulus-stratiformis" ? 12 : 38,
             );
-            minorRadiusKm = majorRadiusKm * (0.52 + random() * 0.30);
+            minorRadiusKm = majorRadiusKm * (
+                species === "cirrocumulus-stratiformis"
+                    ? 0.55 + random() * 0.10
+                    : 0.52 + random() * 0.30);
             break;
         case "castellated-deck":
         case "floccus-field":
@@ -2090,8 +2101,7 @@ const extentFor = (
     const sheet = compiled.macroTopology === "layered-veil" ||
         compiled.macroTopology === "precipitating-sheet" ||
         compiled.macroTopology === "boundary-layer-sheet";
-    const immediateDeck = sheet && layer.coverage >= 0.72 &&
-        !cirrostratusVeil;
+    const immediateDeck = sheet && layer.coverage >= 0.72;
     const highAperiodicField = layerIndex === 2 && !sheet &&
         compiled.macroTopology !== "deep-storm-complex";
     const sectorAngle = cirrostratusVeil ? 0 : placement.angle;
@@ -2179,7 +2189,7 @@ const extentFor = (
     // shield contains the observer; partial sheets remain remote banks whose
     // trailing boundary cannot masquerade as overhead cloud.
     const rangeKm = cirrostratusVeil
-        ? minorRadiusKm + (species === "cirrostratus-fibratus" ? 7.5 : 4)
+        ? minorRadiusKm * (species === "cirrostratus-fibratus" ? 0.70 : 0.10)
         : immediateDeck
             ? Math.max(0.8, minorRadiusKm * lerp(0.16, 0.52, placement.rangeScale))
             : ordinaryRangeKm;
@@ -3316,6 +3326,11 @@ const buildLayerSystems = (
                 (hashText(`congestus-exemplar:${String(scene.seed)}`) +
                     populationIndex) % CLOUD_TOPOLOGY_EXEMPLARS_PER_SPECIES
             ]
+            : !authored && species === "cirrocumulus-stratiformis"
+                ? CLOUD_TOPOLOGY_EXEMPLARS[species][
+                    populationIndex %
+                        CLOUD_TOPOLOGY_EXEMPLARS_PER_SPECIES
+                ]
             : selectedTopologyExemplar;
         // Keep four normalized lanes and the 16-vec4 GPU record intact. Lane
         // W now partitions the stochastic construction space by logical

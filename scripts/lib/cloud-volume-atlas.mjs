@@ -1093,7 +1093,7 @@ const VOLUME_CONFIGS = [
         formationMechanism: "stochastic-ice-veil",
         materialModel: "fibrous-ice",
         topologyPolicy: "continuous-sheet",
-        densityScale: 0.42,
+        densityScale: 0.105,
         phaseBase: 1,
     },
     {
@@ -1108,7 +1108,7 @@ const VOLUME_CONFIGS = [
         materialModel: "granular-ice",
         topologyPolicy: "cellular-colony",
         level: "high",
-        densityScale: 0.56,
+        densityScale: 0.525,
         phaseBase: 0.96,
     },
     {
@@ -1457,10 +1457,10 @@ const VOLUME_CONFIGS = [
         lifecycle: "mature",
         builder: "sheet",
         variant: "cirrostratus-fibratus",
-        formationMechanism: "stochastic-ice-veil",
+        formationMechanism: "frontal-ascent-sheet",
         materialModel: "fibrous-ice",
         topologyPolicy: "continuous-sheet",
-        densityScale: 0.46,
+        densityScale: 0.35,
         phaseBase: 1,
     },
     {
@@ -3230,19 +3230,36 @@ const evaluateSpissatusStochasticField = (x, y, z, primitive, seed = 0) => {
         normalizedX * 4.1 - normalizedZ * 1.7 +
         normalizedY * 1.9 - seed * 0.000011,
     ) * 0.038 * envelopeWarpScale;
+    // Broadside views must retain real top/bottom relief as well as plan-view
+    // corrugation. Shift the vertical humidity coordinate by a low-frequency
+    // world-space field; this bends complete isosurfaces without adding a
+    // screen-space edge treatment or a detached support primitive.
+    const verticalBoundaryRelief = (
+        (fbm3(
+            normalizedX * 1.62 + 8.1,
+            0.37,
+            normalizedZ * 1.88 - 2.9,
+            seed + 3097,
+        ) - 0.5) * 0.16 +
+        Math.sin(
+            normalizedX * 2.7 - normalizedZ * 1.9 +
+            seed * 0.000019,
+        ) * 0.055
+    ) * envelopeWarpScale;
+    const boundaryY = normalizedY - verticalBoundaryRelief;
     const lobeA = 1 - Math.hypot(
         (normalizedX + 0.34 + envelopeWarpX * 0.42) / 0.82,
-        (normalizedY + 0.06 + envelopeWarpY * 0.36) / 0.86,
+        (boundaryY + 0.06 + envelopeWarpY * 0.36) / 0.86,
         (normalizedZ + 0.14 + envelopeWarpZ * 0.38) / 0.76,
     );
     const lobeB = 1 - Math.hypot(
         (normalizedX - 0.26 + envelopeWarpX * 0.48) / 0.78,
-        (normalizedY - 0.14 + envelopeWarpY * 0.40) / 0.80,
+        (boundaryY - 0.14 + envelopeWarpY * 0.40) / 0.80,
         (normalizedZ - 0.08 + envelopeWarpZ * 0.44) / 0.84,
     );
     const lobeC = 1 - Math.hypot(
         (normalizedX + 0.02 + envelopeWarpX * 0.40) / 0.62,
-        (normalizedY + 0.30 + envelopeWarpY * 0.44) / 0.68,
+        (boundaryY + 0.30 + envelopeWarpY * 0.44) / 0.68,
         (normalizedZ - 0.42 + envelopeWarpZ * 0.36) / 0.58,
     );
     const segmentField = (start, end, radius) => {
@@ -3398,6 +3415,7 @@ const evaluateSpissatusStochasticField = (x, y, z, primitive, seed = 0) => {
     const rawSupportGaussian =
         0.42 * (broad - 0.5) +
         0.34 * (mesoscale - 0.5) +
+        0.27 * verticalBoundaryRelief +
         0.07 * (layer.coherence - 0.5) +
         0.04 * (sourceSiteSignal - 0.42) +
         0.14 * (coherentFallstreak - 0.5) *
@@ -5470,7 +5488,7 @@ const buildIceStreamerModel = (config, seed) => {
         ];
         const fallstreakShear = [
             mix(-0.08, 0.08, random()),
-            mix(0.18, 0.34, random()),
+            mix(0.20, 0.36, random()),
         ];
         addSpissatusStochasticField(primitives, {
             center,
@@ -5492,7 +5510,7 @@ const buildIceStreamerModel = (config, seed) => {
             excursionThreshold: 1.02,
             excursionScale: 0.39,
             envelopeScale: 0.23,
-            envelopeWarpScale: 2,
+            envelopeWarpScale: 2.35,
             smoothing: 0.004,
             density: mix(0.93, 1.0, random()),
             detail: mix(0.78, 0.88, random()),
@@ -5532,7 +5550,7 @@ const buildIceStreamerModel = (config, seed) => {
             sourceExcursionThreshold: 1.02,
             sourceLognormalSigma: 1.34,
             sourceLatentStandardDeviationTarget: Math.sqrt(0.019),
-            sourceEnvelopeWarpScale: 2,
+            sourceEnvelopeWarpScale: 2.35,
             sourceLatentMean: latentSummary.latentMean,
             sourceLatentVariance: latentSummary.latentVariance,
             sourceLatentSkew: latentSummary.latentSkew,
@@ -6960,7 +6978,9 @@ const buildUpperMiddleCellularModel = (config, seed) => {
     const primitives = [];
     const cavities = [];
     const ownerPoints = [];
-    const baseY = high ? 0.60 : 0.47;
+    const baseY = high
+        ? variant === "castellanus" ? 0.54 : 0.60
+        : 0.47;
     const moistureEnvelope = buildMoistureEnvelope(random, config.level);
     const domainCount = variant === "stratiformis" ? (high ? 6 : 5) : 4;
     const domains = createAperiodicMoistureDomains({
@@ -7197,10 +7217,10 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                 )
                 : high
                     ? clamp(
-                        0.044 * site.localScale *
+                        0.042 * site.localScale *
                             mix(0.84, 1.14, random()) * stageScale,
-                        0.038,
-                        0.060,
+                        0.036,
+                        0.058,
                     )
                     : 0.052 * site.localScale *
                         mix(0.80, 1.16, random()) * stageScale;
@@ -7277,8 +7297,8 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                 detail: high ? 0.76 : 0.34,
                 phase: config.phaseBase,
                 verticalScale: high ? mix(
-                    dispersive ? 0.78 : 0.85,
-                    dispersive ? 1.05 : 1.18,
+                    dispersive ? 0.78 : 1.08,
+                    dispersive ? 1.05 : 1.48,
                     random(),
                 )
                     : mix(0.52, 0.76, random()),
@@ -7336,7 +7356,11 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                     detail: high ? 0.82 : 0.39,
                     phase: config.phaseBase,
                     verticalScale: high
-                        ? mix(dispersive ? 0.72 : 0.68, 0.90, random())
+                        ? mix(
+                            dispersive ? 0.72 : 0.88,
+                            dispersive ? 0.90 : 1.15,
+                            random(),
+                        )
                         : 0.64,
                     role: high ? "cc-grain-nested-ripple"
                         : "ac-thermal-nested-pulse",
@@ -7410,20 +7434,20 @@ const buildUpperMiddleCellularModel = (config, seed) => {
             if (index < renewalWeights.length) {
                 renewalCumulative += renewalWeights[index];
             }
-            const along = mix(high ? -0.37 : -0.39,
-                high ? 0.37 : 0.39, amount);
+            const along = mix(high ? -0.34 : -0.39,
+                high ? 0.34 : 0.39, amount);
             // A correlated renewal spectrum controls tower births. Two
             // incommensurate low-amplitude modes curve the physical source
             // through its moisture domains without turning it into a row or
             // letting best-candidate repulsion equalize every interval.
             const crossOffset = Math.sin(
                 amount * Math.PI * 2 * 0.83 + renewalBasePhase,
-            ) * (high ? 0.036 : 0.048) + Math.sin(
+            ) * (high ? 0.100 : 0.048) + Math.sin(
                 amount * Math.PI * 2 * 1.71 + renewalBasePhase * 0.63,
-            ) * (high ? 0.016 : 0.021) +
+            ) * (high ? 0.052 : 0.021) +
                 (amount - 0.43) ** 2 * mix(
-                    high ? -0.055 : -0.08,
-                    high ? 0.055 : 0.08,
+                    high ? -0.130 : -0.08,
+                    high ? 0.130 : 0.08,
                     random(),
                 );
             const normal = [-axis[1], axis[0]];
@@ -7435,7 +7459,7 @@ const buildUpperMiddleCellularModel = (config, seed) => {
             ];
         });
         const commonBaseSupport = addSweep(basePoints, basePoints.map((_, index) =>
-            (high ? 0.101 : 0.056) * mix(high ? 0.88 : 0.78, 1.16,
+            (high ? 0.046 : 0.056) * mix(high ? 0.76 : 0.78, 1.16,
                 (hashInteger(seed + index * 271) % 1000) / 1000)), {
             density: high ? 0.94 : 0.86,
             detail: high ? 0.72 : 0.28,
@@ -7445,6 +7469,58 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                 : "ac-castellanus-common-mixed-phase-source",
             lifecycleStage: "mature",
         });
+        if (high) {
+            for (const [sampleFraction, side, reach] of [
+                [0.31, -1, 0.27],
+            ]) {
+                const sampleIndex = Math.min(
+                    commonBaseSupport.samples.length - 1,
+                    Math.floor(
+                        commonBaseSupport.samples.length * sampleFraction,
+                    ),
+                );
+                const attachment = commonBaseSupport.samples[sampleIndex];
+                const endpoint = [
+                    clamp(
+                        attachment.point[0] + axis[0] * reach * 0.18 -
+                            axis[1] * reach * side,
+                        0.10,
+                        0.90,
+                    ),
+                    baseY + 0.064,
+                    clamp(
+                        attachment.point[2] + axis[1] * reach * 0.18 +
+                            axis[0] * reach * side,
+                        0.10,
+                        0.90,
+                    ),
+                ];
+                const midpoint = [
+                    mix(attachment.point[0], endpoint[0], 0.52) +
+                        axis[0] * reach * 0.08,
+                    baseY + 0.018,
+                    mix(attachment.point[2], endpoint[2], 0.52) +
+                        axis[1] * reach * 0.08,
+                ];
+                addSweep([
+                    attachment.point,
+                    midpoint,
+                    endpoint,
+                ], [
+                    Math.max(0.075, attachment.radius),
+                    0.068,
+                    0.058,
+                ], {
+                    density: 0.95,
+                    detail: 0.76,
+                    phase: config.phaseBase,
+                    verticalScale: 0.52,
+                    role: "cc-castellanus-branched-instability-source",
+                    hierarchyLevel: 0,
+                    lifecycleStage: "mature",
+                });
+            }
+        }
         commonBaseCount = 1;
         materialEdges = orderedSites.slice(0, -1).map((site, index) => [
             sites.indexOf(site),
@@ -7455,14 +7531,14 @@ const buildUpperMiddleCellularModel = (config, seed) => {
             const base = basePoints[index];
             const radius = high
                 ? clamp(
-                    0.087 * site.localScale * mix(0.82, 1.16, random()),
-                    0.078,
-                    0.118,
+                    0.080 * site.localScale * mix(0.82, 1.14, random()),
+                    0.070,
+                    0.105,
                 )
                 : 0.050 * site.localScale * mix(0.76, 1.18, random());
             const stageHeight = site.lifecycleStage === "growing" ? 1.06
                 : site.lifecycleStage === "decaying" ? 0.72 : 1;
-            const height = radius * (high ? mix(2.2, 3.8, random())
+            const height = radius * (high ? mix(2.0, 3.2, random())
                 : mix(2.7, 4.9, random())) * stageHeight;
             const cross = [-axis[1], axis[0]];
             const drift = radius * mix(-0.62, 0.62, random());
@@ -7543,39 +7619,39 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                 seed ^ Math.imul(index + 1, 0x119de1f3),
             );
             const crownBranchCount = high
-                ? 1 + (crownSelector % 3 === 0 ? 1 : 0)
+                ? 3
                 : 2;
             for (let branch = 0; branch < crownBranchCount; branch += 1) {
                 const side = ((crownSelector + branch) & 1) === 0 ? -1 : 1;
                 const branchRadius = radius * mix(
-                    high ? 0.48 : 0.31,
-                    high ? 0.64 : 0.52,
+                    high ? 0.42 : 0.31,
+                    high ? 0.61 : 0.52,
                     random(),
                 );
                 const streamwiseDrift = high
-                    ? mix(-0.72, 0.86, random()) : 0;
+                    ? mix(-1.18, 1.26, random()) : 0;
                 addSweep([
                     shoulder,
                     [
-                        shoulder[0] + cross[0] * branchRadius * side * 0.9 +
-                            axis[0] * branchRadius * streamwiseDrift * 0.36,
+                        shoulder[0] + cross[0] * branchRadius * side * 1.12 +
+                            axis[0] * branchRadius * streamwiseDrift * 0.52,
                         shoulder[1] + height * mix(0.12, 0.23, random()),
-                        shoulder[2] + cross[1] * branchRadius * side * 0.9 +
-                            axis[1] * branchRadius * streamwiseDrift * 0.36,
+                        shoulder[2] + cross[1] * branchRadius * side * 1.12 +
+                            axis[1] * branchRadius * streamwiseDrift * 0.52,
                     ],
                     [
                         crown[0] + cross[0] * branchRadius * side *
-                            mix(1.2, 1.8, random()) +
+                            mix(1.85, 2.75, random()) +
                             axis[0] * branchRadius * streamwiseDrift,
                         crown[1] + height * mix(-0.06, 0.13, random()),
                         crown[2] + cross[1] * branchRadius * side *
-                            mix(1.2, 1.8, random()) +
+                            mix(1.85, 2.75, random()) +
                             axis[1] * branchRadius * streamwiseDrift,
                     ],
                 ], [
                     radius * (high ? 0.68 : 0.48),
                     branchRadius,
-                    branchRadius * (high ? 0.38 : 0.34),
+                    branchRadius * (high ? 0.24 : 0.34),
                 ], {
                     density: mix(0.72, 0.91, random()),
                     detail: high ? 0.84 : 0.40,
@@ -7760,12 +7836,12 @@ const buildUpperMiddleCellularModel = (config, seed) => {
                 // never through their one physical common condensation base.
                 // Cutting the base itself made a valid curved source layer
                 // separate into five pieces at the 4x reconstruction footprint.
-                ? baseY + (high ? 0.082 : 0.115)
+                ? baseY + (high ? 0.035 : 0.115)
                 : variant === "floccus"
                     ? baseY + (high ? 0.015 : 0.025)
                     : baseY,
-            high ? 0.020 : 0.030,
-            variant === "castellanus" ? 0.42 : mix(0.58, 0.84, random()),
+            high ? variant === "castellanus" ? 0.055 : 0.020 : 0.030,
+            variant === "castellanus" ? 0.78 : mix(0.58, 0.84, random()),
         );
     }
     const lifecycleCounts = Object.fromEntries([
@@ -9634,19 +9710,24 @@ const buildCirrostratusModel = (config, seed) => {
         orientation: mix(-0.48, 0.48, random()),
         centerAlong: mix(-0.035, 0.035, random()),
         centerAcross: mix(-0.025, 0.025, random()),
-        halfLength: fibratus ? 0.47 : 0.49,
-        halfWidth: fibratus ? 0.38 : 0.43,
-        verticalCenter: mix(0.48, 0.52, random()),
-        verticalHalfDepth: fibratus ? 0.22 : 0.25,
+        halfLength: fibratus ? 0.35 : 0.44,
+        halfWidth: fibratus ? 0.27 : 0.36,
+        verticalCenter: fibratus
+            ? mix(0.58, 0.62, random())
+            : mix(0.60, 0.64, random()),
+        verticalHalfDepth: fibratus ? 0.105 : 0.085,
         shearAlong: fibratus
             ? mix(0.14, 0.24, random())
             : mix(0.035, 0.075, random()),
         shearAcross: fibratus
             ? mix(-0.11, 0.11, random())
             : mix(-0.035, 0.035, random()),
-        heterogeneitySigma: fibratus ? 0.48 : 0.18,
-        outerScale: fibratus ? 1.18 : 0.72,
+        heterogeneitySigma: fibratus ? 0.48 : 0.24,
+        outerScale: fibratus ? 1.18 : 0.90,
         filamentContrast: fibratus ? 0.58 : 0,
+        streamlineCount: fibratus ? 12 : 0,
+        boundaryRoughness: fibratus ? 1 : 1.60,
+        boundaryLobeCount: fibratus ? 6 : 4,
         spectrumSlope: -5 / 3,
         iwcDistribution: "bounded-lognormal",
         verticalProfile: "rounded-isosceles-trapezoid",
@@ -9682,15 +9763,18 @@ const evaluateCirrostratusModel = (model, config, x, y, z, seed) => {
         normalizedAcross * 0.47 + 1.8,
         seed + 2833,
     ) - 0.5;
-    const alongSupport = 1 - Math.abs(normalizedAlong) + alongField * 0.16;
-    const frontSupport = 1 - normalizedAcross + edgeField * 0.28;
+    const boundaryRoughness = model.boundaryRoughness ?? 1;
+    const alongSupport = 1 - Math.abs(normalizedAlong) +
+        alongField * 0.16 * boundaryRoughness;
+    const frontSupport = 1 - normalizedAcross +
+        edgeField * 0.28 * boundaryRoughness;
     const rearSupport = 1 + normalizedAcross +
         (cirriformIwcFbm3(
             normalizedAlong * 0.83 + 6.4,
             0.79,
             normalizedAcross * 0.71 + 3.2,
             seed + 2851,
-        ) - 0.5) * 0.24;
+        ) - 0.5) * 0.24 * boundaryRoughness;
     const planSupport = Math.min(alongSupport, frontSupport, rearSupport);
 
     // Wind varies continuously through the layer. Sedimenting ice therefore
@@ -9783,9 +9867,21 @@ const evaluateCirrostratusModel = (model, config, x, y, z, seed) => {
         0.032,
         finiteSupport + boundaryMixing,
     ) * (planSupport > 0 && verticalProfile > 0 ? 1 : 0);
+    const dryPocketA = Math.exp(-(
+        ((normalizedAlong + 0.14) / 0.31) ** 2 +
+        ((normalizedAcross - 0.18) / 0.23) ** 2
+    ) * 1.8);
+    const dryPocketB = Math.exp(-(
+        ((normalizedAlong - 0.48) / 0.22) ** 2 +
+        ((normalizedAcross + 0.32) / 0.19) ** 2
+    ) * 1.6) * 0.74;
+    const dryPocket = model.fibratus
+        ? 0
+        : Math.max(dryPocketA, dryPocketB);
+    const mesoscaleMoisture = 1 - dryPocket * 0.88;
     const density = clamp(
         condensate * config.densityScale *
-            heterogeneousIwc * filamentFactor,
+            heterogeneousIwc * filamentFactor * mesoscaleMoisture,
     );
     return {
         density,
@@ -13909,8 +14005,8 @@ export const generateCloudMacroAtlas = ({
                     source.phase,
                     source.precipitation,
                     sourceResolution,
-                    2,
-                    occupancyThreshold + 2,
+                    Math.floor(sourceResolution ** 3 * 0.00065),
+                    255,
                 );
                 for (let index = 0; index < source.occupied.length; index += 1) {
                     if (sourceOccupiedBefore[index] && !source.occupied[index]) {
@@ -13976,11 +14072,13 @@ export const generateCloudMacroAtlas = ({
                 signedDistance,
             } = reduced);
             if (reconstructHighIce && config.id === "ci-spissatus") {
-                // Reduction can leave one or two isolated bytes at the support
-                // threshold when a source sample straddles a coarse target
-                // block. They are conservative quantization dust, not a fourth
-                // dense body; remove only a <=2-voxel component whose peak
-                // remains within two bytes of the occupancy floor.
+                // Reduction can leave tiny isolated threshold islands when a
+                // source component occupies only a fraction of a coarse target
+                // block.  A component below 0.065% of the finite source domain
+                // is subgrid at production projection scale; remove it before
+                // it becomes a straight 10--100 pixel satellite.  The main
+                // stochastic body and any material patch above that physical
+                // support floor remain untouched regardless of density.
                 topologyCleanup = removeTinyDetachedComponents(
                     occupied,
                     density,
@@ -13988,8 +14086,8 @@ export const generateCloudMacroAtlas = ({
                     phase,
                     precipitation,
                     resolution,
-                    2,
-                    occupancyThreshold + 2,
+                    Math.floor(resolution ** 3 * 0.00065),
+                    255,
                 );
             }
             if (reconstructHighIce) {
@@ -14622,8 +14720,11 @@ export const generateCloudMacroAtlas = ({
         if (policy === "irregular-patch") {
             const materialComponents = statistics.dominantComponentFractions
                 .filter((fraction) => fraction >= 0.004);
-            if (materialComponents.length < 1 || materialComponents.length > 3 ||
-                materialComponents[0] < 0.75) {
+            const maximumComponents = resolution < 48 ? 4 : 3;
+            const minimumPrimaryFraction = resolution < 48 ? 0.65 : 0.75;
+            if (materialComponents.length < 1 ||
+                materialComponents.length > maximumComponents ||
+                materialComponents[0] < minimumPrimaryFraction) {
                 throw new Error(
                     `${config.id} irregular-patch requires one-to-three ` +
                     `material components; fractions=${JSON.stringify(materialComponents)}`,

@@ -106,7 +106,7 @@ const REFERENCES: CloudReference[] = [
         id: "cc-stratiformis", genus: "cirrocumulus", species: "stratiformis", title: "Cirrocumulus stratiformis",
         image: wmoImage(4800, "cirrocumulus-floccus-undulatus-with-virga-and-mamma_clouds.jpg"), source: wmoViewer(4800), credit: "Rubén del Campo-Hernández / WMO International Cloud Atlas",
         cues: ["sub-degree grains", "little or no shading", "irregular rippled field without a grid"],
-        profile: { base: 8.5, thickness: 0.5, oktas: 5, opticalDepth: 0.22, ice: 0.96, wind: 24, shear: 0.58, turbulence: 0.42, organization: "closed-cell", lifecycle: 0.46, organizationStrength: 0.7 },
+        profile: { base: 8.5, thickness: 2.2, oktas: 5, opticalDepth: 0.22, ice: 0.96, wind: 24, shear: 0.58, turbulence: 0.42, organization: "closed-cell", lifecycle: 0.46, organizationStrength: 0.7 },
     },
     {
         id: "cc-castellanus", genus: "cirrocumulus", species: "castellanus", title: "Cirrocumulus castellanus",
