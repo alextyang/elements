@@ -80,6 +80,13 @@ import styles from "../sky-benchmark/sky-benchmark.module.css";
 type CaptureMode = "pair" | "render" | "reference" | "overlay";
 type QualificationSet = "base" | "orthogonal" | "weather";
 
+interface BenchmarkNavigationParameters {
+    rendererPreference?: SkyRendererPreference;
+    cloudPlateManifest?: string;
+    cloudTimeOffset?: number;
+    captureSession?: "persistent";
+}
+
 interface CloudLightVolumeReadiness {
     caseId: string;
     state: string;
@@ -218,11 +225,30 @@ const benchmarkUrl = (
     debug: SkyDebugView,
     productionPerspective?: string,
     captureParameter: "case" | "weather" = "case",
-) => `/cloud-photographs?${captureParameter}=${encodeURIComponent(caseId)}` +
-    `&capture=${capture}&debug=${debug}` +
-    (productionPerspective
-        ? `&productionPerspective=${encodeURIComponent(productionPerspective)}`
-        : "");
+    navigation: BenchmarkNavigationParameters = {},
+) => {
+    const parameters = new URLSearchParams({
+        [captureParameter]: caseId,
+        capture,
+        debug,
+    });
+    if (productionPerspective) {
+        parameters.set("productionPerspective", productionPerspective);
+    }
+    if (navigation.rendererPreference) {
+        parameters.set("rendererPreference", navigation.rendererPreference);
+    }
+    if (navigation.cloudPlateManifest) {
+        parameters.set("cloudPlateManifest", navigation.cloudPlateManifest);
+    }
+    if (navigation.cloudTimeOffset !== undefined) {
+        parameters.set("cloudTimeOffset", String(navigation.cloudTimeOffset));
+    }
+    if (navigation.captureSession) {
+        parameters.set("captureSession", navigation.captureSession);
+    }
+    return `/cloud-photographs?${parameters.toString()}`;
+};
 
 const RENDERER_DEBUG_VIEWS: readonly SkyDebugView[] = [
     "final",
@@ -274,7 +300,8 @@ export function CloudPhotographBenchmark() {
     const matrixGeneration = requestedMatrixGeneration === null
         ? undefined : Number(requestedMatrixGeneration);
     const requestedProductionPerspective = search.get("productionPerspective");
-    const requestedCloudTimeOffset = Number(search.get("cloudTimeOffset") ?? 0);
+    const requestedCloudTimeOffsetParameter = search.get("cloudTimeOffset");
+    const requestedCloudTimeOffset = Number(requestedCloudTimeOffsetParameter ?? 0);
     const cloudTimeOffset = Number.isFinite(requestedCloudTimeOffset)
         ? requestedCloudTimeOffset : 0;
     const cloudPlateManifestUrl =
@@ -283,6 +310,20 @@ export function CloudPhotographBenchmark() {
     const rendererPreference = ["auto", "webgpu", "webgl2", "fallback"].includes(
         requestedRendererPreference ?? "",
     ) ? requestedRendererPreference as SkyRendererPreference : undefined;
+    const benchmarkNavigationParameters = useMemo<BenchmarkNavigationParameters>(
+        () => ({
+            rendererPreference,
+            cloudPlateManifest: cloudPlateManifestUrl,
+            cloudTimeOffset: requestedCloudTimeOffsetParameter === null
+                ? undefined : cloudTimeOffset,
+        }),
+        [
+            cloudPlateManifestUrl,
+            cloudTimeOffset,
+            rendererPreference,
+            requestedCloudTimeOffsetParameter,
+        ],
+    );
     const productionPerspective = approvedProductionPerspectiveId(
         requestedProductionPerspective,
     ) ?? DEFAULT_PRODUCTION_PERSPECTIVE_ID;
@@ -766,6 +807,7 @@ export function CloudPhotographBenchmark() {
         nextDebug,
         nextProductionPerspective,
         captureParameter,
+        benchmarkNavigationParameters,
     ), { scroll: false });
 
     useEffect(() => {
@@ -795,7 +837,11 @@ export function CloudPhotographBenchmark() {
                         "final",
                         productionPerspective,
                         request.captureParameter,
-                    ) + "&captureSession=persistent",
+                        {
+                            ...benchmarkNavigationParameters,
+                            captureSession: "persistent",
+                        },
+                    ),
                     { scroll: false },
                 );
                 return true;
@@ -807,7 +853,12 @@ export function CloudPhotographBenchmark() {
                 delete captureWindow.__elementsCloudPreviewCapture;
             }
         };
-    }, [persistentCaptureSession, productionPerspective, router]);
+    }, [
+        benchmarkNavigationParameters,
+        persistentCaptureSession,
+        productionPerspective,
+        router,
+    ]);
     const navigateBase = (
         nextGenus: string,
         nextSpecies: string,

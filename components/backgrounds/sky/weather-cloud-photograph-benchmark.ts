@@ -145,6 +145,7 @@ export const approvedProductionPerspectiveId = (
 
 export interface ProductionPerspectiveCamera {
     id: string;
+    viewAzimuth: number;
     viewElevation: number;
     horizontalFov: number;
     verticalFov: number;
@@ -156,7 +157,8 @@ export interface ProductionPerspectiveCamera {
 /**
  * The one camera contract shared by the capture host and serial matrix.  Keep
  * target-native perspective ids out of this resolver: they identify a weather
- * case but must never change live camera geometry.
+ * case but must never change live camera geometry. The canonical day heading
+ * also stays fixed when the lighting environment changes.
  */
 export const resolveProductionPerspectiveCamera = (
     _perspectiveId: string | null | undefined,
@@ -166,6 +168,7 @@ export const resolveProductionPerspectiveCamera = (
     )!;
     return {
         id: perspective.id,
+        viewAzimuth: 55,
         viewElevation: perspective.viewElevationDegrees,
         horizontalFov: perspective.horizontalFieldOfViewDegrees,
         verticalFov: Math.min(120, Math.max(24,
@@ -182,6 +185,7 @@ export const productionPerspectiveCameraSignature = (
 ): string => {
     const camera = resolveProductionPerspectiveCamera(perspectiveId);
     return [
+        camera.viewAzimuth,
         camera.viewElevation,
         camera.horizontalFov,
         camera.verticalFov,
@@ -211,6 +215,7 @@ export const applyProductionPerspectiveToCloudPhotographCase = <
         environment: {
             ...benchmark.environment,
             label: `${benchmark.environment.label} · ${perspective.label}`,
+            viewAzimuth: camera.viewAzimuth,
             viewElevation: camera.viewElevation,
             horizontalFov: camera.horizontalFov,
             verticalFov: camera.verticalFov,
@@ -226,6 +231,7 @@ export const applyProductionPerspectiveToCloudPhotographCase = <
         },
         preview: {
             ...benchmark.preview,
+            viewAzimuth: camera.viewAzimuth,
             viewElevation: camera.viewElevation,
             horizontalFov: camera.horizontalFov,
             verticalFov: camera.verticalFov,

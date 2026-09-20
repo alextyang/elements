@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import ts from "typescript";
 
 const benchmarkSource = readFileSync(
     new URL("../app/cloud-photographs/cloud-photograph-benchmark.tsx", import.meta.url),
@@ -234,8 +235,24 @@ test("orthogonal controls and captures reuse the measured base-route contract", 
     assert.match(benchmarkSource, /orthogonalBenchmark \?\? baseBenchmark/);
     assert.match(benchmarkSource, /data-benchmark-kind=\{qualificationSet\}/);
     assert.match(benchmarkSource, /cloudMorphologyPhotographCaseId/);
-    assert.match(benchmarkSource,
-        /\$\{captureParameter\}=\$\{encodeURIComponent\(caseId\)\}/);
+    const helperStart = benchmarkSource.indexOf("const benchmarkUrl =");
+    const helperEnd = benchmarkSource.indexOf("const RENDERER_DEBUG_VIEWS", helperStart);
+    assert.ok(helperStart >= 0 && helperEnd > helperStart);
+    const urlModule = {};
+    new Function("exports", ts.transpileModule(
+        benchmarkSource.slice(helperStart, helperEnd) + "\nexport { benchmarkUrl };",
+        { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+    ).outputText)(urlModule);
+    const weatherCase = "weather source/with & reserved=?characters";
+    const url = new URL(urlModule.benchmarkUrl(
+        weatherCase, "render", "density", "oblique-natural", "weather",
+        { rendererPreference: "webgl2", cloudTimeOffset: 0 },
+    ), "http://127.0.0.1:3000");
+    assert.deepEqual(Object.fromEntries(url.searchParams), {
+        weather: weatherCase, capture: "render", debug: "density",
+        productionPerspective: "oblique-natural", rendererPreference: "webgl2",
+        cloudTimeOffset: "0",
+    });
     assert.match(benchmarkSource, /applyProductionPerspectiveToCloudPhotographCase/);
     assert.match(benchmarkSource, /productionCameraSignature/);
     assert.doesNotMatch(benchmarkSource, /iterateCloudMorphologyPhotographCases/);

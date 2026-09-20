@@ -87,9 +87,35 @@ test("the review route preserves every base case and emits stable capture URLs",
         /const qualificationSet:[\s\S]*?orthogonalBenchmark[\s\S]*?\? "orthogonal" : "base"/);
     assert.match(routeSource,
         /orthogonalBenchmark \?\? baseBenchmark/);
-    assert.match(routeSource,
-        /`\/cloud-photographs\?\$\{captureParameter\}=\$\{encodeURIComponent\(caseId\)\}`/);
-    assert.match(routeSource, /productionPerspective=\$\{encodeURIComponent\(productionPerspective\)\}/);
+    const helperStart = routeSource.indexOf("const benchmarkUrl =");
+    const helperEnd = routeSource.indexOf("const RENDERER_DEBUG_VIEWS", helperStart);
+    assert.ok(helperStart >= 0 && helperEnd > helperStart);
+    const urlModule = {};
+    new Function("exports", ts.transpileModule(
+        routeSource.slice(helperStart, helperEnd) + "\nexport { benchmarkUrl };",
+        { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+    ).outputText)(urlModule);
+    const navigation = {
+        rendererPreference: "webgl2",
+        cloudPlateManifest: "/generated/cloud-plates/example/manifest.json?revision=a&b=c",
+        cloudTimeOffset: -12.5,
+        captureSession: "persistent",
+    };
+    const selectedId = `${currentId}&cloudTimeOffset=999 #`;
+    const url = new URL(urlModule.benchmarkUrl(
+        selectedId, "render", "final", "oblique-natural", "case", navigation,
+    ), "http://127.0.0.1:3000");
+    assert.equal(url.pathname, "/cloud-photographs");
+    assert.equal(url.hash, "");
+    assert.deepEqual(Object.fromEntries(url.searchParams), {
+        case: selectedId, capture: "render", debug: "final",
+        productionPerspective: "oblique-natural",
+        ...navigation, cloudTimeOffset: "-12.5",
+    });
+    const basic = new URL(urlModule.benchmarkUrl(
+        benchmark.CLOUD_PHOTOGRAPH_CASES[0].id, "pair", "final",
+    ), url);
+    assert.deepEqual([...basic.searchParams.keys()], ["case", "capture", "debug"]);
     assert.match(routeSource,
         /resolveOrthogonalCloudPhotographCase\(requested\)/);
     assert.doesNotMatch(routeSource, /iterateCloudMorphologyPhotographCases/);

@@ -38,7 +38,7 @@ const validEntry = {
     contentHash: "b".repeat(64),
     imageContentHash: "a".repeat(64),
     productionPerspective: "oblique-natural",
-    productionCameraSignature: "27|64|43.52|0.02|natural|auto",
+    productionCameraSignature: "55|27|64|43.52|0.02|natural|auto",
     photographicAcceptance: "not-accepted",
     qualification: {
         schemaVersion: 1,
