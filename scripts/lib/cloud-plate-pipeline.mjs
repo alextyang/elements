@@ -22,10 +22,25 @@ import {
 } from "./cloud-preview-generation.mjs";
 import { qualifyCloudPlateImage } from
     "./cloud-plate-image-qualification.mjs";
+import { CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION } from
+    "../../components/backgrounds/sky/cloud-plate-scene.ts";
 
 export const CLOUD_PLATE_ASSET_SCHEMA_VERSION = 1;
 export const CLOUD_PLATE_PIPELINE_VERSION = 1;
 export const CLOUD_PLATE_CAPTURE_TOKEN = "local-cloud-plate-capture";
+
+/** Reject an outdated exporter before publishing newly generated responses. */
+export const cloudPlateCaptureResponseConvention = (backend, metrics) => {
+    if (backend !== "webgl2-local-gpu") return undefined;
+    const convention = metrics?.cloudPlateExport?.responseConvention;
+    if (convention !== CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION) {
+        throw new Error(
+            "WebGL cloud plate capture is missing the fixed-lighting " +
+            "atmosphere response convention; refresh the renderer and recapture.",
+        );
+    }
+    return convention;
+};
 
 const CLOUD_PLATE_RENDERER_INPUTS = Object.freeze([
     "app/api/cloud-plates",
@@ -742,6 +757,7 @@ export const renderCloudPlateScene = async ({
                     });
                 }
                 const metrics = JSON.parse(readFileSync(metricsPath, "utf8"));
+                cloudPlateCaptureResponseConvention(scene.render.backend, metrics);
                 if (scene.render.backend === "blender-cycles-metal" ||
                     scene.render.backend === "webgl2-local-gpu") {
                     const currentTransport = {
@@ -815,6 +831,9 @@ export const renderCloudPlateScene = async ({
                 height,
             });
             const convergedMetrics = JSON.parse(readFileSync(metricsPath, "utf8"));
+            const responseConvention = cloudPlateCaptureResponseConvention(
+                scene.render.backend, convergedMetrics,
+            );
             writeJsonAtomic(metricsPath, {
                 ...convergedMetrics,
                 imageQualification: imageEvidence.qualification,
@@ -887,6 +906,7 @@ export const renderCloudPlateScene = async ({
                         minimumFiniteDepthFromRadiancePlane(radianceSource),
                     radiance: radiancePlane,
                     transmittance: transmittancePlane,
+                    ...(responseConvention ? { responseConvention } : {}),
                     ...responsePlanes,
                 }],
             });

@@ -183,7 +183,11 @@ export const compileWebGlCloudMorphology = (
         branchOrCrestCount: override(controls, "branchOrCrestCount", construction ? midpoint(construction.branchOrCrestCount) : 3, 0, 24),
         shearCoupling: override(controls, "shearCoupling", construction ? midpoint(construction.shearCoupling) : layer.shear, 0, 1),
         sedimentationCoupling: override(controls, "sedimentationCoupling", construction ? midpoint(construction.sedimentationCoupling) : layer.precipitation, 0, 1),
-        cellularClosure: override(controls, "cellularClosure", construction ? midpoint(construction.cellularClosure) : 0, -1, 1),
+        cellularClosure: override(controls, "cellularClosure",
+            layer.organization === "closed-cell" ? 0.76 :
+                layer.organization === "open-cell" ? -0.76 :
+                    construction ? midpoint(construction.cellularClosure) : 0,
+            -1, 1),
         anisotropy: override(controls, "anisotropy", ORGANIZATION_ANISOTROPY[layer.organization], 0.1, 12),
         baseConnectivity: override(controls, "baseConnectivity", defaults.baseConnectivity, 0, 1),
         crownExpansion: override(controls, "crownExpansion", defaults.crownExpansion, 0, 1),

@@ -2,6 +2,9 @@ import type { CloudGenus, CloudSpecies } from "./cloud-scene";
 
 export const CLOUD_PLATE_SCENE_SCHEMA_VERSION = 1 as const;
 export const CLOUD_PLATE_ASSET_SCHEMA_VERSION = 1 as const;
+/** Atmosphere and direct Sun/Moon illumination are frozen into these responses. */
+export const CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION =
+    "webgl-atmosphere-baked-fixed-lighting-v1" as const;
 
 export type CloudPlateRenderBackend =
     | "native-metal"
@@ -136,12 +139,26 @@ export interface CloudPlateTransportOperator {
     firstDepthKm: number;
     radiance: CloudPlateBinaryPlane;
     transmittance: CloudPlateBinaryPlane;
+    /**
+     * Absence denotes legacy response weights. The fixed-lighting convention
+     * retains diagnostic bases but must replay captured radiance: a single
+     * direct plane cannot independently relight Sun/Moon or changed atmosphere.
+     * Refresh the plate when lighting changes.
+     */
+    responseConvention?: typeof CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION;
     directResponse?: CloudPlateBinaryPlane;
     skyResponse?: CloudPlateBinaryPlane;
     groundResponse?: CloudPlateBinaryPlane;
     geometry?: CloudPlateBinaryPlane;
     motion?: CloudPlateBinaryPlane;
 }
+
+/** Unknown conventions also fail closed when handling unvalidated input. */
+export const cloudPlateOperatorSupportsLiveRelighting = (
+    operator: CloudPlateTransportOperator,
+) => operator.responseConvention === undefined && Boolean(
+    operator.directResponse && operator.skyResponse && operator.groundResponse,
+);
 
 export interface CloudPlateAssetFrame {
     index: number;
@@ -336,6 +353,14 @@ export const validateCloudPlateAssetManifest = (
         }
         const groupIds = new Set<string>();
         for (const operator of frame.operators) {
+            if (operator.responseConvention !== undefined &&
+                (operator.responseConvention !==
+                    CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION ||
+                    manifest.backend !== "webgl2-local-gpu")) {
+                failures.push(
+                    `invalid-response-convention:${frame.index}:${operator.groupId}`,
+                );
+            }
             if (!declaredGroupIds.has(operator.groupId)) {
                 failures.push(
                     `unknown-frame-group:${frame.index}:${operator.groupId}`,

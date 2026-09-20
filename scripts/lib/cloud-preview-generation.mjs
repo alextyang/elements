@@ -44,6 +44,7 @@ export const CLOUD_PREVIEW_RENDERER_INPUTS = Object.freeze([
     "scripts/capture-cloud-preview.sh",
     "scripts/qualify-cloud-preview-image.mjs",
     "scripts/lib/cloud-preview-image-qualification.mjs",
+    "scripts/lib/cloud-preview-webgl-readiness.mjs",
     "scripts/generate-cloud-previews.mjs",
     "scripts/lib/cloud-preview-generation.mjs",
     "scripts/lib/cloud-preview-managed-server.mjs",

@@ -46,6 +46,15 @@ Statuses below are pending rendered verification; existing test passes do not ma
 | Cumulus | humilis, mediocris, congestus, fractus |
 | Cumulonimbus | calvus, capillatus and incus/group variants |
 
+## FLAT-SKY-PROJECTION — current user steering
+
+The user reports radial/perspective distortion near the top and wants a flatter sky presentation, while retaining nearer/larger depth. Keep one production projection, not multiple optimized views.
+
+1. [ ] Audit actual default WebGL rays separately from fixed benchmark rays and match all celestial overlays. Initial source evidence: no-preview WebGL still spans 241.2° horizontally and reaches 91.8° above the horizon, whereas the benchmark uses 64° × 43.52°; the same production-view contract is not applied everywhere.
+2. [ ] Remove panoramic/zenith convergence from the production sky presentation with one coherent projection contract. Preserve depth scaling; do not conceal density-field artifacts with a postprocess warp.
+3. [ ] Verify CPU projection, WebGL rays, Sun/Moon/stars, cloud placement and any physical-WebGPU compatibility together. Add forward/inverse and straight-feature projection checks.
+4. [ ] Capture before/after at unchanged species/lighting/physical scales, then inspect the upper frame and near/far cloud sizes. Current frozen GPU-hang comparison must finish before changing its camera contract.
+
 ## EVIDENCE-LOG
 
 ### 2026-09-20 — recovered WebGL integration and sampling investigation
@@ -70,6 +79,8 @@ Statuses below are pending rendered verification; existing test passes do not ma
 - Retained offscreen RGBA8 plus 128-pixel scissored tiles and per-tile fences still left an untouched canary rectangle on repeated native-GPU probes, with GL error 0. Readback is not a reliable cure. Do not ship that approach as a verified fix; smaller bounded submissions are being tested.
 - Frozen-shader Chrome stderr confirms Metal command-buffer GPU hang/recovery errors despite an empty page console, live context, completed fence and GL error 0. Evidence: `/tmp/elements-webgl-submission-m4M1B5/geometry128.log`. This is a real submission failure, not just black cloud shading. Apple documents command-buffer termination when work exceeds the permitted execution time: https://developer.apple.com/documentation/metal/mtlcommandbuffererror-swift.struct/timeout.
 - Plate/runtime/lighting/lifecycle rerun: 72/73 pass; the sole failure remains inherited Cc castellanus atlas turret-line anatomy. No test thresholds changed.
+- Fresh full-suite rerun after the latest ice refinement and standalone wave tests: **968 tests, 954 pass, 14 fail**, zero skipped/cancelled, 50.79 seconds. All 14 match the inherited ledger below; this is a new measured total, not a reconciliation.
+- Standalone finite lenticularis/volutus module and 10 numerical tests are complete for species 24/9/28/27/14, with one texture lookup and no population loops. It is deliberately not yet imported by production: placement, recipe-count calibration, GPU compilation and visual review remain pending. Only its documented nine controls are implemented.
 
 #### CONTROL-COVERAGE — verified code gaps, not accepted capabilities
 
@@ -83,6 +94,13 @@ All 16 morphology fields pack into WebGL, but packing alone does not mean the ac
 6. [ ] Add per-species control sensitivity evidence, including useful extremes and saturation. Cloudlet closure above −0.05, anisotropy below 1, storm counts above 32 and lineage above 9 currently have dead ranges. Do not add UI promises beyond verified support.
 
 Numeric/source tests establish control wiring and bounds only; inspect actual fixed-camera renders before recognizing anatomy or accepting realism.
+
+#### PLATE-RADIOMETRY — integration blocker
+
+1. [ ] Refuse the new fixed-lighting WebGL response convention in the physical WebGPU compositor until same-domain playback or a physically calibrated export exists. The compatibility WebGL full-Moon source is 0.95, versus physical lunar irradiance around 7.68e-6; physical night adaptation can therefore clip captured compatibility-domain cloud radiance to white. A single scalar cannot independently correct already-combined Sun, Moon and palette ambient terms. Preserve legacy playback contracts separately.
+2. [ ] Store a deterministic captured-lighting/medium fingerprint and reject stale fixed-lighting frames when lighting changes. Current URL-only playback invalidation can retain daylight clouds at night even if radiometry is addressed.
+3. [ ] Implement same-domain WebGL plate compositing or source-separated physically calibrated transport, then test day→twilight→night against the live renderer.
+4. [ ] Wire bounded local recapture and atomic completed-frame publication for changed lighting/medium; retain only frames whose compatibility is established. Do not silently relight baked response bases.
 
 #### REGRESSION-DEBT — inherited gates, not waived
 

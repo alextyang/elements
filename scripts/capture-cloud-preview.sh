@@ -28,6 +28,7 @@ capture_renderer_preference="${CLOUD_PREVIEW_RENDERER_PREFERENCE:-}"
 capture_native_config="$capture_root/scripts/config/cloud-preview-native-playwright.json"
 capture_native_headless_config="$capture_root/scripts/config/cloud-preview-native-headless-playwright.json"
 capture_adapter_policy="$capture_root/components/backgrounds/sky/cloud-transport-adapter-policy.mjs"
+capture_webgl_readiness_policy="$capture_root/scripts/lib/cloud-preview-webgl-readiness.mjs"
 capture_adapter_probe_url="$capture_base_url/cloud-preview-adapter-probe.html"
 capture_persistent_session="${CLOUD_PREVIEW_PERSISTENT_SESSION:-}"
 capture_session="${capture_persistent_session:-cloud-preview-${$}-$(date +%s)}"
@@ -68,6 +69,11 @@ case "$capture_debug" in
         exit 2
         ;;
 esac
+if [[ "$capture_renderer_preference" == "webgl2" &&
+    -z "$capture_plate_scene" && "$capture_debug" != "final" ]]; then
+    echo "WebGL completed-frame preview capture supports only the final view." >&2
+    exit 2
+fi
 if [[ "$capture_skip_qualification" != "0" &&
     "$capture_skip_qualification" != "1" ]] ||
     [[ "$capture_immutable_output" != "0" &&
@@ -451,6 +457,16 @@ capture_run_output="$(
             }
         };
         const output = page.locator('[data-benchmark-ready]');
+        const consoleIssues = [];
+        const pageErrors = [];
+        const onConsole = (message) => {
+            if (message.type() === 'warning' || message.type() === 'error') {
+                consoleIssues.push({ type: message.type(), text: message.text() });
+            }
+        };
+        const onPageError = (error) => pageErrors.push(String(error));
+        page.on('console', onConsole);
+        page.on('pageerror', onPageError);
         const readinessSnapshot = async () => {
             const renderer = page.locator(
                 '[data-benchmark-render] canvas[data-sky-renderer]'
@@ -480,6 +496,13 @@ capture_run_output="$(
                 rendererInitializationStage:
                     rendererInitializationStage ?? 'unavailable',
                 rendererLightProgress,
+                rendererFrameEvidence: await boundedDiagnostic(renderer.evaluate((canvas) =>
+                    Object.fromEntries([...canvas.attributes]
+                        .filter((attribute) => attribute.name.startsWith(
+                            'data-cloud-webgl-') ||
+                            attribute.name === 'data-sky-renderer')
+                        .map((attribute) => [attribute.name, attribute.value]))),
+                    { unavailable: 'renderer-frame-evidence' }),
             };
         };
         try {
@@ -501,9 +524,10 @@ capture_run_output="$(
                 $(node -p 'JSON.stringify(process.argv[1])' "$capture_perspective"),
         };
         const webglPlate = $([[ -n "$capture_plate_scene" && "$capture_renderer_preference" == "webgl2" ]] && printf true || printf false);
+        const webglFrame = $([[ -z "$capture_plate_scene" && "$capture_renderer_preference" == "webgl2" ]] && printf true || printf false);
         const lightingDiagnostic = target.debugView.startsWith('lighting-');
         const persistent = $([[ -n "$capture_persistent_session" ]] && printf true || printf false);
-        const canSwitch = persistent && $([[ "$capture_disable_case_switch" == "1" || "$capture_debug" != "final" ]] && printf false || printf true) && await page.evaluate(() =>
+        const canSwitch = !webglFrame && persistent && $([[ "$capture_disable_case_switch" == "1" || "$capture_debug" != "final" ]] && printf false || printf true) && await page.evaluate(() =>
             typeof window.__elementsCloudPreviewCapture?.switchCase === 'function');
         if (canSwitch) {
             const accepted = await page.evaluate((request) =>
@@ -525,6 +549,116 @@ capture_run_output="$(
                     (persistent ? '&captureSession=persistent' : ''),
                 { waitUntil: 'domcontentloaded', timeout: remaining() }
             );
+        }
+        if (webglFrame) {
+            const assessFrame = $(node --input-type=module -e '
+                import { pathToFileURL } from "node:url";
+                const policy = await import(pathToFileURL(process.argv[1]).href);
+                process.stdout.write(policy.assessWebGlPreviewFrame.toString());
+            ' "$capture_webgl_readiness_policy");
+            const frameRequest = {
+                ...target,
+                width: 800,
+                height: 500,
+                requireAppleMetal: $([[ "$capture_mode" == "native-metal" || "$capture_mode" == "native-metal-headless" ]] && printf true || printf false),
+            };
+            const boundedWebGlStep = async (operation, label) => {
+                return await Promise.race([
+                    operation,
+                    page.waitForTimeout(Math.min(controllerStepTimeoutMs, remaining()))
+                        .then(() => { throw new Error(
+                            'CLOUD_PREVIEW_CONTROLLER_STEP_TIMEOUT WebGL ' + label); }),
+                ]);
+            };
+            const readFrame = () => boundedWebGlStep(page.evaluate(() => {
+                const canvas = document.querySelector(
+                    '[data-benchmark-render] canvas[data-sky-renderer]');
+                if (!canvas) return null;
+                const benchmark = document.querySelector('[data-benchmark-case]');
+                const render = document.querySelector('[data-benchmark-render]');
+                const bounds = render?.getBoundingClientRect();
+                const value = (name) => canvas.getAttribute('data-cloud-webgl-' + name);
+                return {
+                    url: window.location.href,
+                    title: document.title,
+                    renderer: canvas.getAttribute('data-sky-renderer'),
+                    benchmarkCase: benchmark?.getAttribute('data-benchmark-case'),
+                    sceneKey: canvas.getAttribute('data-cloud-scene-key'),
+                    debugView: benchmark?.getAttribute('data-cloud-debug-view'),
+                    productionPerspective: benchmark?.getAttribute('data-production-perspective'),
+                    productionCameraSignature: benchmark?.getAttribute('data-production-camera-signature'),
+                    benchmarkReady: document.querySelector('[data-benchmark-ready]')
+                        ?.getAttribute('data-benchmark-ready'),
+                    viewport: { width: innerWidth, height: innerHeight,
+                        devicePixelRatio: devicePixelRatio || 1 },
+                    renderBounds: bounds ? { width: bounds.width, height: bounds.height } : null,
+                    width: canvas.width,
+                    height: canvas.height,
+                    frameState: value('frame-state'),
+                    frameFailure: value('frame-failure'),
+                    programState: value('program-state'),
+                    frameSceneKey: value('frame-scene-key'),
+                    frameWidth: Number(value('frame-width')),
+                    frameHeight: Number(value('frame-height')),
+                    completedFrames: Number(value('completed-frames')),
+                    glError: Number(value('error')),
+                    contextLost: value('context-lost') === 'true',
+                    glVendor: value('vendor'),
+                    glRenderer: value('renderer'),
+                    shaderSourceHash: value('shader-source-hash'),
+                    captureFrameAvailable:
+                        typeof canvas.__elementsWebGlFrameComplete === 'function',
+                };
+            }), 'frame-evidence');
+            let state = null;
+            let assessment = { ready: false, failed: false, reason: 'renderer-missing' };
+            while (Date.now() < deadline) {
+                state = await readFrame();
+                if (state?.captureFrameAvailable &&
+                    state.programState === 'linked' &&
+                    state.frameState !== 'complete' && state.frameState !== 'failed') {
+                    await boundedWebGlStep(page.evaluate(async () => {
+                        const canvas = document.querySelector(
+                            '[data-benchmark-render] canvas[data-sky-renderer]');
+                        await canvas.__elementsWebGlFrameComplete();
+                    }), 'frame-completion');
+                    state = await readFrame();
+                }
+                assessment = assessFrame(state, frameRequest);
+                if (assessment.ready || assessment.failed) break;
+                await page.waitForTimeout(Math.min(50, remaining()));
+            }
+            if (!assessment.ready) throw new Error(
+                'WebGL completed-frame gate: ' + JSON.stringify({ assessment, state }));
+            if (pageErrors.length) throw new Error(
+                'WebGL capture page errors: ' + JSON.stringify(pageErrors));
+            await page.locator('[data-benchmark-render]').screenshot({
+                path: $(node -p 'JSON.stringify(process.argv[1])' "$capture_output"),
+                scale: 'device', type: 'png', timeout: remaining(),
+            });
+            const after = await readFrame();
+            const afterAssessment = assessFrame(after, frameRequest);
+            if (!afterAssessment.ready || after.frameSceneKey !== state.frameSceneKey ||
+                after.productionCameraSignature !== state.productionCameraSignature) {
+                throw new Error('WebGL frame changed during screenshot: ' +
+                    JSON.stringify({ assessment: afterAssessment, state: after }));
+            }
+            const encodedState = await page.evaluate((value) => {
+                const bytes = new TextEncoder().encode(JSON.stringify(value));
+                let binary = '';
+                for (const byte of bytes) binary += String.fromCharCode(byte);
+                return btoa(binary);
+            }, {
+                ...after,
+                captureAdapter: $(node -p 'JSON.stringify(JSON.parse(process.argv[1]))' "$capture_adapter_info"),
+                captureBackend: $(node -p 'JSON.stringify(process.argv[1])' "$capture_adapter_backend"),
+                frameReady: true,
+                readinessContract: 'webgl-completed-frame',
+                photographicAcceptance: false,
+                consoleIssues,
+                pageErrors,
+            });
+            return 'CLOUD_PREVIEW_CAPTURE_METRICS_B64:' + encodedState;
         }
         if (webglPlate) {
             const webglRequest = {
@@ -941,6 +1075,9 @@ capture_run_output="$(
             const readiness = await readinessSnapshot();
             throw new Error('Cloud preview readiness: ' +
                 JSON.stringify(readiness) + '; cause=' + String(error));
+        } finally {
+            page.off('console', onConsole);
+            page.off('pageerror', onPageError);
         }
     }" 2>&1
 )" || capture_run_status=$?

@@ -17,13 +17,17 @@ const license = read("../components/backgrounds/sky/PHOTON-LICENSE.txt");
 test("WebGL clouds use continuous world-space volume density", () => {
     assert.match(shader, /precision highp sampler3D/);
     assert.match(shader, /float cloud_density\(vec3 position/);
-    assert.match(shader, /texture\(\s*u_cloud_base,/s);
-    assert.match(shader, /texture\(\s*u_cloud_detail,/s);
+    assert.match(shader, /cloud_texture\(\s*u_cloud_base,/s);
+    assert.match(shader, /cloud_texture\(\s*u_cloud_detail,/s);
+    assert.match(shader, /textureLod\(field, coordinate, 0\.0\)/);
+    assert.doesNotMatch(shader, /\btexture\(/);
     assert.match(shader, /cloud_ray_sphere\(origin, direction/);
-    assert.match(shader, /for \(int index = 0; index < 384/);
-    assert.match(shader, /steps = clamp\(steps, 8, 384\)/);
+    assert.match(shader, /for \(int index = 0; index < 1536/);
+    assert.match(shader, /steps = clamp\(steps, 8, 1536\)/);
     assert.match(shader, /min\(span \/ float\(steps\), 25\.0\)/);
-    assert.match(shader, /for \(int i = 0; i < 12/);
+    assert.match(shader, /for \(int i = 0; i < 32/);
+    assert.match(shader, /float step_length = end - start/);
+    assert.match(shader, /cloud_material_bounds\(layer, base_radius, top_radius\)/);
     assert.match(shader, /u_cloud_output_mode > 0\.5[\s\S]*u_cloud_offline_sample\.z/);
     assert.match(shader, /: 0\.5;/);
     assert.doesNotMatch(shader, /cloud_dither\(gl_FragCoord/);
@@ -130,8 +134,20 @@ test("AtmosphereCanvas integrates the volume at the physical camera", () => {
     assert.match(atmosphere, /current\.horizontalFov/);
     assert.match(atmosphere, /current\.viewElevation/);
     assert.match(atmosphere, /current\.verticalFov/);
-    assert.match(atmosphere, /cameraYawRadiansFromViewAzimuth\(current\.viewAzimuth\)/);
-    assert.match(atmosphere, /uniform\("u_cloud_quality"\),\s*384,\s*12,/s);
+    assert.match(atmosphere,
+        /cameraYawRadiansFromViewAzimuth\(\s*current\.viewAzimuth,?\s*\)/);
+    assert.match(atmosphere, /uniform vec3 u_sun_direction/);
+    assert.match(atmosphere, /uniform vec3 u_moon_direction/);
+    assert.match(atmosphere,
+        /vec3 sun_direction = normalize\(u_sun_direction\)/);
+    assert.match(atmosphere,
+        /vec3 moon_direction = normalize\(u_moon_direction\)/);
+    assert.match(atmosphere,
+        /uniform\("u_sun_direction"\),\s*rotateDirectionByCameraYaw\(\s*current\.sunDirection,\s*cameraYaw,?\s*\)/s);
+    assert.match(atmosphere,
+        /uniform\("u_moon_direction"\),\s*rotateDirectionByCameraYaw\(\s*current\.moonDirection,\s*cameraYaw,?\s*\)/s);
+    assert.doesNotMatch(atmosphere, /vec3 source_direction\(vec2/);
+    assert.match(atmosphere, /uniform\("u_cloud_quality"\),\s*1536,\s*24,/s);
     assert.match(atmosphere, /data-sky-renderer="webgl2"/);
     assert.match(atmosphere, /data-cloud-scene-key=\{sceneKey\}/);
 });
@@ -173,4 +189,45 @@ test("fixed-camera photograph benchmark can explicitly select WebGL2", () => {
     assert.match(benchmark, /search\.get\("rendererPreference"\)/);
     assert.match(benchmark, /requestedRendererPreference as SkyRendererPreference/);
     assert.match(benchmark, /preview:\s*\{[\s\S]*rendererPreference,/);
+});
+
+test("photograph benchmark navigation preserves renderer and plate controls", () => {
+    assert.match(benchmark, /new URLSearchParams\(/);
+    for (const parameter of [
+        "rendererPreference",
+        "cloudPlateManifest",
+        "cloudTimeOffset",
+    ]) {
+        assert.match(benchmark, new RegExp(
+            `parameters\\.set\\("${parameter}"`,
+        ));
+    }
+    assert.match(benchmark,
+        /rendererPreference,\s*cloudPlateManifest: cloudPlateManifestUrl,\s*cloudTimeOffset:/s);
+
+    const replaceCaseStart = benchmark.indexOf("const replaceCase =");
+    const persistentNavigationStart = benchmark.indexOf(
+        "if (!persistentCaptureSession)",
+        replaceCaseStart,
+    );
+    assert.notEqual(replaceCaseStart, -1);
+    assert.notEqual(persistentNavigationStart, -1);
+    assert.match(
+        benchmark.slice(replaceCaseStart, persistentNavigationStart),
+        /benchmarkNavigationParameters/,
+    );
+
+    const switchCaseStart = benchmark.indexOf(
+        "switchCase: (request: CaptureSwitchRequest)",
+        persistentNavigationStart,
+    );
+    const switchCaseEnd = benchmark.indexOf(
+        "captureWindow.__elementsCloudPreviewCapture = bridge",
+        switchCaseStart,
+    );
+    assert.notEqual(switchCaseStart, -1);
+    assert.notEqual(switchCaseEnd, -1);
+    const switchCase = benchmark.slice(switchCaseStart, switchCaseEnd);
+    assert.match(switchCase, /\.\.\.benchmarkNavigationParameters/);
+    assert.match(switchCase, /captureSession: "persistent"/);
 });

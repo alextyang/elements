@@ -25,6 +25,7 @@ import {
 } from "./atmospheric-composition";
 import type { SkyRadianceScene } from "./atmosphere-canvas";
 import type { PhysicalAtmosphereState } from "./physical-atmosphere";
+import { webGlCloudMoonSourceIrradiance } from "./webgl-cloud-lighting";
 import type { ProductionWeatherSceneAuthoring } from "./weather-scene";
 import {
     createDailyCloudScene,
@@ -1869,21 +1870,15 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
             (channel) => channel * moonVisibility,
         ) as [number, number, number];
 
-    // Unattenuated solar exposure is passed to cloud transport. The shader
-    // samples the shared atmosphere transmittance LUT at each cloud sample's
-    // real altitude, so a high cirrus deck and a low cumulus field no longer
-    // receive the same pre-baked sea-level sunset colour.
-    // Airmass now supplies the dimming as the Sun sets, so this only needs to
-    // close the source off below the horizon rather than double-count falloff.
+    // Legacy source coefficients remain available to existing WebGPU plate
+    // playback. The live WebGL cloud path consumes the unattenuated solar
+    // field above and samples physical atmosphere T at each cloud point.
     const sunAbove = clamp((visualSolarAltitude + 4) / 6);
     // The transport march integrates absorbed radiance per segment directly.
     // Keep the source in the same scene-linear exposure domain as the sky;
     // carrying over Photon's pre-integral multiplier clips every illuminated
     // lobe and erases the internal contrast that makes cloud volume readable.
-    // The shader's altitude-aware atmospheric path removes low-Sun irradiance.
-    // A modest exposure-domain compensation preserves the warm light that
-    // remains on cloud-facing surfaces without tinting the cloud material or
-    // changing the surrounding sky. It tapers completely by 14° elevation.
+    // Retain this historic low-Sun coefficient for legacy plate playback.
     const lowSunCloudExposure =
         1 + clamp((14 - visualSolarAltitude) / 16) * 0.62;
     // HG phase lobes are normalized per steradian. Cloud transport needs the
@@ -1908,6 +1903,12 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         celestialScene.moon.transmittance[1] * moonStrength,
         celestialScene.moon.transmittance[2] * moonStrength,
     ];
+    const webGlCloudMoonTopOfAtmosphereIrradiance =
+        webGlCloudMoonSourceIrradiance(
+            celestialScene.moon.diskPhotometry.relativeIrradiance,
+            visualSolarAltitude,
+            moonVisibility,
+        );
 
     // Hemispheric skylight on cloud tops, taken from the palette's upper sky so
     // cloud ambient always agrees with the dome rendered behind it.
@@ -1988,6 +1989,8 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
             weather: preview?.weather,
             solarTopOfAtmosphereIrradiance,
             moonTopOfAtmosphereIrradiance,
+            physicalAtmosphereState,
+            webGlCloudMoonTopOfAtmosphereIrradiance,
             adaptationExposure: celestialScene.adaptationExposure,
             sunRadiance,
             sunDirection,

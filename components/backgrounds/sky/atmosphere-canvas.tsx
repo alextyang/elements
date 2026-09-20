@@ -9,13 +9,19 @@ import {
     packCloudLayers,
 } from "./webgl-cloud-shader";
 import { createCloudNoise } from "./webgl-cloud-noise";
+import { createWebGlCloudLighting } from "./webgl-cloud-lighting";
 import { cloudSourceFloat16Bits } from "./cloud-fibratus-source-field";
 import type { CloudScene } from "./cloud-scene";
+import { CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION } from "./cloud-plate-scene";
 import type { HydrometeorSceneOverrides } from "./hydrometeor-system";
 import type { GroundAlbedoRgb } from "./atmospheric-composition";
 import type { SkyPalette } from "./sky-palettes";
 import type { ProductionWeatherSceneAuthoring } from "./weather-scene";
-import { cameraYawRadiansFromViewAzimuth } from "./camera-contract";
+import type { PhysicalAtmosphereState } from "./physical-atmosphere";
+import {
+    cameraYawRadiansFromViewAzimuth,
+    rotateDirectionByCameraYaw,
+} from "./camera-contract";
 import styles from "./sky.module.css";
 
 export interface SkyRadianceScene {
@@ -57,6 +63,13 @@ export interface SkyRadianceScene {
     solarTopOfAtmosphereIrradiance: [number, number, number];
     /** Unattenuated lunar irradiance at TOA; phase and distance are included. */
     moonTopOfAtmosphereIrradiance: [number, number, number];
+    /** Exact shared medium used by the WebGL cloud transmittance lookup. */
+    physicalAtmosphereState?: PhysicalAtmosphereState;
+    /**
+     * Unattenuated Moon source in the legacy WebGL full-Moon-relative domain.
+     * Physical WebGPU consumers continue to use moonTopOfAtmosphereIrradiance.
+     */
+    webGlCloudMoonTopOfAtmosphereIrradiance?: [number, number, number];
     /** Common post-transport photographic exposure multiplier (not EV). */
     adaptationExposure: number;
     /** @deprecated Legacy cloud-lighting field; use solarTopOfAtmosphereIrradiance. */
@@ -103,6 +116,8 @@ uniform vec2 u_resolution;
 uniform vec4 u_camera;
 uniform vec2 u_sun;
 uniform vec2 u_moon;
+uniform vec3 u_sun_direction;
+uniform vec3 u_moon_direction;
 uniform vec4 u_optics;
 uniform vec4 u_light;
 uniform vec4 u_composition;
@@ -208,26 +223,6 @@ vec3 view_direction(vec2 uv) {
     ));
 }
 
-vec3 source_direction(vec2 point) {
-    float azimuth = (point.x - 0.5) * u_camera.x;
-    float elevation = u_camera.z > 0.0
-        ? u_camera.y + (0.5 - point.y) * u_camera.z
-        : mix(PI * 0.51, -0.035, pow(clamp(point.y, 0.0, 1.15), 0.91));
-    float cos_elevation = cos(elevation);
-    vec3 local = normalize(vec3(
-        sin(azimuth) * cos_elevation,
-        sin(elevation),
-        cos(azimuth) * cos_elevation
-    ));
-    float cosine = cos(u_camera.w);
-    float sine = sin(u_camera.w);
-    return normalize(vec3(
-        local.x * cosine + local.z * sine,
-        local.y,
-        -local.x * sine + local.z * cosine
-    ));
-}
-
 float henyey_greenstein(float cosine, float g) {
     float g2 = g * g;
     return (1.0 - g2) /
@@ -259,8 +254,8 @@ void main() {
     vec3 base_srgb = sky_spline(y);
     vec3 radiance = srgb_to_linear(base_srgb);
     vec3 view = view_direction(uv);
-    vec3 sun_direction = source_direction(u_sun);
-    vec3 moon_direction = source_direction(u_moon);
+    vec3 sun_direction = normalize(u_sun_direction);
+    vec3 moon_direction = normalize(u_moon_direction);
     float sun_cosine = dot(view, sun_direction);
     float moon_cosine = dot(view, moon_direction);
 
@@ -657,6 +652,7 @@ interface WebGlCloudPlateCaptureRequest {
 interface WebGlCloudPlateCaptureResult {
     width: number;
     height: number;
+    responseConvention: typeof CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION;
     planes: readonly {
         channel: "radiance" | "transmittance" |
             "direct-response" | "sky-response" | "ground-response";
@@ -667,6 +663,7 @@ interface WebGlCloudPlateCaptureResult {
 }
 
 type WebGlCloudPlateCaptureCanvas = HTMLCanvasElement & {
+    __elementsWebGlFrameComplete?: () => Promise<void>;
     __elementsCloudPlateCapture?: (
         request: WebGlCloudPlateCaptureRequest,
     ) => Promise<WebGlCloudPlateCaptureResult>;
@@ -715,17 +712,30 @@ const webGlOfflineSample = (index: number) => [
 export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sceneRef = useRef(scene);
+    const sceneKeyRef = useRef(sceneKey);
     const drawRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
         sceneRef.current = scene;
+        sceneKeyRef.current = sceneKey;
         drawRef.current?.();
-    }, [scene]);
+    }, [scene, sceneKey]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return undefined;
         const captureCanvas = canvas as WebGlCloudPlateCaptureCanvas;
+        const diagnostic = captureCanvas.dataset;
+        diagnostic.cloudWebglFrameState = "initializing";
+        diagnostic.cloudWebglProgramState = "compiling";
+        diagnostic.cloudWebglFrameFailure = "none";
+        diagnostic.cloudWebglCompletedFrames = "0";
+        diagnostic.cloudWebglContextLost = "false";
+        diagnostic.cloudWebglError = "0";
+        const failFrame = (message: string) => {
+            diagnostic.cloudWebglFrameState = "failed";
+            diagnostic.cloudWebglFrameFailure = message;
+        };
         const gl = canvas.getContext("webgl2", {
             alpha: false,
             antialias: false,
@@ -733,12 +743,23 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             powerPreference: "high-performance",
             premultipliedAlpha: false,
         });
-        if (!gl) return undefined;
+        if (!gl) {
+            failFrame("WebGL2 context unavailable");
+            return undefined;
+        }
+        const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info");
+        diagnostic.cloudWebglVendor = String(gl.getParameter(
+            rendererInfo?.UNMASKED_VENDOR_WEBGL ?? gl.VENDOR));
+        diagnostic.cloudWebglRenderer = String(gl.getParameter(
+            rendererInfo?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER));
 
         let program: WebGLProgram;
         try {
             program = createProgram(gl);
+            diagnostic.cloudWebglProgramState = "linked";
         } catch (error) {
+            diagnostic.cloudWebglProgramState = "failed";
+            failFrame(String(error));
             console.warn("Atmospheric shader unavailable", error);
             return undefined;
         }
@@ -747,13 +768,32 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
         // Worley density basis on this context. Species state shapes that
         // field during the world-space march; no sprite, atlas lobe, or CSS
         // cloud participates in this backend.
-        const cloudNoise = createCloudNoise(gl);
+        let cloudNoise: ReturnType<typeof createCloudNoise> = null;
+        let cloudLighting: ReturnType<typeof createWebGlCloudLighting>;
+        try {
+            cloudNoise = createCloudNoise(gl);
+            cloudLighting = createWebGlCloudLighting(gl, program, 4);
+        } catch (error) {
+            failFrame(String(error));
+            cloudNoise?.dispose();
+            gl.deleteProgram(program);
+            console.warn("WebGL cloud resources unavailable", error);
+            return undefined;
+        }
         if (!cloudNoise) {
             console.warn("WebGL cloud noise unavailable; rendering clear sky");
         }
+        // Noise uses units 0–3. A separate nearest-filtered float lookup on 4
+        // is valid for both the live frame and every offline response plane.
 
         const buffer = gl.createBuffer();
-        if (!buffer) return undefined;
+        if (!buffer) {
+            failFrame("WebGL vertex buffer unavailable");
+            cloudLighting.dispose();
+            cloudNoise?.dispose();
+            gl.deleteProgram(program);
+            return undefined;
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.bufferData(
             gl.ARRAY_BUFFER,
@@ -774,6 +814,16 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             ["u_glow", "glow"],
             ["u_haze", "haze"],
         ] as const;
+        let drawSerial = 0;
+        let disposed = false;
+        const captureAbort = new AbortController();
+        const assertCaptureActive = () => {
+            if (disposed || captureAbort.signal.aborted || gl.isContextLost()) {
+                throw new Error(
+                    "WebGL cloud plate capture canceled: renderer disposed or context lost.",
+                );
+            }
+        };
 
         const draw = (
             outputMode = 0,
@@ -781,8 +831,15 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             outputWidth?: number,
             outputHeight?: number,
             offlineSample: readonly [number, number, number] = [0, 0, 0.5],
+            captureLiveFrame = false,
         ) => {
-            if (document.hidden && outputMode === 0) return;
+            if (disposed || gl.isContextLost()) return;
+            if (document.hidden && outputMode === 0 && !captureLiveFrame) return;
+            if (outputMode === 0) {
+                drawSerial += 1;
+                diagnostic.cloudWebglFrameState = "submitted";
+                diagnostic.cloudWebglFrameFailure = "none";
+            }
             const current = sceneRef.current;
             const bounds = canvas.getBoundingClientRect();
             // Match Retina density on ordinary displays so faint lunar
@@ -817,6 +874,9 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             gl.enableVertexAttribArray(position);
             gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
             gl.uniform2f(uniform("u_resolution"), width, height);
+            const cameraYaw = cameraYawRadiansFromViewAzimuth(
+                current.viewAzimuth,
+            );
             gl.uniform4f(
                 uniform("u_camera"),
                 (current.horizontalFov * Math.PI) / 180,
@@ -824,10 +884,18 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 current.cameraProjection
                     ? (current.verticalFov * Math.PI) / 180
                     : 0,
-                cameraYawRadiansFromViewAzimuth(current.viewAzimuth),
+                cameraYaw,
             );
             gl.uniform2f(uniform("u_sun"), current.sun[0], current.sun[1]);
             gl.uniform2f(uniform("u_moon"), current.moon[0], current.moon[1]);
+            gl.uniform3fv(
+                uniform("u_sun_direction"),
+                rotateDirectionByCameraYaw(current.sunDirection, cameraYaw),
+            );
+            gl.uniform3fv(
+                uniform("u_moon_direction"),
+                rotateDirectionByCameraYaw(current.moonDirection, cameraYaw),
+            );
             gl.uniform4f(
                 uniform("u_optics"),
                 current.nightDepth,
@@ -885,19 +953,26 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             gl.uniform4fv(uniform("u_cloud_scene"), packedClouds.scene);
             gl.uniform4fv(uniform("u_cloud_seed"), packedClouds.seed);
             gl.uniform3fv(
-                uniform("u_cloud_sun_radiance"), current.sunRadiance,
+                uniform("u_cloud_sun_radiance"),
+                current.solarTopOfAtmosphereIrradiance,
             );
             gl.uniform3fv(
-                uniform("u_cloud_moon_radiance"), current.moonRadiance,
+                uniform("u_cloud_moon_radiance"),
+                current.webGlCloudMoonTopOfAtmosphereIrradiance ??
+                    current.moonTopOfAtmosphereIrradiance,
             );
+            cloudLighting.updateAndBind(current.physicalAtmosphereState);
             gl.uniform3fv(uniform("u_cloud_ambient"), current.cloudAmbient);
             gl.uniform3fv(
                 uniform("u_cloud_ground_light"), current.cloudGroundLight,
             );
+            // Reference-quality deterministic integration. A 384-step budget
+            // aliases opaque storm fronts into horizontal bands; 768 reduces
+            // them but 1536 resolves the fixed production view.
             gl.uniform4f(
                 uniform("u_cloud_quality"),
-                384,
-                12,
+                1536,
+                24,
                 1 / 70000,
                 cloudNoise && packedClouds.active ? 1 : 0,
             );
@@ -949,6 +1024,74 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         };
 
+        // Only explicit capture requests fence a live draw. Ordinary scene
+        // updates never synchronously wait for the GPU or poll a fence.
+        captureCanvas.__elementsWebGlFrameComplete = async () => {
+            let fence: WebGLSync | null = null;
+            try {
+                if (disposed || gl.isContextLost()) {
+                    throw new Error("WebGL context lost or disposed");
+                }
+                if (!cloudNoise && packCloudLayers(sceneRef.current.cloudScene,
+                    sceneRef.current.cloudTime + sceneRef.current.cloudTimeOffset).active) {
+                    throw new Error("WebGL cloud noise unavailable");
+                }
+                draw(0, null, undefined, undefined, [0, 0, 0.5], true);
+                const serial = drawSerial;
+                const completedSceneKey = sceneKeyRef.current ?? "";
+                const width = canvas.width;
+                const height = canvas.height;
+                fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+                if (!fence) throw new Error("WebGL completion fence unavailable");
+                gl.flush();
+                const deadline = performance.now() + 15_000;
+                while (true) {
+                    if (disposed || gl.isContextLost()) {
+                        throw new Error("WebGL context lost or disposed");
+                    }
+                    const status = gl.clientWaitSync(fence, 0, 0);
+                    if (status === gl.WAIT_FAILED) {
+                        throw new Error("WebGL completion fence failed");
+                    }
+                    if (status === gl.ALREADY_SIGNALED ||
+                        status === gl.CONDITION_SATISFIED) break;
+                    if (performance.now() >= deadline) {
+                        throw new Error("WebGL completion fence timed out");
+                    }
+                    await new Promise<void>((resolve) => setTimeout(resolve, 16));
+                }
+                const error = gl.getError();
+                diagnostic.cloudWebglError = String(error);
+                if (error !== gl.NO_ERROR) {
+                    throw new Error(`WebGL draw failed with ${error}`);
+                }
+                const shaderDigest = await crypto.subtle.digest("SHA-256",
+                    new TextEncoder().encode(VERTEX_SHADER + "\0" + FRAGMENT_SHADER));
+                if (disposed || gl.isContextLost()) {
+                    throw new Error("WebGL context lost or disposed");
+                }
+                if (serial !== drawSerial || completedSceneKey !== (sceneKeyRef.current ?? "") ||
+                    width !== canvas.width || height !== canvas.height) {
+                    // A newer draw owns the canvas; the caller may request a
+                    // fresh fence, but must never accept this stale completion.
+                    return;
+                }
+                diagnostic.cloudWebglFrameSceneKey = completedSceneKey;
+                diagnostic.cloudWebglShaderSourceHash = [...new Uint8Array(shaderDigest)]
+                    .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+                diagnostic.cloudWebglFrameWidth = String(width);
+                diagnostic.cloudWebglFrameHeight = String(height);
+                diagnostic.cloudWebglCompletedFrames = String(
+                    Number(diagnostic.cloudWebglCompletedFrames) + 1);
+                diagnostic.cloudWebglFrameState = "complete";
+            } catch (error) {
+                if (!disposed) failFrame(String(error));
+                throw error;
+            } finally {
+                if (fence) gl.deleteSync(fence);
+            }
+        };
+
         const createCloudPlateReadback = () => {
             if (!gl.getExtension("EXT_color_buffer_float")) {
                 throw new Error(
@@ -964,7 +1107,10 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 if (framebuffer) gl.deleteFramebuffer(framebuffer);
                 throw new Error("Unable to allocate WebGL cloud plate target.");
             }
+            let released = false;
             const dispose = () => {
+                if (released) return;
+                released = true;
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
                 gl.deleteFramebuffer(framebuffer);
                 gl.deleteTexture(texture);
@@ -1037,6 +1183,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
         };
 
         captureCanvas.__elementsCloudPlateCapture = async (request) => {
+            assertCaptureActive();
             if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.sceneId) ||
                 !Number.isInteger(request.frame) || request.frame < 0 ||
                 !Number.isSafeInteger(request.samples ?? 1) ||
@@ -1112,6 +1259,9 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     accumulateRgb(readback.read(4, sample), skyResponseSum);
                     accumulateRgb(readback.read(5, sample), groundResponseSum);
                 }
+                // Readback is synchronous. Release its GL target before any
+                // upload can yield to effect cleanup or a replacement renderer.
+                readback.dispose();
 
                 const radiance = new Float32Array(pixelCount * 4);
                 const transmittance = new Float32Array(pixelCount * 4);
@@ -1167,26 +1317,38 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     });
                     const response = await fetch(`${endpoint}?${query}`, {
                         method: "POST",
+                        signal: captureAbort.signal,
                         headers: {
                             "content-type": "application/octet-stream",
                             "x-cloud-plate-capture-token": request.token,
                         },
                         body: payload,
                     });
+                    assertCaptureActive();
                     if (!response.ok) {
+                        const message = await response.text();
+                        assertCaptureActive();
                         throw new Error(
                             `WebGL cloud plate ${channel} upload failed: ` +
-                            `${response.status} ${await response.text()}`,
+                            `${response.status} ${message}`,
                         );
                     }
-                    planeResults.push(await response.json() as
-                        WebGlCloudPlateCaptureResult["planes"][number]);
+                    const plane = await response.json() as
+                        WebGlCloudPlateCaptureResult["planes"][number];
+                    assertCaptureActive();
+                    planeResults.push(plane);
                 }
+            } catch (error) {
+                assertCaptureActive();
+                throw error;
             } finally {
                 readback.dispose();
                 draw();
             }
-            return { width, height, planes: planeResults };
+            return {
+                width, height, planes: planeResults,
+                responseConvention: CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION,
+            };
         };
         captureCanvas.dataset.cloudPlateExport = "available";
 
@@ -1197,15 +1359,27 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
         const visibilityHandler = () => {
             if (!document.hidden) draw();
         };
+        const contextLostHandler = () => {
+            captureAbort.abort();
+            diagnostic.cloudWebglContextLost = "true";
+            failFrame("WebGL context lost");
+        };
         document.addEventListener("visibilitychange", visibilityHandler);
+        canvas.addEventListener("webglcontextlost", contextLostHandler);
 
         return () => {
+            disposed = true;
+            captureAbort.abort();
+            diagnostic.cloudWebglFrameState = "disposed";
             drawRef.current = null;
+            delete captureCanvas.__elementsWebGlFrameComplete;
             delete captureCanvas.__elementsCloudPlateCapture;
             delete captureCanvas.dataset.cloudPlateExport;
             resizeObserver.disconnect();
             document.removeEventListener("visibilitychange", visibilityHandler);
+            canvas.removeEventListener("webglcontextlost", contextLostHandler);
             cloudNoise?.dispose();
+            cloudLighting.dispose();
             gl.deleteBuffer(buffer);
             gl.deleteProgram(program);
         };

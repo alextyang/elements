@@ -160,6 +160,7 @@ import {
     rotateDirectionByCameraYaw,
 } from "./camera-contract";
 import {
+    cloudPlateOperatorSupportsLiveRelighting,
     validateCloudPlateAssetManifest,
     type CloudPlateAssetFrame,
     type CloudPlateAssetManifest,
@@ -3845,12 +3846,14 @@ function WebGpuSkyCanvas({
                     const optionalResponse = (plane?: CloudPlateBinaryPlane) =>
                         plane ? loadCloudPlatePlane(plane) :
                             Promise.resolve(zeroResponse());
-                    const relightable = Boolean(
-                        firstOperator.directResponse && firstOperator.skyResponse &&
-                        firstOperator.groundResponse &&
-                        secondOperator.directResponse && secondOperator.skyResponse &&
-                        secondOperator.groundResponse,
-                    );
+                    // New WebGL bases include the captured atmosphere and a
+                    // combined response to the captured Sun/Moon directions.
+                    // Preserve their exact captured affine radiance/T operator;
+                    // lighting changes require a new plate. Legacy response
+                    // planes retain their existing coefficient convention.
+                    const relightable =
+                        cloudPlateOperatorSupportsLiveRelighting(firstOperator) &&
+                        cloudPlateOperatorSupportsLiveRelighting(secondOperator);
                     const planes = await Promise.all([
                         loadCloudPlatePlane(firstOperator.radiance),
                         loadCloudPlatePlane(firstOperator.transmittance),
