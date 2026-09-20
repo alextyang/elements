@@ -10,7 +10,6 @@ precision highp float;
 
 in vec2 a_position;
 in float a_size;
-in float a_opacity;
 in vec3 a_color;
 in float a_scintillation;
 in float a_phase;
@@ -506,10 +505,11 @@ const loadTexture = (
     texture: WebGLTexture,
     source: string,
     redraw: () => void,
+    onError?: () => void,
 ) => {
     const image = new Image();
     image.decoding = "async";
-    image.addEventListener("load", () => {
+    const upload = () => {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.texImage2D(
@@ -522,8 +522,16 @@ const loadTexture = (
         );
         gl.generateMipmap(gl.TEXTURE_2D);
         redraw();
-    });
+    };
+    image.addEventListener("load", upload);
+    if (onError) image.addEventListener("error", onError);
     image.src = source;
+    // Image decoding can outlive the effect (including StrictMode replay).
+    // Detach uploads before deleting the GPU resources they belong to.
+    return () => {
+        image.removeEventListener("load", upload);
+        if (onError) image.removeEventListener("error", onError);
+    };
 };
 
 interface CelestialCanvasProps {
@@ -601,19 +609,18 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
 
         gl.bindVertexArray(starVertexArray);
         gl.bindBuffer(gl.ARRAY_BUFFER, starBuffer);
-        const starStride = 14 * Float32Array.BYTES_PER_ELEMENT;
+        const starStride = 13 * Float32Array.BYTES_PER_ELEMENT;
         const starAttributes: Array<[string, number, number]> = [
             ["a_position", 2, 0],
             ["a_size", 1, 2],
-            ["a_opacity", 1, 3],
-            ["a_color", 3, 4],
-            ["a_scintillation", 1, 7],
-            ["a_phase", 1, 8],
-            ["a_chromatic", 1, 9],
-            ["a_radiance", 1, 10],
-            ["a_detection", 1, 11],
-            ["a_glow", 1, 12],
-            ["a_seeing", 1, 13],
+            ["a_color", 3, 3],
+            ["a_scintillation", 1, 6],
+            ["a_phase", 1, 7],
+            ["a_chromatic", 1, 8],
+            ["a_radiance", 1, 9],
+            ["a_detection", 1, 10],
+            ["a_glow", 1, 11],
+            ["a_seeing", 1, 12],
         ];
         starAttributes.forEach(([name, size, offset]) => {
             const location = gl.getAttribLocation(starProgram, name);
@@ -634,7 +641,8 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
         const photoTexture = createTexture(gl);
         let requestedPhotoUrl = "";
         let loadedPhotoUrl = "";
-        let photoRequest = 0;
+        let cancelPhotoRequest: (() => void) | undefined;
+        let disposed = false;
         let uploadedScene: CelestialScene | null = null;
         let starCount = 0;
         let devicePixelRatio = 1;
@@ -643,35 +651,17 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
             gl.getUniformLocation(program, name);
 
         const requestPhotoTexture = (source: string) => {
+            cancelPhotoRequest?.();
             requestedPhotoUrl = source;
             loadedPhotoUrl = "";
-            const request = ++photoRequest;
-            const image = new Image();
-            image.decoding = "async";
-            image.addEventListener("load", () => {
-                if (request !== photoRequest) return;
-                gl.bindTexture(gl.TEXTURE_2D, photoTexture);
-                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-                gl.texImage2D(
-                    gl.TEXTURE_2D,
-                    0,
-                    gl.RGBA,
-                    gl.RGBA,
-                    gl.UNSIGNED_BYTE,
-                    image,
-                );
-                gl.generateMipmap(gl.TEXTURE_2D);
+            cancelPhotoRequest = loadTexture(gl, photoTexture, source, () => {
                 loadedPhotoUrl = source;
                 draw();
-            });
-            image.addEventListener("error", () => {
-                if (request === photoRequest) loadedPhotoUrl = "";
-            });
-            image.src = source;
+            }, () => { loadedPhotoUrl = ""; });
         };
 
         const draw = (time = performance.now() / 1000) => {
-            if (document.hidden) return;
+            if (disposed || document.hidden) return;
             const current = sceneRef.current;
             if (
                 current.moon.photoUrl &&
@@ -695,16 +685,15 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
             gl.enable(gl.BLEND);
 
             if (uploadedScene !== current) {
-                const starData = new Float32Array(current.stars.length * 14);
+                const starData = new Float32Array(current.stars.length * 13);
                 current.stars.forEach((star, index) => {
-                    const offset = index * 14;
+                    const offset = index * 13;
                     const color = parseRgb(star.color);
                     starData.set(
                         [
                             star.x / 100,
                             star.y / 100,
                             Math.max(1, star.radius * 2.12),
-                            star.opacity,
                             color[0],
                             color[1],
                             color[2],
@@ -867,20 +856,25 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
         };
 
         redrawRef.current = () => draw();
-        loadTexture(gl, albedoTexture, MOON_ALBEDO_URL, () => draw());
-        loadTexture(gl, elevationTexture, MOON_ELEVATION_URL, () => draw());
+        const cancelAlbedo = loadTexture(gl, albedoTexture, MOON_ALBEDO_URL, () => draw());
+        const cancelElevation = loadTexture(gl, elevationTexture, MOON_ELEVATION_URL, () => draw());
         draw();
 
         const resizeObserver = new ResizeObserver(() => draw());
         resizeObserver.observe(canvas);
+        let animationFrame: number | undefined;
         const animation = window.setInterval(() => {
             const current = sceneRef.current;
             if (
                 !pausedRef.current &&
+                animationFrame === undefined &&
                 current.starsOpacity > 0.02 &&
                 current.stars.some((star) => star.scintillation > 0.01)
             ) {
-                window.requestAnimationFrame((timestamp) => draw(timestamp / 1000));
+                animationFrame = window.requestAnimationFrame((timestamp) => {
+                    animationFrame = undefined;
+                    draw(timestamp / 1000);
+                });
             }
         }, 80);
         const handleVisibility = () => {
@@ -889,10 +883,15 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
         document.addEventListener("visibilitychange", handleVisibility);
 
         return () => {
+            disposed = true;
             redrawRef.current = null;
             window.clearInterval(animation);
+            if (animationFrame !== undefined) window.cancelAnimationFrame(animationFrame);
             resizeObserver.disconnect();
             document.removeEventListener("visibilitychange", handleVisibility);
+            cancelAlbedo();
+            cancelElevation();
+            cancelPhotoRequest?.();
             gl.deleteBuffer(starBuffer);
             gl.deleteBuffer(moonBuffer);
             gl.deleteVertexArray(starVertexArray);
