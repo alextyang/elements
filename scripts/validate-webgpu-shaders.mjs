@@ -484,7 +484,7 @@ async function validate() {
         },
     };
     const entry = (binding, descriptor) => ({ binding, ...descriptor });
-    const productionParameterBufferBytes = 54 * 16;
+    const productionParameterBufferBytes = 55 * 16;
 
     // Explicit production layouts are intentional. Auto layouts remove
     // resources that an individual entry point dead-code-eliminates, allowing
@@ -1229,7 +1229,7 @@ async function validate() {
     // attachment formats, resource hazards, and entry-point execution agree.
     // This tiny deterministic scene keeps CI cost bounded while forcing the
     // interval, cached-lighting, and transport shaders through a real submit.
-    const parameters = new Float32Array(54 * 4);
+    const parameters = new Float32Array(55 * 4);
     const setVector = (target, index, values) => target.set(values, index * 4);
     setVector(parameters, 0, [8, 8, 17.25, 0]);
     setVector(parameters, 1, [0.68, 0.24, 0.34, 0.31]);

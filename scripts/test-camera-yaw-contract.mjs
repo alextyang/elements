@@ -62,11 +62,11 @@ test("camera yaw is included in shader and parameter ABI contracts", () => {
         "./validate-webgpu-shaders.mjs",
         import.meta.url,
     ), "utf8");
-    assert.match(rendererSource, /new Float32Array\(54 \* 4\)/);
+    assert.match(rendererSource, /new Float32Array\(55 \* 4\)/);
     assert.match(rendererSource, /setVector\(data, 53, \[\s*currentTransportYawRadians/);
     assert.match(shaderSource, /view_direction_for_camera\(input\.uv, p\[4\], p\[53\]\.x\)/);
     assert.match(shaderSource, /project_direction_to_camera\(\s*display_direction, p\[32\], p\[53\]\.y/);
     assert.match(shaderSource, /sin\(p\[53\]\.x - p\[53\]\.y\)/);
-    assert.match(validatorSource, /const productionParameterBufferBytes = 54 \* 16/);
+    assert.match(validatorSource, /const productionParameterBufferBytes = 55 \* 16/);
+    assert.match(validatorSource, /new Float32Array\(55 \* 4\)/);
 });
-

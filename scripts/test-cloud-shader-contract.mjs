@@ -196,7 +196,7 @@ test("validator compiles exact production compositions and rejects broken weathe
     assert.match(validatorSource,
         /layout: cloudPipelineLayout[\s\S]*?cloud_fragment_physical_layer/);
     assert.match(validatorSource,
-        /const productionParameterBufferBytes = 54 \* 16/);
+        /const productionParameterBufferBytes = 55 \* 16/);
     assert.match(validatorSource,
         /size: productionParameterBufferBytes/);
     assert.doesNotMatch(validatorSource, /35 \* 16/);
