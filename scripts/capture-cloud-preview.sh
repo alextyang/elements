@@ -562,10 +562,12 @@ capture_run_output="$(
                 height: 500,
                 requireAppleMetal: $([[ "$capture_mode" == "native-metal" || "$capture_mode" == "native-metal-headless" ]] && printf true || printf false),
             };
-            const boundedWebGlStep = async (operation, label) => {
+            const boundedWebGlStep = async (
+                operation, label, budgetMs = controllerStepTimeoutMs,
+            ) => {
                 return await Promise.race([
                     operation,
-                    page.waitForTimeout(Math.min(controllerStepTimeoutMs, remaining()))
+                    page.waitForTimeout(Math.min(budgetMs, remaining()))
                         .then(() => { throw new Error(
                             'CLOUD_PREVIEW_CONTROLLER_STEP_TIMEOUT WebGL ' + label); }),
                 ]);
@@ -617,11 +619,14 @@ capture_run_output="$(
                 if (state?.captureFrameAvailable &&
                     state.programState === 'linked' &&
                     state.frameState !== 'complete' && state.frameState !== 'failed') {
+                    // Reference rendering yields between bounded GPU batches.
+                    // Its full frame may exceed the short controller probe
+                    // timeout; the overall capture deadline still applies.
                     await boundedWebGlStep(page.evaluate(async () => {
                         const canvas = document.querySelector(
                             '[data-benchmark-render] canvas[data-sky-renderer]');
                         await canvas.__elementsWebGlFrameComplete();
-                    }), 'frame-completion');
+                    }), 'frame-completion', remaining());
                     state = await readFrame();
                 }
                 assessment = assessFrame(state, frameRequest);

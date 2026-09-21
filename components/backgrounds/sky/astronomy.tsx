@@ -1,7 +1,12 @@
 import SunCalc from "suncalc";
 
 import { HIPPARCOS_STARS } from "./star-catalog";
-import { CAMERA_REFERENCE_HEADING_DEGREES } from "./camera-contract";
+import {
+    CAMERA_REFERENCE_HEADING_DEGREES,
+    projectCameraLocalDirectionToUv,
+    resolveSkyCamera,
+    type SkyCameraState,
+} from "./camera-contract";
 import {
     createLunarPhysicalEphemeris,
     createNightSkyCoordinateFrame,
@@ -308,23 +313,20 @@ const projectHorizontal = (
     azimuth: number,
     altitude: number,
     viewAzimuth?: number,
-    horizontalFov = 360,
+    horizontalFov?: number,
     viewElevation?: number,
-    verticalFov = 180,
+    verticalFov?: number,
 ) => {
-    const relativeAzimuth = viewAzimuth === undefined
-        ? normalizeRadians(azimuth)
-        // SunCalc azimuth is south-zero; converting the public compass
-        // heading to that frame subtracts the explicit 180° GPU reference.
-        : normalizeRadians(
-            azimuth - (viewAzimuth - CAMERA_REFERENCE_HEADING_DEGREES) * DEG,
-        );
-    return {
-        x: 50 + (relativeAzimuth / (horizontalFov * DEG)) * 100,
-        y: viewElevation === undefined
-            ? 80 - (altitude / (Math.PI / 2)) * 72
-            : 50 - ((altitude / DEG - viewElevation) / verticalFov) * 100,
-    };
+    const camera = resolveSkyCamera({
+        viewAzimuth, horizontalFov, viewElevation, verticalFov,
+    });
+    const projected = projectCameraLocalDirectionToUv(
+        directionForHorizontal(azimuth, altitude, camera.viewAzimuth), camera,
+    );
+    // Celestial consumers retain outside-frame coordinates for clipping.
+    // Sources behind the flat image plane must never wrap into its viewport.
+    return projected ? { x: projected[0] * 100, y: projected[1] * 100 }
+        : { x: -200, y: -200 };
 };
 
 const directionForHorizontal = (
@@ -500,6 +502,7 @@ export interface NaturalNightScene {
 }
 
 export interface CelestialScene {
+    camera: SkyCameraState;
     stars: ProjectedStar[];
     starsOpacity: number;
     stellarExposure: number;
@@ -554,10 +557,10 @@ export const calculateCelestialScene = ({
     date,
     latitude,
     longitude,
-    viewAzimuth,
-    horizontalFov = 360,
-    viewElevation,
-    verticalFov = 180,
+    viewAzimuth: requestedViewAzimuth,
+    horizontalFov: requestedHorizontalFov,
+    viewElevation: requestedViewElevation,
+    verticalFov: requestedVerticalFov,
     physicalMoonScale = false,
     haze,
     cloudDensity,
@@ -576,6 +579,13 @@ export const calculateCelestialScene = ({
     moonVisibility = 1,
     solarAltitudeOverride,
 }: CelestialInput): CelestialScene => {
+    const camera = resolveSkyCamera({
+        viewAzimuth: requestedViewAzimuth,
+        horizontalFov: requestedHorizontalFov,
+        viewElevation: requestedViewElevation,
+        verticalFov: requestedVerticalFov,
+    });
+    const { viewAzimuth, horizontalFov, viewElevation, verticalFov } = camera;
     const sun = SunCalc.getPosition(date, latitude, longitude);
     const moon = SunCalc.getMoonPosition(date, latitude, longitude);
     const illumination = SunCalc.getMoonIllumination(date);
@@ -752,7 +762,7 @@ export const calculateCelestialScene = ({
 
         const projected = projectHorizontal(
             horizontal.azimuth,
-            Math.max(0, altitudeDegrees) * DEG,
+            altitudeDegrees * DEG,
             viewAzimuth,
             horizontalFov,
             viewElevation,
@@ -876,19 +886,22 @@ export const calculateCelestialScene = ({
         ];
     });
 
-    const sunPoint = projectHorizontal(
-        sun.azimuth,
-        sun.altitude,
-        viewAzimuth,
-        horizontalFov,
-        viewElevation,
-        verticalFov,
+    // Project the Sun-facing tangent at the Moon, not the distant Sun's
+    // screen position: the Sun can lie behind this rectilinear camera while
+    // still illuminating a visible lunar crescent.
+    const lunarLightDirection = directionForHorizontal(
+        sun.azimuth, sun.altitude, viewAzimuth,
     );
-    let directionX = sunPoint.x - moonPoint.x;
-    if (directionX > 50) directionX -= 100;
-    if (directionX < -50) directionX += 100;
-    const rotation =
-        Math.atan2(sunPoint.y - moonPoint.y, directionX) / DEG;
+    const sourceCosine = lunarLightDirection.reduce(
+        (sum, value, index) => sum + value * moonDirection[index], 0,
+    );
+    const limbProbe = moonDirection.map((value, index) => value + 0.001 *
+        (lunarLightDirection[index] - value * sourceCosine)) as [number, number, number];
+    const projectedLimb = projectCameraLocalDirectionToUv(limbProbe, camera);
+    const projectedMoon = projectCameraLocalDirectionToUv(moonDirection, camera);
+    const rotation = projectedLimb && projectedMoon
+        ? Math.atan2(projectedLimb[1] - projectedMoon[1],
+            projectedLimb[0] - projectedMoon[0]) / DEG : 0;
     const moonHorizonFade = clamp((moonAltitude + 1.5) / 5.5);
     const darkness = clamp((-sunAltitude + 1) / 11);
     // Lunar surface brightness changes far less than its illuminated area.
@@ -1014,6 +1027,7 @@ export const calculateCelestialScene = ({
     };
 
     return {
+        camera,
         stars,
         starsOpacity,
         stellarExposure: stellarExposureGain,

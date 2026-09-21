@@ -1,4 +1,5 @@
 import SunCalc from "suncalc";
+import { PRODUCTION_SKY_CAMERA, SKY_PROJECTION_VERSION } from "./camera-contract";
 
 import {
     CLOUD_PHOTOGRAPH_CASES,
@@ -168,11 +169,7 @@ export const resolveProductionPerspectiveCamera = (
     )!;
     return {
         id: perspective.id,
-        viewAzimuth: 55,
-        viewElevation: perspective.viewElevationDegrees,
-        horizontalFov: perspective.horizontalFieldOfViewDegrees,
-        verticalFov: Math.min(120, Math.max(24,
-            perspective.horizontalFieldOfViewDegrees * 0.68)),
+        ...PRODUCTION_SKY_CAMERA,
         observerAltitude: clamp(perspective.observerAltitudeKm / 2.5),
         cloudPerspective: "natural",
         cloudEditorialRegime: perspective.range === "near" ? "nearby"
@@ -185,6 +182,7 @@ export const productionPerspectiveCameraSignature = (
 ): string => {
     const camera = resolveProductionPerspectiveCamera(perspectiveId);
     return [
+        SKY_PROJECTION_VERSION,
         camera.viewAzimuth,
         camera.viewElevation,
         camera.horizontalFov,

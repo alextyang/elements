@@ -158,8 +158,10 @@ import styles from "./sky.module.css";
 import {
     cameraYawRadiansFromViewAzimuth,
     rotateDirectionByCameraYaw,
+    resolveSkyCamera,
 } from "./camera-contract";
 import {
+    cloudPlateManifestSupportsPhysicalPlayback,
     cloudPlateOperatorSupportsLiveRelighting,
     validateCloudPlateAssetManifest,
     type CloudPlateAssetFrame,
@@ -648,23 +650,17 @@ const analyticLunarProfileIntegral = (
 
 const createPackedCameraState = (
     radiance: SkyRadianceScene,
-    width: number,
-    height: number,
-): PackedCameraState => [
-    radiance.cameraProjection
-        ? (radiance.horizontalFov * Math.PI) / 180
-        : 2 * Math.atan(
-              Math.tan((80 * Math.PI) / 360) *
-                  Math.max(0.35, width / Math.max(1, height)),
-          ),
-    // The default view spans the physical horizon through the upper dome.
-    // Centering at 50° cropped the horizon and forced low cloud into a warped
-    // fringe along the canvas edge; 40° with the same 80° vertical field
-    // preserves both real cloud perspective and the full palette composition.
-    ((radiance.cameraProjection ? radiance.viewElevation : 40) * Math.PI) / 180,
-    ((radiance.cameraProjection ? radiance.verticalFov : 80) * Math.PI) / 180,
-    2,
-];
+    _width: number,
+    _height: number,
+): PackedCameraState => {
+    const camera = resolveSkyCamera(radiance);
+    return [
+        (camera.horizontalFov * Math.PI) / 180,
+        (camera.viewElevation * Math.PI) / 180,
+        (camera.verticalFov * Math.PI) / 180,
+        2,
+    ];
+};
 
 const createParameterData = (
     radiance: SkyRadianceScene,
@@ -3935,6 +3931,7 @@ function WebGpuSkyCanvas({
                 nowSeconds: number,
             ) => {
                 const serial = ++cloudPlateRequestSerial;
+                let rejectionStatus = "failed";
                 canvas.dataset.cloudPlatePlayback = "loading";
                 delete canvas.dataset.cloudPlateScene;
                 delete canvas.dataset.cloudPlateSceneHash;
@@ -3966,6 +3963,15 @@ function WebGpuSkyCanvas({
                         );
                     }
                     if (disposed || serial !== cloudPlateRequestSerial) return;
+                    if (!cloudPlateManifestSupportsPhysicalPlayback(manifest)) {
+                        rejectionStatus = "incompatible-radiance-domain";
+                        throw new Error(
+                            "Fixed-lighting WebGL cloud plates cannot enter the physical " +
+                            "sky compositor: captured Moon/palette radiance has incompatible " +
+                            "units and no foreground-air conversion. Same-domain playback " +
+                            "or a calibrated physical export is required.",
+                        );
+                    }
                     const state: CloudPlatePlaybackState = {
                         url,
                         manifest,
@@ -3980,11 +3986,15 @@ function WebGpuSkyCanvas({
                     );
                     await loadCloudPlatePair(state, frames[0], frames[1] ?? frames[0]);
                 } catch (error) {
-                    if (serial === cloudPlateRequestSerial) {
+                    if (!disposed && serial === cloudPlateRequestSerial) {
                         cloudPlatePlaybackState = null;
                         cloudPlatePlaybackActive = false;
                         cloudPlateRelightable = false;
-                        canvas.dataset.cloudPlatePlayback = "failed";
+                        cloudPlateBlend = 0;
+                        cloudTargetsNeedClear = true;
+                        historyValid = false;
+                        temporalNeedsClear = true;
+                        canvas.dataset.cloudPlatePlayback = rejectionStatus;
                         delete canvas.dataset.cloudPlateScene;
                         delete canvas.dataset.cloudPlateSceneHash;
                         delete canvas.dataset.cloudPlateExtent;
@@ -5889,6 +5899,11 @@ function WebGpuSkyCanvas({
                     cloudPlateRelightable = false;
                     cloudPlateBlend = 0;
                     cloudPlateRequestSerial += 1;
+                    // A newly requested/rejected asset must not reveal the
+                    // preceding plate's resolved radiance as live transport.
+                    cloudTargetsNeedClear = true;
+                    historyValid = false;
+                    temporalNeedsClear = true;
                     if (requestedCloudPlateUrl) {
                         // Plate playback owns cloud transport. Abandon any
                         // amortized light-volume generation from the retired

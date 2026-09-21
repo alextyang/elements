@@ -20,6 +20,7 @@ import type { ProductionWeatherSceneAuthoring } from "./weather-scene";
 import type { PhysicalAtmosphereState } from "./physical-atmosphere";
 import {
     cameraYawRadiansFromViewAzimuth,
+    resolveSkyCamera,
     rotateDirectionByCameraYaw,
 } from "./camera-contract";
 import styles from "./sky.module.css";
@@ -112,7 +113,7 @@ in vec2 v_uv;
 out vec4 out_color;
 
 uniform vec2 u_resolution;
-// x=horizontal FOV, y=pitch, z=vertical FOV (zero for the dome), w=world yaw.
+// x=horizontal FOV, y=pitch, z=vertical FOV, w=world yaw; all radians.
 uniform vec4 u_camera;
 uniform vec2 u_sun;
 uniform vec2 u_moon;
@@ -204,16 +205,23 @@ vec3 sky_spline(float y) {
 }
 
 vec3 view_direction(vec2 uv) {
-    float azimuth = (uv.x - 0.5) * u_camera.x;
-    float elevation = u_camera.z > 0.0
-        ? u_camera.y + (0.5 - uv.y) * u_camera.z
-        : mix(PI * 0.51, -0.035, pow(uv.y, 0.91));
-    float cos_elevation = cos(elevation);
-    vec3 local = normalize(vec3(
-        sin(azimuth) * cos_elevation,
-        sin(elevation),
-        cos(azimuth) * cos_elevation
+    // One flat image plane, shared with the physical renderer and CPU
+    // celestial projection. Angular panoramas bend straight cloud structures
+    // and collapse all azimuths at the zenith; a bounded rectilinear view
+    // retains near/far scale without that wrapped-dome singularity.
+    vec2 ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    vec3 camera_ray = normalize(vec3(
+        ndc.x * tan(u_camera.x * 0.5),
+        ndc.y * tan(u_camera.z * 0.5),
+        1.0
     ));
+    float pitch_cosine = cos(u_camera.y);
+    float pitch_sine = sin(u_camera.y);
+    vec3 local = vec3(
+        camera_ray.x,
+        camera_ray.y * pitch_cosine + camera_ray.z * pitch_sine,
+        -camera_ray.y * pitch_sine + camera_ray.z * pitch_cosine
+    );
     float cosine = cos(u_camera.w);
     float sine = sin(u_camera.w);
     return normalize(vec3(
@@ -817,6 +825,14 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
         let drawSerial = 0;
         let disposed = false;
         const captureAbort = new AbortController();
+        const releases = new Set<() => void>();
+        const fences = new Set<WebGLSync>();
+        let gpuWork: Promise<unknown> = Promise.resolve();
+        const enqueue = <T,>(operation: () => Promise<T>): Promise<T> => {
+            const result = gpuWork.then(operation);
+            gpuWork = result.catch(() => undefined);
+            return result;
+        };
         const assertCaptureActive = () => {
             if (disposed || captureAbort.signal.aborted || gl.isContextLost()) {
                 throw new Error(
@@ -825,22 +841,10 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             }
         };
 
-        const draw = (
-            outputMode = 0,
-            framebuffer: WebGLFramebuffer | null = null,
-            outputWidth?: number,
-            outputHeight?: number,
-            offlineSample: readonly [number, number, number] = [0, 0, 0.5],
-            captureLiveFrame = false,
-        ) => {
-            if (disposed || gl.isContextLost()) return;
-            if (document.hidden && outputMode === 0 && !captureLiveFrame) return;
-            if (outputMode === 0) {
-                drawSerial += 1;
-                diagnostic.cloudWebglFrameState = "submitted";
-                diagnostic.cloudWebglFrameFailure = "none";
-            }
-            const current = sceneRef.current;
+        let viewportSerial = 0;
+        let requestedWidth = 0;
+        let requestedHeight = 0;
+        const snapshotDraw = () => {
             const bounds = canvas.getBoundingClientRect();
             // Match Retina density on ordinary displays so faint lunar
             // gradients and fixed-pixel dither survive compositing. A pixel
@@ -851,20 +855,38 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 8_500_000 / Math.max(1, bounds.width * bounds.height),
             );
             const pixelRatio = Math.min(nativePixelRatio, pixelBudgetRatio);
-            const width = outputWidth ?? Math.max(
+            const width = Math.max(
                 1,
                 Math.round(bounds.width * pixelRatio),
             );
-            const height = outputHeight ?? Math.max(
+            const height = Math.max(
                 1,
                 Math.round(bounds.height * pixelRatio),
             );
-            if (framebuffer === null &&
-                (canvas.width !== width || canvas.height !== height)) {
-                canvas.width = width;
-                canvas.height = height;
+            if (width !== requestedWidth || height !== requestedHeight) {
+                requestedWidth = width;
+                requestedHeight = height;
+                viewportSerial += 1;
             }
-
+            return { current: sceneRef.current, sceneKey: sceneKeyRef.current ?? "",
+                width, height, viewportSerial };
+        };
+        type DrawSnapshot = ReturnType<typeof snapshotDraw>;
+        const assertDrawActive = (snapshot: DrawSnapshot) => {
+            assertCaptureActive();
+            if (document.hidden) {
+                throw new Error("WebGL cloud draw canceled: presentation unavailable while hidden.");
+            }
+            if (snapshot.viewportSerial !== viewportSerial) {
+                throw new Error("WebGL cloud draw canceled: viewport resized.");
+            }
+        };
+        const bindDraw = (
+            { current, width, height }: DrawSnapshot,
+            outputMode: number,
+            framebuffer: WebGLFramebuffer,
+            offlineSample: readonly [number, number, number],
+        ) => {
             gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
             gl.viewport(0, 0, width, height);
             gl.disable(gl.BLEND);
@@ -874,16 +896,15 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             gl.enableVertexAttribArray(position);
             gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
             gl.uniform2f(uniform("u_resolution"), width, height);
+            const camera = resolveSkyCamera(current);
             const cameraYaw = cameraYawRadiansFromViewAzimuth(
-                current.viewAzimuth,
+                camera.viewAzimuth,
             );
             gl.uniform4f(
                 uniform("u_camera"),
-                (current.horizontalFov * Math.PI) / 180,
-                (current.viewElevation * Math.PI) / 180,
-                current.cameraProjection
-                    ? (current.verticalFov * Math.PI) / 180
-                    : 0,
+                (camera.horizontalFov * Math.PI) / 180,
+                (camera.viewElevation * Math.PI) / 180,
+                (camera.verticalFov * Math.PI) / 180,
                 cameraYaw,
             );
             gl.uniform2f(uniform("u_sun"), current.sun[0], current.sun[1]);
@@ -1021,34 +1042,18 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             colorUniforms.forEach(([uniformName, paletteKey]) => {
                 gl.uniform3fv(uniform(uniformName), parseColor(current.palette[paletteKey]));
             });
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
         };
 
-        // Only explicit capture requests fence a live draw. Ordinary scene
-        // updates never synchronously wait for the GPU or poll a fence.
-        captureCanvas.__elementsWebGlFrameComplete = async () => {
-            let fence: WebGLSync | null = null;
+        const waitForGpu = async (snapshot: DrawSnapshot) => {
+            assertDrawActive(snapshot);
+            const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+            if (!fence) throw new Error("WebGL completion fence unavailable");
+            fences.add(fence);
             try {
-                if (disposed || gl.isContextLost()) {
-                    throw new Error("WebGL context lost or disposed");
-                }
-                if (!cloudNoise && packCloudLayers(sceneRef.current.cloudScene,
-                    sceneRef.current.cloudTime + sceneRef.current.cloudTimeOffset).active) {
-                    throw new Error("WebGL cloud noise unavailable");
-                }
-                draw(0, null, undefined, undefined, [0, 0, 0.5], true);
-                const serial = drawSerial;
-                const completedSceneKey = sceneKeyRef.current ?? "";
-                const width = canvas.width;
-                const height = canvas.height;
-                fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-                if (!fence) throw new Error("WebGL completion fence unavailable");
                 gl.flush();
                 const deadline = performance.now() + 15_000;
                 while (true) {
-                    if (disposed || gl.isContextLost()) {
-                        throw new Error("WebGL context lost or disposed");
-                    }
+                    assertDrawActive(snapshot);
                     const status = gl.clientWaitSync(fence, 0, 0);
                     if (status === gl.WAIT_FAILED) {
                         throw new Error("WebGL completion fence failed");
@@ -1060,23 +1065,222 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     }
                     await new Promise<void>((resolve) => setTimeout(resolve, 16));
                 }
+            } finally {
+                if (fences.delete(fence)) gl.deleteSync(fence);
+            }
+        };
+        const yieldFrame = () => new Promise<void>((resolve, reject) => {
+            assertCaptureActive();
+            const finish = (error?: Error) => {
+                cancelAnimationFrame(frame);
+                clearTimeout(timeout);
+                captureAbort.signal.removeEventListener("abort", cancel);
+                document.removeEventListener("visibilitychange", visibility);
+                if (error) reject(error);
+                else resolve();
+            };
+            const cancel = () => finish(new Error(
+                "WebGL cloud plate capture canceled: renderer disposed or context lost."));
+            const visibility = () => {
+                if (document.hidden) finish(new Error(
+                    "WebGL cloud draw canceled: presentation unavailable while hidden."));
+            };
+            const frame = requestAnimationFrame(() => finish());
+            // This timeout only cancels; it must not submit more tiles without
+            // a real presentation boundary when a browser suspends rAF.
+            const timeout = setTimeout(() => finish(new Error(
+                "WebGL cloud draw canceled: presentation boundary timed out.")), 5_000);
+            captureAbort.signal.addEventListener("abort", cancel, { once: true });
+            document.addEventListener("visibilitychange", visibility);
+            visibility();
+        });
+
+        // Metal can discard a costly command buffer while ANGLE still signals
+        // its fence and reports NO_ERROR. Bound rasterized geometry (not only
+        // the scissor) without changing the global UVs, resolution or samples.
+        // A presentation boundary between submissions keeps these small draws
+        // separate. The retained target is presented only after full coverage.
+        const drawTiles = async (
+            snapshot: DrawSnapshot,
+            framebuffer: WebGLFramebuffer,
+            outputMode: number,
+            offlineSample: readonly [number, number, number] = [0, 0, 0.5],
+        ) => {
+            assertDrawActive(snapshot);
+            bindDraw(snapshot, outputMode, framebuffer, offlineSample);
+            gl.disable(gl.SCISSOR_TEST);
+            gl.clearBufferfv(gl.COLOR, 0, new Float32Array(
+                [0, 0, 0, outputMode === 0 ? 0 : -1]));
+            const { width, height } = snapshot;
+            const tileSize = 16;
+            for (let y = 0; y < height; y += tileSize) {
+                for (let x = 0; x < width; x += tileSize) {
+                    assertDrawActive(snapshot);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                    const left = x / width * 2 - 1;
+                    const right = Math.min(width, x + tileSize) / width * 2 - 1;
+                    const bottom = y / height * 2 - 1;
+                    const top = Math.min(height, y + tileSize) / height * 2 - 1;
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                        left, bottom, right, bottom, left, top,
+                        left, top, right, bottom, right, top,
+                    ]), gl.STATIC_DRAW);
+                    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                    await waitForGpu(snapshot);
+                    assertDrawActive(snapshot);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                    await yieldFrame();
+                }
+            }
+            assertDrawActive(snapshot);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        };
+
+        const assertCurrentScene = (snapshot: DrawSnapshot) => {
+            if (snapshot.current !== sceneRef.current ||
+                snapshot.sceneKey !== (sceneKeyRef.current ?? "")) {
+                throw new Error("WebGL frame capture canceled: scene was superseded.");
+            }
+        };
+        const renderLive = async (snapshot: DrawSnapshot, exactScene = false) => {
+            assertDrawActive(snapshot);
+            if (!cloudNoise && packCloudLayers(snapshot.current.cloudScene,
+                snapshot.current.cloudTime + snapshot.current.cloudTimeOffset).active) {
+                throw new Error("WebGL cloud noise unavailable");
+            }
+            const framebuffer = gl.createFramebuffer();
+            const color = gl.createRenderbuffer();
+            if (!framebuffer || !color) {
+                if (framebuffer) gl.deleteFramebuffer(framebuffer);
+                if (color) gl.deleteRenderbuffer(color);
+                throw new Error("Unable to allocate WebGL retained frame.");
+            }
+            const release = () => {
+                if (!releases.delete(release)) return;
+                gl.deleteFramebuffer(framebuffer);
+                gl.deleteRenderbuffer(color);
+            };
+            releases.add(release);
+            const { width, height } = snapshot;
+            try {
+                gl.bindRenderbuffer(gl.RENDERBUFFER, color);
+                gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA8, width, height);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                    gl.RENDERBUFFER, color);
+                if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+                    throw new Error("WebGL retained frame is incomplete.");
+                }
+                diagnostic.cloudWebglFrameState = "submitted";
+                diagnostic.cloudWebglFrameFailure = "none";
+                await drawTiles(snapshot, framebuffer, 0);
+                assertDrawActive(snapshot);
+                const pixels = new Uint8Array(width * height * 4);
+                gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
                 const error = gl.getError();
                 diagnostic.cloudWebglError = String(error);
-                if (error !== gl.NO_ERROR) {
-                    throw new Error(`WebGL draw failed with ${error}`);
+                if (error !== gl.NO_ERROR) throw new Error(`WebGL draw failed with ${error}`);
+                let missing = 0;
+                for (let offset = 3; offset < pixels.length; offset += 4) {
+                    if (pixels[offset] !== 255) missing += 1;
                 }
+                if (missing) throw new Error(`WebGL frame incomplete: ${missing} pixels were not rendered.`);
+                assertDrawActive(snapshot);
+                // A live job may finish its frozen image before the coalesced
+                // next state. A capture-only job has no such display ownership:
+                // never replace the last good frame with a superseded request.
+                if (exactScene) assertCurrentScene(snapshot);
+                // Resizing earlier would erase the last complete visible frame.
+                if (canvas.width !== width || canvas.height !== height) {
+                    canvas.width = width;
+                    canvas.height = height;
+                }
+                gl.bindFramebuffer(gl.READ_FRAMEBUFFER, framebuffer);
+                gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+                gl.blitFramebuffer(0, 0, width, height, 0, 0, width, height,
+                    gl.COLOR_BUFFER_BIT, gl.NEAREST);
+                await waitForGpu(snapshot);
+                assertDrawActive(snapshot);
+                drawSerial += 1;
+                return { snapshot, serial: drawSerial };
+            } finally {
+                release();
+            }
+        };
+        type LiveFrame = Awaited<ReturnType<typeof renderLive>>;
+        let lastFrame: LiveFrame | null = null;
+        let activeLive: { snapshot: DrawSnapshot; promise: Promise<LiveFrame> } | null = null;
+        let pendingLive: DrawSnapshot | null = null;
+        const sameDraw = (a: DrawSnapshot, b: DrawSnapshot) =>
+            a.current === b.current && a.sceneKey === b.sceneKey &&
+            a.viewportSerial === b.viewportSerial;
+        const ownsReadiness = (snapshot: DrawSnapshot) => !disposed &&
+            !document.hidden &&
+            snapshot.current === sceneRef.current &&
+            snapshot.sceneKey === (sceneKeyRef.current ?? "") &&
+            snapshot.viewportSerial === viewportSerial;
+        const renderOrReuse = async (snapshot: DrawSnapshot, exactScene = false) => {
+            assertDrawActive(snapshot);
+            // Drop a queued state that changed before any of its work began.
+            // This does not interrupt a running live frame on every clock tick.
+            assertCurrentScene(snapshot);
+            // Captures and coalesced live updates share one queue. Recheck at
+            // execution time: an earlier queued capture may have rendered this
+            // exact immutable snapshot while this request was waiting.
+            if (lastFrame && sameDraw(lastFrame.snapshot, snapshot)) return lastFrame;
+            const frame = await renderLive(snapshot, exactScene);
+            lastFrame = frame;
+            return frame;
+        };
+        const requestLive = () => {
+            if (disposed || gl.isContextLost() || document.hidden) return;
+            const snapshot = snapshotDraw();
+            if (!lastFrame || !sameDraw(lastFrame.snapshot, snapshot)) {
+                diagnostic.cloudWebglFrameState = "submitted";
+                diagnostic.cloudWebglFrameFailure = "none";
+            }
+            if (activeLive) {
+                // Let this frozen frame finish; retain only the newest next
+                // state, so a live clock cannot starve a slow complete frame.
+                pendingLive = sameDraw(activeLive.snapshot, snapshot) ? null : snapshot;
+                return;
+            }
+            if (lastFrame && sameDraw(lastFrame.snapshot, snapshot)) return;
+            const promise = enqueue(() => renderOrReuse(snapshot));
+            activeLive = { snapshot, promise };
+            void promise.then((frame) => { lastFrame = frame; }).catch((error) => {
+                if (ownsReadiness(snapshot)) failFrame(String(error));
+            }).finally(() => {
+                activeLive = null;
+                if (pendingLive) {
+                    pendingLive = null;
+                    requestLive();
+                }
+            });
+        };
+
+        captureCanvas.__elementsWebGlFrameComplete = async () => {
+            const snapshot = snapshotDraw();
+            try {
+                assertDrawActive(snapshot);
+                const frame = activeLive && sameDraw(activeLive.snapshot, snapshot)
+                    ? await activeLive.promise
+                    : lastFrame && sameDraw(lastFrame.snapshot, snapshot)
+                        ? lastFrame
+                        : await enqueue(() => renderOrReuse(snapshot, true));
+                assertDrawActive(snapshot);
+                lastFrame = frame;
                 const shaderDigest = await crypto.subtle.digest("SHA-256",
                     new TextEncoder().encode(VERTEX_SHADER + "\0" + FRAGMENT_SHADER));
-                if (disposed || gl.isContextLost()) {
-                    throw new Error("WebGL context lost or disposed");
-                }
-                if (serial !== drawSerial || completedSceneKey !== (sceneKeyRef.current ?? "") ||
+                assertDrawActive(snapshot);
+                const { width, height } = snapshot;
+                if (!ownsReadiness(snapshot) || frame.serial !== drawSerial ||
                     width !== canvas.width || height !== canvas.height) {
                     // A newer draw owns the canvas; the caller may request a
                     // fresh fence, but must never accept this stale completion.
                     return;
                 }
-                diagnostic.cloudWebglFrameSceneKey = completedSceneKey;
+                diagnostic.cloudWebglFrameSceneKey = snapshot.sceneKey;
                 diagnostic.cloudWebglShaderSourceHash = [...new Uint8Array(shaderDigest)]
                     .map((byte) => byte.toString(16).padStart(2, "0")).join("");
                 diagnostic.cloudWebglFrameWidth = String(width);
@@ -1085,21 +1289,19 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     Number(diagnostic.cloudWebglCompletedFrames) + 1);
                 diagnostic.cloudWebglFrameState = "complete";
             } catch (error) {
-                if (!disposed) failFrame(String(error));
+                if (ownsReadiness(snapshot)) failFrame(String(error));
                 throw error;
-            } finally {
-                if (fence) gl.deleteSync(fence);
             }
         };
 
-        const createCloudPlateReadback = () => {
+        const createCloudPlateReadback = (snapshot: DrawSnapshot) => {
+            assertDrawActive(snapshot);
             if (!gl.getExtension("EXT_color_buffer_float")) {
                 throw new Error(
                     "WebGL cloud plate export requires EXT_color_buffer_float.",
                 );
             }
-            const width = canvas.width;
-            const height = canvas.height;
+            const { width, height } = snapshot;
             const texture = gl.createTexture();
             const framebuffer = gl.createFramebuffer();
             if (!texture || !framebuffer) {
@@ -1111,10 +1313,11 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             const dispose = () => {
                 if (released) return;
                 released = true;
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                releases.delete(dispose);
                 gl.deleteFramebuffer(framebuffer);
                 gl.deleteTexture(texture);
             };
+            releases.add(dispose);
             try {
                 gl.bindTexture(gl.TEXTURE_2D, texture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -1147,17 +1350,17 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 const values = new Float32Array(width * height * 4);
                 return {
                     dispose,
-                    read: (
+                    read: async (
                         outputMode: 1 | 2 | 3 | 4 | 5,
                         offlineSample: readonly [number, number, number],
                     ) => {
-                        draw(
-                            outputMode,
+                        await drawTiles(
+                            snapshot,
                             framebuffer,
-                            width,
-                            height,
+                            outputMode,
                             offlineSample,
                         );
+                        assertDrawActive(snapshot);
                         gl.readPixels(
                             0,
                             0,
@@ -1173,6 +1376,11 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                                 `WebGL cloud plate readback failed with ${error}.`,
                             );
                         }
+                        for (let offset = 3; offset < values.length; offset += 4) {
+                            if (!(values[offset] >= 0)) {
+                                throw new Error("WebGL cloud plate incomplete: an output pixel was not rendered.");
+                            }
+                        }
                         return values;
                     },
                 };
@@ -1184,6 +1392,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
 
         captureCanvas.__elementsCloudPlateCapture = async (request) => {
             assertCaptureActive();
+            const snapshot = snapshotDraw();
             if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.sceneId) ||
                 !Number.isInteger(request.frame) || request.frame < 0 ||
                 !Number.isSafeInteger(request.samples ?? 1) ||
@@ -1198,8 +1407,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             }
             const endpoint = request.endpoint ??
                 "/api/cloud-plates/capture-plane";
-            const width = canvas.width;
-            const height = canvas.height;
+            const { width, height } = snapshot;
             const sampleCount = request.samples ?? 1;
             const pixelCount = width * height;
             const radianceSum = new Float64Array(pixelCount * 3);
@@ -1213,7 +1421,6 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             const meanDepthWeight = new Float64Array(pixelCount);
             const planeResults:
                 WebGlCloudPlateCaptureResult["planes"][number][] = [];
-            const readback = createCloudPlateReadback();
             try {
                 const accumulateRgb = (
                     values: Float32Array,
@@ -1227,41 +1434,44 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                         target[destination + 2] += values[source + 2];
                     }
                 };
-                for (let sampleIndex = 0;
-                    sampleIndex < sampleCount;
-                    sampleIndex += 1) {
-                    const sample = webGlOfflineSample(sampleIndex);
-                    let values = readback.read(1, sample);
-                    accumulateRgb(values, radianceSum);
-                    for (let pixel = 0; pixel < pixelCount; pixel += 1) {
-                        const source = pixel * 4;
-                        firstDepth[pixel] = Math.min(
-                            firstDepth[pixel],
-                            values[source + 3],
-                        );
+                await enqueue(async () => {
+                    const readback = createCloudPlateReadback(snapshot);
+                    try {
+                        for (let sampleIndex = 0;
+                            sampleIndex < sampleCount;
+                            sampleIndex += 1) {
+                            const sample = webGlOfflineSample(sampleIndex);
+                            let values = await readback.read(1, sample);
+                            accumulateRgb(values, radianceSum);
+                            for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+                                const source = pixel * 4;
+                                firstDepth[pixel] = Math.min(
+                                    firstDepth[pixel], values[source + 3]);
+                            }
+                            values = await readback.read(2, sample);
+                            for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+                                const source = pixel * 4;
+                                const target = pixel * 3;
+                                transmittanceSum[target] += values[source];
+                                transmittanceSum[target + 1] += values[source + 1];
+                                transmittanceSum[target + 2] += values[source + 2];
+                                const meanTransmittance = Math.max(0, Math.min(1,
+                                    (values[source] + values[source + 1] +
+                                        values[source + 2]) / 3,
+                                ));
+                                const opacity = 1 - meanTransmittance;
+                                meanDepthSum[pixel] += values[source + 3] * opacity;
+                                meanDepthWeight[pixel] += opacity;
+                            }
+                            accumulateRgb(await readback.read(3, sample), directResponseSum);
+                            accumulateRgb(await readback.read(4, sample), skyResponseSum);
+                            accumulateRgb(await readback.read(5, sample), groundResponseSum);
+                        }
+                    } finally {
+                        readback.dispose();
                     }
-                    values = readback.read(2, sample);
-                    for (let pixel = 0; pixel < pixelCount; pixel += 1) {
-                        const source = pixel * 4;
-                        const target = pixel * 3;
-                        transmittanceSum[target] += values[source];
-                        transmittanceSum[target + 1] += values[source + 1];
-                        transmittanceSum[target + 2] += values[source + 2];
-                        const meanTransmittance = Math.max(0, Math.min(1,
-                            (values[source] + values[source + 1] +
-                                values[source + 2]) / 3,
-                        ));
-                        const opacity = 1 - meanTransmittance;
-                        meanDepthSum[pixel] += values[source + 3] * opacity;
-                        meanDepthWeight[pixel] += opacity;
-                    }
-                    accumulateRgb(readback.read(3, sample), directResponseSum);
-                    accumulateRgb(readback.read(4, sample), skyResponseSum);
-                    accumulateRgb(readback.read(5, sample), groundResponseSum);
-                }
-                // Readback is synchronous. Release its GL target before any
-                // upload can yield to effect cleanup or a replacement renderer.
-                readback.dispose();
+                });
+                assertDrawActive(snapshot);
 
                 const radiance = new Float32Array(pixelCount * 4);
                 const transmittance = new Float32Array(pixelCount * 4);
@@ -1342,8 +1552,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 assertCaptureActive();
                 throw error;
             } finally {
-                readback.dispose();
-                draw();
+                requestLive();
             }
             return {
                 width, height, planes: planeResults,
@@ -1352,12 +1561,12 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
         };
         captureCanvas.dataset.cloudPlateExport = "available";
 
-        drawRef.current = () => draw();
-        draw();
-        const resizeObserver = new ResizeObserver(() => draw());
+        drawRef.current = requestLive;
+        requestLive();
+        const resizeObserver = new ResizeObserver(requestLive);
         resizeObserver.observe(canvas);
         const visibilityHandler = () => {
-            if (!document.hidden) draw();
+            if (!document.hidden) requestLive();
         };
         const contextLostHandler = () => {
             captureAbort.abort();
@@ -1378,6 +1587,9 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             resizeObserver.disconnect();
             document.removeEventListener("visibilitychange", visibilityHandler);
             canvas.removeEventListener("webglcontextlost", contextLostHandler);
+            for (const fence of fences) gl.deleteSync(fence);
+            fences.clear();
+            for (const release of releases) release();
             cloudNoise?.dispose();
             cloudLighting.dispose();
             gl.deleteBuffer(buffer);

@@ -131,11 +131,12 @@ test("AtmosphereCanvas integrates the volume at the physical camera", () => {
     assert.match(atmosphere, /\$\{CLOUD_COMPOSITE\}/);
     assert.match(atmosphere, /createCloudNoise\(gl\)/);
     assert.match(atmosphere, /packCloudLayers\(/);
-    assert.match(atmosphere, /current\.horizontalFov/);
-    assert.match(atmosphere, /current\.viewElevation/);
-    assert.match(atmosphere, /current\.verticalFov/);
+    assert.match(atmosphere, /const camera = resolveSkyCamera\(current\)/);
+    assert.match(atmosphere, /camera\.horizontalFov/);
+    assert.match(atmosphere, /camera\.viewElevation/);
+    assert.match(atmosphere, /camera\.verticalFov/);
     assert.match(atmosphere,
-        /cameraYawRadiansFromViewAzimuth\(\s*current\.viewAzimuth,?\s*\)/);
+        /cameraYawRadiansFromViewAzimuth\(\s*camera\.viewAzimuth,?\s*\)/);
     assert.match(atmosphere, /uniform vec3 u_sun_direction/);
     assert.match(atmosphere, /uniform vec3 u_moon_direction/);
     assert.match(atmosphere,

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import ts from "typescript";
 import {
     atmosphereTransmittanceToSpace,
     createPhysicalAtmosphereState,
@@ -14,6 +16,7 @@ import {
 } from "../components/backgrounds/sky/webgl-cloud-lighting.ts";
 import {
     CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION,
+    cloudPlateManifestSupportsPhysicalPlayback,
     cloudPlateOperatorSupportsLiveRelighting,
     validateCloudPlateAssetManifest,
 } from "../components/backgrounds/sky/cloud-plate-scene.ts";
@@ -219,6 +222,72 @@ test("atmosphere-baked plate responses cannot use legacy live source weights", (
     assert.ok(validateCloudPlateAssetManifest({
         ...manifestFor(fixedOperator), backend: "native-metal",
     }).some((failure) => failure.startsWith("invalid-response-convention:")));
+});
+
+test("physical playback refuses fixed WebGL energy in any frame without changing legacy acceptance", () => {
+    assert.equal(cloudPlateManifestSupportsPhysicalPlayback(manifestFor(legacyOperator)), true);
+    assert.equal(cloudPlateManifestSupportsPhysicalPlayback(manifestFor(fixedOperator)), false);
+    const mixed = manifestFor(legacyOperator);
+    mixed.frames.push({ ...mixed.frames[0], index: 1, operators: [fixedOperator] });
+    assert.equal(cloudPlateManifestSupportsPhysicalPlayback(mixed), false);
+    assert.equal(cloudPlateManifestSupportsPhysicalPlayback(manifestFor({
+        ...legacyOperator, responseConvention: "unknown",
+    })), false);
+});
+
+test("actual physical manifest loader rejects incompatible energy before loading planes and clears old history", async () => {
+    const source = readFileSync(new URL(
+        "../components/backgrounds/sky/sky-renderer-canvas.tsx", import.meta.url), "utf8");
+    const start = source.indexOf("const requestCloudPlateManifest = async (");
+    const end = source.indexOf("\n            let intervalLowMiddle", start);
+    assert.ok(start >= 0 && end > start);
+    const loader = ts.transpileModule(source.slice(start, end), {
+        compilerOptions: { target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const fixture = (manifest) => {
+        const canvas = { dataset: { cloudPlateScene: "old", cloudPlateSceneHash: "old", cloudPlateExtent: "old" } };
+        const loads = [];
+        const harness = runInNewContext(`(() => {
+            let disposed = false;
+            let cloudPlateRequestSerial = 0;
+            let cloudPlatePlaybackState = { old: true };
+            let cloudPlatePlaybackActive = true;
+            let cloudPlateRelightable = true;
+            let cloudPlateBlend = 0.7;
+            let cloudTargetsNeedClear = false;
+            let historyValid = true;
+            let temporalNeedsClear = false;
+            ${loader}
+            return { request: requestCloudPlateManifest, state: () => ({
+                cloudPlatePlaybackState, cloudPlatePlaybackActive,
+                cloudPlateRelightable, cloudPlateBlend, cloudTargetsNeedClear,
+                historyValid, temporalNeedsClear,
+            }) };
+        })()`, {
+            canvas, URL, Date,
+            window: { location: { href: "http://127.0.0.1:3000/" } },
+            console: { warn() {} },
+            fetch: async () => ({ ok: true, json: async () => manifest }),
+            validateCloudPlateAssetManifest,
+            cloudPlateManifestSupportsPhysicalPlayback,
+            loadCloudPlatePair: async (...args) => loads.push(args),
+        });
+        return { canvas, loads, ...harness };
+    };
+    const rejected = fixture(manifestFor(fixedOperator));
+    await rejected.request("/fixed-plate.json", 10);
+    assert.equal(rejected.loads.length, 0);
+    assert.equal(rejected.canvas.dataset.cloudPlatePlayback, "incompatible-radiance-domain");
+    assert.equal(rejected.canvas.dataset.cloudPlateScene, undefined);
+    assert.deepEqual({ ...rejected.state() }, {
+        cloudPlatePlaybackState: null, cloudPlatePlaybackActive: false,
+        cloudPlateRelightable: false, cloudPlateBlend: 0,
+        cloudTargetsNeedClear: true, historyValid: false, temporalNeedsClear: true,
+    });
+    const legacy = fixture(manifestFor(legacyOperator));
+    await legacy.request("/legacy-plate.json", 10);
+    assert.equal(legacy.loads.length, 1);
+    assert.equal(legacy.state().cloudPlatePlaybackState.manifest.frames[0].operators[0], legacyOperator);
 });
 
 test("new WebGL publication requires the exporter's exact response convention", () => {

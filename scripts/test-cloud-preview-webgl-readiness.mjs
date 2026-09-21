@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { assessWebGlPreviewFrame } from "./lib/cloud-preview-webgl-readiness.mjs";
 
@@ -90,4 +91,23 @@ test("native capture refuses software and non-Apple WebGL even after a successfu
     assert.equal(assessWebGlPreviewFrame({
         ...frame, glVendor: "NVIDIA", glRenderer: "NVIDIA OpenGL",
     }, { ...request, requireAppleMetal: false }).ready, true);
+});
+
+test("batched reference frames use the capture deadline while controller probes stay short", async () => {
+    const script = readFileSync(new URL("./capture-cloud-preview.sh", import.meta.url), "utf8");
+    const helper = script.match(/const boundedWebGlStep = async \([^]*?\n            \};/)?.[0];
+    assert.ok(helper);
+    const timeouts = [];
+    const remaining = () => 145000;
+    const run = new Function("page", "controllerStepTimeoutMs", "remaining",
+        `${helper}; return boundedWebGlStep;`)(
+        { waitForTimeout: (milliseconds) => {
+            timeouts.push(milliseconds);
+            return new Promise(() => {});
+        } }, 30000, remaining,
+    );
+    assert.equal(await run(Promise.resolve("probe"), "frame-evidence"), "probe");
+    assert.equal(await run(Promise.resolve("complete"), "frame-completion", remaining()), "complete");
+    assert.deepEqual(timeouts, [30000, 145000]);
+    assert.match(script, /'frame-completion', remaining\(\)\)/);
 });

@@ -195,6 +195,19 @@ export interface CloudPlateAssetManifest {
     frames: readonly CloudPlateAssetFrame[];
 }
 
+/**
+ * New fixed WebGL plates contain compatibility-domain Moon/palette energy,
+ * not physical irradiance. Physical adaptation would amplify that energy
+ * again. Preserve legacy handling, but refuse these new operators until a
+ * same-domain player or calibrated source-separated export is available.
+ * Call only after manifest validation; unknown future conventions fail closed.
+ */
+export const cloudPlateManifestSupportsPhysicalPlayback = (
+    manifest: CloudPlateAssetManifest,
+) => manifest.frames.every((frame) => frame.operators.every(
+    (operator) => operator.responseConvention === undefined,
+));
+
 const finitePositive = (value: number) => Number.isFinite(value) && value > 0;
 const stableId = (value: string) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 const finiteVector3 = (value: readonly number[]) => value.length === 3 &&

@@ -26,6 +26,10 @@ import {
 import type { SkyRadianceScene } from "./atmosphere-canvas";
 import type { PhysicalAtmosphereState } from "./physical-atmosphere";
 import { webGlCloudMoonSourceIrradiance } from "./webgl-cloud-lighting";
+import {
+    projectCameraLocalDirectionToUv,
+    resolveSkyCamera,
+} from "./camera-contract";
 import type { ProductionWeatherSceneAuthoring } from "./weather-scene";
 import {
     createDailyCloudScene,
@@ -1634,15 +1638,18 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
                 ));
     const motionSpeed = preview?.motionSpeed ?? 1;
     const motionAmount = preview?.motionAmount ?? 1;
-    const horizontalFov = clamp(preview?.horizontalFov ?? 241.2, 2, 300);
-    const cameraProjection = preview?.viewAzimuth !== undefined;
-    const viewElevation = clamp(preview?.viewElevation ?? 24, -10, 90);
-    const verticalFov = clamp(preview?.verticalFov ?? 48, 2, 160);
+    const camera = resolveSkyCamera(preview);
+    const {
+        horizontalFov,
+        viewElevation,
+        verticalFov,
+        viewAzimuth: rendererViewAzimuth,
+    } = camera;
+    const cameraProjection = true;
     const sunCompassAzimuth =
         ((sun.azimuth * 180) / Math.PI + 540) % 360;
     const moonCompassAzimuth =
         ((moon.azimuth * 180) / Math.PI + 540) % 360;
-    const rendererViewAzimuth = preview?.viewAzimuth ?? 180;
     const localDirection = (
         compassAzimuth: number,
         elevationDegrees: number,
@@ -1663,16 +1670,10 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     };
     const sunDirection = localDirection(sunCompassAzimuth, visualSolarAltitude);
     const moonDirection = localDirection(moonCompassAzimuth, moonAltitude);
-    const relativeSunAzimuth = preview?.viewAzimuth === undefined
-        ? undefined
-        : ((sunCompassAzimuth - preview.viewAzimuth + 540) % 360) - 180;
-    const projectedSunX = relativeSunAzimuth === undefined
-        ? 50 + Math.sin(sun.azimuth) * 47
-        : 50 + (relativeSunAzimuth / horizontalFov) * 100;
+    const projectedSun = projectCameraLocalDirectionToUv(sunDirection, camera);
+    const projectedSunX = (projectedSun?.[0] ?? -2) * 100;
     const sunX = clamp(projectedSunX, 2, 98);
-    const projectedSunY = cameraProjection
-        ? 50 - ((visualSolarAltitude - viewElevation) / verticalFov) * 100
-        : 78 - Math.sin((visualSolarAltitude * Math.PI) / 180) * 69;
+    const projectedSunY = (projectedSun?.[1] ?? -2) * 100;
     const sunY = clamp(projectedSunY, 8, 84);
     const horizonGlow = clamp((18 - Math.abs(visualSolarAltitude)) / 18);
     const bloomStyle =
@@ -1816,11 +1817,10 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
         date,
         latitude,
         longitude,
-        viewAzimuth: preview?.viewAzimuth,
-        horizontalFov:
-            preview?.viewAzimuth === undefined ? undefined : horizontalFov,
-        viewElevation: cameraProjection ? viewElevation : undefined,
-        verticalFov: cameraProjection ? verticalFov : undefined,
+        viewAzimuth: rendererViewAzimuth,
+        horizontalFov,
+        viewElevation,
+        verticalFov,
         physicalMoonScale: preview?.physicalMoonScale,
         haze: clamp(
             intensity.haze *
@@ -1936,18 +1936,11 @@ const calculateSky = (date: Date, preview?: SkyPreviewOptions): SkyVisual => {
     // scene interval rather than resetting, so shape changes stay gradual.
     const cloudTime = date.getTime() / 1000;
 
-    const shaderSunY = cameraProjection
-        ? projectedSunY / 100
-        : clamp(
-              0.78 - Math.sin((visualSolarAltitude * Math.PI) / 180) * 0.69,
-              0.03,
-              1.12,
-          );
     return {
         palette,
         radiance: {
             palette,
-            sun: [projectedSunX / 100, shaderSunY],
+            sun: [projectedSunX / 100, projectedSunY / 100],
             // Every atmospheric lunar term must use the exact same projection
             // as the textured disc. The former sine approximation could put
             // the aureole far beside the Moon at large azimuths.
@@ -2283,12 +2276,12 @@ export function Sky({
                         temporal: preview?.temporalClouds,
                         cloudComposition:
                             preview?.cloudComposition ??
-                            (visual.radiance.cameraProjection
+                            (preview?.viewAzimuth !== undefined
                                 ? "physical"
                                 : undefined),
                         cloudPerspective:
                             preview?.cloudPerspective ??
-                            (visual.radiance.cameraProjection
+                            (preview?.viewAzimuth !== undefined
                                 ? "natural"
                                 : undefined),
                         cloudEditorialRegime:

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
+import * as cameraContract from "../components/backgrounds/sky/camera-contract.ts";
 
 const source = readFileSync(new URL(
     "../components/backgrounds/sky/celestial-canvas.tsx", import.meta.url,
@@ -98,6 +99,7 @@ function fixture() {
         react,
         "react/jsx-runtime": { jsx: (_, props) => { props.ref.current = canvas; } },
         "./sky.module.css": { default: {} },
+        "./camera-contract": cameraContract,
     };
     const module = { exports: {} };
     new Function("exports", "require", "Image", "window", "document", "ResizeObserver", javascript)(

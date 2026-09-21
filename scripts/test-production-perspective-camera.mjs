@@ -67,7 +67,7 @@ const assertProductionCamera = (original) => {
 
 test("the production signature includes one canonical 55-degree heading", () => {
     assert.equal(productionPerspectiveCameraSignature(DEFAULT_PRODUCTION_PERSPECTIVE_ID),
-        "55|27|64|43.52|0.02|natural|auto");
+        "rectilinear-v1|55|27|64|43.52|0.02|natural|auto");
     for (const nativePerspective of matrix.WEATHER_QUALIFICATION_PERSPECTIVES) {
         assert.equal(resolveProductionPerspectiveCamera(nativePerspective.id).viewAzimuth, 55);
         assert.equal(productionPerspectiveCameraSignature(nativePerspective.id),

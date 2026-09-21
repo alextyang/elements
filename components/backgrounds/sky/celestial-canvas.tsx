@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import type { CelestialScene } from "./astronomy";
+import { skyCameraAngularRadiusPixels } from "./camera-contract";
 import styles from "./sky.module.css";
 
 const STAR_VERTEX_SHADER = `#version 300 es
@@ -757,8 +758,12 @@ export function CelestialCanvas({ scene, paused = false }: CelestialCanvasProps)
                 const radiusCss = moon.physicalScale
                     ? Math.max(
                           0.55,
-                          bounds.width * (0.2595 * moon.scale) /
-                              Math.max(0.5, moon.horizontalFov),
+                          skyCameraAngularRadiusPixels(
+                              moon.radianceContract.angularRadiusRadians,
+                              bounds.width,
+                              current.camera,
+                              moon.direction,
+                          ),
                       )
                     : Math.min(
                           22,
