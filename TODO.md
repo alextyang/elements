@@ -50,10 +50,24 @@ Statuses below are pending rendered verification; existing test passes do not ma
 
 The user reports radial/perspective distortion near the top and wants a flatter sky presentation, while retaining nearer/larger depth. Keep one production projection, not multiple optimized views.
 
-1. [ ] Audit actual default WebGL rays separately from fixed benchmark rays and match all celestial overlays. Initial source evidence: no-preview WebGL still spans 241.2° horizontally and reaches 91.8° above the horizon, whereas the benchmark uses 64° × 43.52°; the same production-view contract is not applied everywhere.
-2. [ ] Remove panoramic/zenith convergence from the production sky presentation with one coherent projection contract. Preserve depth scaling; do not conceal density-field artifacts with a postprocess warp.
-3. [ ] Verify CPU projection, WebGL rays, Sun/Moon/stars, cloud placement and any physical-WebGPU compatibility together. Add forward/inverse and straight-feature projection checks.
-4. [ ] Capture before/after at unchanged species/lighting/physical scales, then inspect the upper frame and near/far cloud sizes. Current frozen GPU-hang comparison must finish before changing its camera contract.
+1. [x] Audit actual default WebGL rays separately from fixed benchmark rays and match celestial projections. Old default was 241.2° wide and reached 91.8° elevation; identical benchmark camera numbers still differed by 10.54° at a top corner between angular WebGL and rectilinear WebGPU.
+2. [x] Replace the panorama with one shared rectilinear production camera, preserving inverse-depth size and explicit diagnostic overrides. No postprocess warp or density change in this phase.
+3. [x] Verify CPU inverse projection, actual extracted WebGL rays, Sun/Moon/star centers, inverse-depth sizing and absence of zenith folding; 42 focused tests and TypeScript pass. Moon sprite remains a circular approximation of an off-axis conic.
+4. [x] Capture unchanged Cc species/light/scale after projection and inspect upper-frame geometry and near/far sizes. Native Metal frame `/tmp/elements-cloud-depth-b2sM2f/before.png` is complete, with zero console/page errors; camera signature `rectilinear-v1|55|27|64|43.52|0.02|natural|auto`. User confirms better perspective but rejects shallow tile-like morphology. This is not photographic acceptance.
+
+## CLOUDLET-VOLUME — current user steering
+
+The flatter camera exposes weak three-dimensional depth and a visibly textured/tiled underlying fill. Fix the material density, not the camera or grading. Cc is naturally thin and largely unshaded; Ac/Sc must demonstrate their stronger real depth without changing species identity.
+
+**Paused at the user's request.** No density rewrite has started. Next implementation should replace `webgl-cloudlet-field.ts`'s altitude-independent cellular mask multiplied by a slab with a continuous condensation density field: vary the threshold through packet height, contract cross-sections toward both faces and add modest 3D boundary variation. Keep the shared physical density on view/light paths, existing optical targets and single production camera. Add nested-cross-section and curved-underside tests alongside existing bounds/scale checks.
+
+Measured benchmark packet/core depths: Cc 77/58.03 m, Ac 525/367.96 m, Sc 720/466.65 m. Cc's `coarse=0` disables both lower/top relief; remaining 3D density variation is at most 3.7152%. Repeated cellular frequencies reinforce the printed appearance, but an actual texture-wrap seam has not been established. Do not label this diagnosis a completed fix.
+
+1. [x] Preserve a fixed-camera baseline and audit the active Cc/Ac/Sc field, noise frequencies, packet thickness and light paths.
+2. [ ] Replace the planar threshold/extruded-cutout appearance with connected, height-varying condensate and rounded optical boundaries; remove visible repeated texture motifs.
+3. [ ] Verify physical scale, vertical-aspect sensitivity, open/closed-cell behavior, continuity, material bounds and absence of repeating horizontal fill numerically.
+4. [ ] Compare native-GPU Cc and Ac/Sc images at unchanged camera/light; review genuine volume, depth overlap, soft edges and self-shadowing. Do not use false dark shading to make Cc appear more dimensional.
+5. [ ] Validate integrated tests, record remaining visual gaps, commit and push the complete history.
 
 ## EVIDENCE-LOG
 
@@ -81,6 +95,16 @@ The user reports radial/perspective distortion near the top and wants a flatter 
 - Plate/runtime/lighting/lifecycle rerun: 72/73 pass; the sole failure remains inherited Cc castellanus atlas turret-line anatomy. No test thresholds changed.
 - Fresh full-suite rerun after the latest ice refinement and standalone wave tests: **968 tests, 954 pass, 14 fail**, zero skipped/cancelled, 50.79 seconds. All 14 match the inherited ledger below; this is a new measured total, not a reconciliation.
 - Standalone finite lenticularis/volutus module and 10 numerical tests are complete for species 24/9/28/27/14, with one texture lookup and no population loops. It is deliberately not yet imported by production: placement, recipe-count calibration, GPU compilation and visual review remain pending. Only its documented nine controls are implemented.
+- Full existing branch history pushed to GitHub through `11facb4`, including integrated-field checkpoint `77fbf09`, roadmap `d904efa` and the separate wave prototype. This is a progress checkpoint, not photographic acceptance. Subsequent batching/projection/safety edits require a new verified commit and push.
+- Two frozen-source 16×16 actual-geometry submissions with presentation yields produced intact 800×500 Cc frames at 54.80/54.91 seconds; repeated readback has zero untouched canary or dark pixels and alpha 1 everywhere, with no Metal errors. Larger batches still fail. Production async lifecycle integration and same-source after-proof remain in progress.
+- Projection audit measured a 10.54° top-corner ray discrepancy between current WebGL angular mapping and WebGPU rectilinear mapping despite identical camera numbers. The chosen fix shares rectilinear forward/inverse projection across the single production sky and celestial centers, preserving normal inverse-depth size while removing panoramic bending. Default WebGL's zenith crossing is at 1.298% of image height; remove that legacy path from production.
+- Production bounded GPU submission now has an uninstrumented native-Metal after-proof (`/tmp/elements-webgl-submission-m4M1B5/after.png`): complete Cc image, no missing/dark raster tiles, zero console/page errors and the same shader hash as the frozen before image. Mean RGB8 difference from the intact before is 0.00558/255. Final lifecycle review passes 16/16, including queued and in-flight B→restored A, resize/readiness ownership and hidden-frame cancellation. No quality budget reduction.
+- Shared rectilinear camera integration passes 42 focused tests, including actual GLSL ray evaluation. The first integrated native frame is `/tmp/elements-cloud-depth-b2sM2f/before.png`; shader hash `9573f9a2f55e9fd7a6563dcb69baf7cea5583a27289363569b9eaf8ebf7f08d3`. Projection improved; torn white flakes and planar texture remain unaccepted.
+- New fixed-lighting WebGL plate manifests are rejected before plane loading by the physical WebGPU player, with old radiance/history cleared. Twelve lighting tests pass, including actual manifest-loader execution. Legacy untagged physical playback is preserved; calibrated or same-domain WebGL playback and automatic recapture are still open.
+- Pause checkpoint: the Ac fixed-camera baseline `/tmp/elements-cloud-depth-b2sM2f/ac-before.png` also completes on native Metal with zero page/console errors and no missing raster tiles. Visual review confirms oversized, smooth, flat-bottomed cellular forms; no new cloudlet density edits were started. Cc/Ac shape, depth and pattern remain explicitly unaccepted.
+- Fresh integrated full suite: **992 tests, 977 pass, 15 fail**, zero skipped/cancelled; TypeScript passes. Fourteen failures match the inherited ledger; the fifteenth was a stale source assertion requiring direct `current.*` camera fields instead of `resolveSkyCamera(current)`. Updated that contract without weakening ray/projection checks; final focused camera/rendering/lighting/lifecycle/readiness rerun is **54/54 passed**. This focused rerun is not represented as a new whole-suite result. Full logs: `/tmp/elements-integrated-regression-fWYMN7/`.
+- Browser QA at pause: repository Playwright native-Metal fallback (Browser plugin unavailable), `http://127.0.0.1:3000/cloud-photographs`, 800×500. Cc and Ac routes have correct identity, meaningful complete frames, no framework overlay, no console/page errors, and the same production camera. No new interactive morphology controls or mobile viewport were tested in this checkpoint; earlier environment-navigation evidence remains separate.
+- Implementation checkpoint `ec19337` records bounded frame publication, shared flat-sky projection, physical plate-domain rejection and their regressions. Root `AGENTS.md` and this roadmap preserve the user-requested stopping point; resume with CLOUDLET-VOLUME, not more camera tuning. No species is newly photographically accepted.
 
 #### CONTROL-COVERAGE — verified code gaps, not accepted capabilities
 
@@ -97,7 +121,7 @@ Numeric/source tests establish control wiring and bounds only; inspect actual fi
 
 #### PLATE-RADIOMETRY — integration blocker
 
-1. [ ] Refuse the new fixed-lighting WebGL response convention in the physical WebGPU compositor until same-domain playback or a physically calibrated export exists. The compatibility WebGL full-Moon source is 0.95, versus physical lunar irradiance around 7.68e-6; physical night adaptation can therefore clip captured compatibility-domain cloud radiance to white. A single scalar cannot independently correct already-combined Sun, Moon and palette ambient terms. Preserve legacy playback contracts separately.
+1. [x] Refuse the new fixed-lighting WebGL response convention in the physical WebGPU compositor until same-domain playback or a physically calibrated export exists. The compatibility WebGL full-Moon source is 0.95, versus physical lunar irradiance around 7.68e-6; physical night adaptation can therefore clip captured compatibility-domain cloud radiance to white. A single scalar cannot independently correct already-combined Sun, Moon and palette ambient terms. Legacy playback contracts are preserved separately; actual loader rejection and old-history clearing are tested.
 2. [ ] Store a deterministic captured-lighting/medium fingerprint and reject stale fixed-lighting frames when lighting changes. Current URL-only playback invalidation can retain daylight clouds at night even if radiometry is addressed.
 3. [ ] Implement same-domain WebGL plate compositing or source-separated physically calibrated transport, then test day→twilight→night against the live renderer.
 4. [ ] Wire bounded local recapture and atomic completed-frame publication for changed lighting/medium; retain only frames whose compatibility is established. Do not silently relight baked response bases.
@@ -111,7 +135,7 @@ Numeric/source tests establish control wiring and bounds only; inspect actual fi
 
 #### Next steps from this checkpoint
 
-1. Fix incomplete native-GPU raster tiles with bounded submission and preserve reference-quality integration; verify both live draw and plate capture lifecycle.
+1. Resume CLOUDLET-VOLUME: replace the cutout/slab density with rounded, height-varying condensate; compare Cc and Ac/Sc against the fixed-camera baselines. Keep verified bounded GPU submission and frame ownership unchanged.
 2. Refine Ci hooks/fibres/common bases after the repeated-pattern fixes; distinguish Cs fibratus from nebulosus in actual frames.
 3. Correct Ac/Sc cellular scale and relief, then review every remaining species in the same camera.
 4. Verify dynamic day/twilight/night lighting, complete group scenes, and control ranges with actual GPU images.

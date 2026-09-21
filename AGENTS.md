@@ -11,7 +11,9 @@ Use `npm run typecheck` for TypeScript validation. Focused renderer checks are `
 - Make all supported cloud species recognisable and photorealistic in the dynamic sky, with controllable morphology, optical properties, weather groups, and lighting.
 - Continue the WebGL volume-rendering direction. Support slowly streamed, transparent local-GPU cloud plates composited into the live sky.
 - Use one production camera. Additional diagnostic views must not become production camera requirements.
+- The shared production projection is rectilinear (55° heading, 27° elevation, 64° × 43.52° FOV). CPU celestial projection and GPU rays must agree; never restore the default 241.2° panorama or zenith folding.
 - Preserve continuous storm groups and physical scale; avoid repeated circles, screen-radial patterns, disconnected blob stamps, and affine cloud cards.
+- Judge dimensionality from actual density, self-shadowing and soft optical boundaries, not decorative texture or stronger contrast. Preserve each species' real anatomy: thin Cc must not become deep cumulus just to exaggerate depth.
 - Do not use generative AI images for clouds, change photographic reference images, or change exposure/grading to conceal morphology problems.
 - Structural tests are necessary evidence, not proof of photorealism. Require rendered visual review and dynamic-lighting checks.
 - A packed morphology parameter is not a supported control until its active species field consumes it and sensitivity is verified. Keep control/lifecycle/group limitations explicit in the roadmap.
