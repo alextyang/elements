@@ -713,7 +713,6 @@ interface WebGlCloudWorldRaySpec {
     lengthM: number;
     layerIndex: 0 | 1 | 2;
     kind: "view" | "sun";
-    referenceSampleCount: 256 | 512 | 1024;
 }
 
 type WebGlCloudPlateCaptureCanvas = HTMLCanvasElement & {
@@ -1099,7 +1098,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     ray.lengthM,
                     ray.layerIndex,
                     ray.kind === "sun" ? 1 : 0,
-                    ray.referenceSampleCount,
+                    0,
                 ], offset);
             });
             gl.uniform4fv(uniform("u_cloud_evidence_ray_origins"), rayOrigins);
@@ -1741,8 +1740,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     ray.direction.length !== 3 || !ray.direction.every(Number.isFinite) ||
                     Math.abs(length - 1) > 1e-4 || !Number.isFinite(ray.lengthM) ||
                     ray.lengthM <= 0 || ![0, 1, 2].includes(ray.layerIndex) ||
-                    !["view", "sun"].includes(ray.kind) ||
-                    ![256, 512, 1024].includes(ray.referenceSampleCount);
+                    !["view", "sun"].includes(ray.kind);
             }))) {
                 throw new Error("INVALID_INPUT: invalid world ray specification.");
             }

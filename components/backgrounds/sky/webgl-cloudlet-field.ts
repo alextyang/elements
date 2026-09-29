@@ -55,10 +55,19 @@ float cloud_cloudlet_coverage(
         dot(sample_position.xz, cross_axis)
     ) / period;
     vec3 seed = u_cloud_seed.xzw * vec3(3.1, 2.7, 3.9);
+    // Ac alone follows one coherent parent field through height. The phase is
+    // zero for Cc and Sc, preserving their established thin/deck coordinates.
+    // Its lateral components lean connected condensate rather than shrinking
+    // the footprint; the vertical component exposes genuinely different
+    // medium-scale support through the packet.
+    float ac_height_phase = abs(layer.species - 8.0) < 0.5
+        ? clamp((h - 0.48) / max(1e-5, packet_depth), -0.85, 0.85)
+        : 0.0;
     vec2 broad_position = cloud_rotate2(horizontal, 0.57) * 0.043;
     vec4 organization = cloud_texture(u_cloud_base, vec3(
-        broad_position.x + seed.z, u_cloud_seed.y * 3.7,
-        broad_position.y + seed.x
+        broad_position.x + seed.z + ac_height_phase * 0.018,
+        u_cloud_seed.y * 3.7 + ac_height_phase * 0.055,
+        broad_position.y + seed.x - ac_height_phase * 0.014
     ));
     // Distortion changes on a scale of several cells, so each element remains
     // coherent while spacing and shape vary across an extensive layer.
@@ -66,18 +75,19 @@ float cloud_cloudlet_coverage(
         mix(0.65, 1.0, saturate(layer.turbulence));
     vec2 cell_position = cloud_rotate2(horizontal, -0.21) * 0.40 + distortion;
     vec3 cell_coordinate = vec3(
-        cell_position.x + seed.x,
+        cell_position.x + seed.x + ac_height_phase * 0.10,
         u_cloud_seed.y * 4.1 + cell_position.x * 0.371 + cell_position.y * 0.593,
-        cell_position.y + seed.z
+        cell_position.y + seed.z - ac_height_phase * 0.07
     );
+    cell_coordinate.y += ac_height_phase * 0.28;
     vec4 filtered = cloud_cloudlet_filtered(cell_coordinate);
     vec2 secondary_position = cloud_rotate2(horizontal, 0.73) * 0.23 +
         distortion * 0.37;
     vec4 secondary = cloud_texture(u_cloud_base, vec3(
-        secondary_position.x + seed.z,
+        secondary_position.x + seed.z - ac_height_phase * 0.06,
         u_cloud_seed.y * 5.3 + secondary_position.x * 0.613 +
-            secondary_position.y * 0.257,
-        secondary_position.y + seed.x
+            secondary_position.y * 0.257 + ac_height_phase * 0.19,
+        secondary_position.y + seed.x + ac_height_phase * 0.08
     ));
     // The texture distribution is not uniform: its G channel is inverted
     // Worley FBM, centred near 0.4. Normalize that useful condensate range
