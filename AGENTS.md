@@ -21,6 +21,9 @@ Use `npm run typecheck` for static TypeScript validation. Validate renderer chan
 ## Rules
 
 - Maintain this file and `TODO.md` at large phase boundaries and before the end of a turn. Store plans, remaining work, and verification in the roadmap.
+- Use `TODO.md`'s PROJECT-MAP for the cross-subsystem roadmap and its latest evidence entries for status. Historical WebGPU integration claims and older multi-view/plate documents do not establish completion in the selected WebGL path or override the one-camera/fixed-lighting constraints.
+- Execute phase by phase. Near scene acceptance and between large phases, show the user an actual rendered preview set with changes, remaining defects, verification limits and the exact baseline proposed for acceptance. Internal checks do not substitute for user baseline review; retain pending/rejected/accepted states distinctly.
+- Clean and optimize the code touched by each phase: remove superseded experiments and unused controls, simplify duplicated logic, and measure relevant runtime costs. Preserve evidence and Git history; do not broaden this into unrelated deletion or disguise quality loss as optimization.
 - Do not add unit tests. Exercise changed modules through real end-to-end tests at their actual boundaries, including rendered effects, negative controls and restoration where applicable.
 - No deployed-production state is established for this development branch. Beyond these required root instruction/roadmap files, do not add documentation, compatibility layers, migration options or legacy maintenance without an actual deployed-production requirement. This is not permission to delete unrelated existing work.
 - Preserve existing user changes. Keep coherent commits and push the authorised branch with the full history; do not rewrite history.

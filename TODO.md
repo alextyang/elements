@@ -1,5 +1,78 @@
 # Elements roadmap
 
+## PROJECT-MAP — consolidated project roadmap, 2026-09-29
+
+The user has authorized executing this roadmap phase by phase, with preview review near scene acceptance and between major phases, and ongoing code cleanup/optimization. Implementation, integration into the selected backend, and photographic acceptance are different stages. The 32 cloud benchmark entries include varieties/features/group variants, not 32 distinct WMO species. Current visual acceptance remains zero in the resumed run. Historical notes below retain their original chronology; newer evidence supersedes old pending statements.
+
+### PHASE-REVIEW-PROTOCOL — user steering
+
+1. [x] Record the phase-by-phase execution, user preview and cleanup requirements in root instructions and roadmap.
+2. [ ] Near acceptance, assemble actual before/candidate renders at matched camera/seed/light, plus relevant lighting or control variants. Use the one production camera; do not generate illustrative cloud imagery.
+3. [ ] Present a compact labeled set with what changed, what is verified, what still fails, and the exact scene/controls/lighting scope proposed as the baseline. Clearly label failed experiments and unresolved items.
+4. [ ] Obtain the user's baseline decision at consequential visual gates before dependent aesthetic expansion. Continue only genuinely independent authorized work while that decision is pending; no silent acceptance from lack of response.
+5. [ ] At each large phase boundary, show its representative preview set and update acceptance/progress before beginning dependent work.
+6. [ ] During each phase, remove superseded experiments/dead controls in touched code, simplify duplication and measure performance where relevant. Preserve rendering quality, exact evidence and full commit history. No unrelated cleanup project or new unit tests.
+7. [ ] Immediate execution phase: resolve the failed cloud-realism design using retained actual imagery and measurements, then resume the same implementation owner under the revised contract. The existing failed Ac/Cc images are diagnostic baselines, not user-approved visual baselines.
+
+### FOUNDATION — camera, renderer and reliable GPU output
+
+1. [x] Establish the single rectilinear production projection and bounded native-Metal WebGL submissions with atomic complete-frame publication.
+2. [x] Establish capture-only density/ray readback, absent/restoration controls, and sampled Ac convergence evidence. This does not establish all-species numerical convergence.
+3. [ ] Preserve these properties through later changes; exercise cancellation, resize, visibility and context-loss recovery at the real browser/GPU edge.
+4. [ ] Align normal application backend selection with the accepted WebGL outcome. Current defaults still choose `auto`; explicit WebGL benchmark success does not prove the homepage uses that renderer.
+
+### MORPHOLOGY — first convincing volumes, then the complete cloud catalogue
+
+1. [!] Resolve REALISM-V2's attachment-staging blocker and review the revised image-grounded design. Latest height-support intervention failed despite improved numerical decorrelation.
+2. [ ] Establish genuinely convincing Ac/Cc, then Sc, separating element scale, density detail, opacity and transport experiments. Require visible improvement and useful controls, not merely lower correlation or coverage.
+3. [ ] Qualify the three stratiformis recipes across five lighting/environment states, seeds, control ranges and motion/restoration.
+4. [ ] Complete seven Ci/Cs ice recipes; five Cc/Ac/Sc lens/roll recipes; six Cc/Ac/Sc castellanus/floccus recipes; four As/Ns/St sheet/fragment recipes; seven Cu/Cb convection/storm recipes. Follow the detailed P3/P4 gates below, with representative visual acceptance before family expansion.
+
+### SCENE-SYSTEMS — groups, lifecycle and full authoring
+
+1. [ ] Connect independent same-tier finite cloud owners to WebGL instead of limiting authored scenes to three layer slots.
+2. [ ] Implement real parent/daughter grouping and growing/mature/dissipating lifecycle, including continuous storm systems rather than isolated blobs.
+3. [ ] Verify spatial overlap, mutual extinction, distinct winds, deterministic seeds, stable advection and transitions.
+4. [ ] Verify every exposed morphology/optical control by species at useful extremes; wire meaningful behavior or explicitly mark unsupported controls. Packed values alone are not support.
+
+### RICH-SKY — atmosphere, Sun, Moon and stars
+
+1. [ ] Audit which existing atmosphere/celestial foundations are active in WebGL versus WebGPU; reuse relevant physical code without starting a backend-compatibility project.
+2. [ ] Finish coherent Sun/Moon direct light, diffuse sky/ground light, atmospheric extinction and distance haze, using consistent world coordinates and radiometric units.
+3. [ ] Verify Sun/Moon/star occlusion by clouds and correct foreground-atmosphere ordering; do not double-apply attenuation or exposure.
+4. [ ] Verify day, low Sun, humid/hazy conditions, twilight and moonlight through real live transitions. Existing detailed night-sky sources require selected-backend evidence before being called complete.
+
+### WEATHER — precipitation, surface obscuration and optical/electrical effects
+
+1. [ ] Attach real rain/virga/snow/ice precipitation fields to their source clouds; underside darkening is not precipitation geometry.
+2. [ ] Integrate fog/mist and other authored surface media with correct distance visibility and cloud/atmosphere ordering.
+3. [ ] Carry existing physical weather foundations into the selected render path where required: storm lightning, droplet/ice optical effects, aurora and blowing media. Existing WGSL/CPU modules are not proof of WebGL support or photographic quality.
+4. [ ] Extend qualification beyond base cloud recipes to meaningful varieties, supplementary/accessory features, mother-cloud transitions, special origins, upper-atmosphere states and mixed scenes. Do not revive multiple production-camera optimization from older review matrices.
+
+### PLATES — local-GPU asset generation and slow live composition
+
+1. [ ] Establish one valid radiometric playback contract for current WebGL output: same-domain composition or genuinely source-separated calibrated transport. Current atmosphere-baked plates are fixed-lighting, not arbitrarily relightable.
+2. [ ] Fingerprint geometry, captured lighting and atmospheric medium; reject stale/incompatible frames.
+3. [ ] Wire bounded local capture/recapture and publish only complete, validated frame pairs. Keep the live sky responsive during expensive cloud generation.
+4. [ ] Verify slow delivery/playback, interruption, missing/stale frame handling, transitions and day-to-night changes without wrong-lighting clouds. No dedicated remote GPU streaming service is presently an approved infrastructure milestone.
+
+### AUTHORING-AND-REVIEW — Sky Lab and photographic evidence
+
+1. [ ] Keep deterministic URL/seed-based reproduction and explicit backend/scene identity across Sky Lab, photograph comparison and preview matrix.
+2. [ ] Expose only working controls with appropriate species constraints and clear unsupported states.
+3. [ ] Track reference-taxonomy mismatches without editing photographs or claiming literal anatomy matches.
+4. [ ] Review the initial 32 recipes × five lighting/environment cases at the one production camera, then meaningful mixtures, motion and control extremes. Existing broader weather matrices are inventories, not accepted images.
+
+### APP-AND-DELIVERY — start page, performance and release acceptance
+
+1. [ ] Integrate the accepted renderer/plate path into the actual search-and-bookmarks homepage, not only development routes.
+2. [ ] Exercise real search/bookmark navigation, keyboard interaction, responsive layout, visibility and long-session resource use with the sky running. The homepage still has a selected-bookmark submit TODO; no broader account/sync/weather-data product roadmap is established.
+3. [ ] Measure actual GPU time, memory, update cadence and client responsiveness; preserve rendering quality while bounding expensive work.
+4. [ ] Reconcile inherited active-path defects and assets without weakening thresholds; distinguish old WebGPU/atlas debt from current WebGL acceptance. Use real end-to-end checks and static typecheck, not new unit tests.
+5. [ ] Review the full integrated outcome, retain durable evidence, maintain coherent commits and push full history. Deployment is not an established current milestone and requires its own explicit scope.
+
+Dependency order: reliable foundation → representative Ac/Cc/Sc realism → cloud-family expansion and meaningful controls → complete groups/weather/rich-sky integration → radiometrically correct slow plate delivery → integrated application qualification. Shared sky/plate contracts may be resolved alongside family work where independent; coupled source edits and GPU capture remain serialized.
+
 ## CLOUD-PHOTOREALISM — active objective
 
 All cloud species must look photorealistic and integrate with the dynamic rich sky. One production camera, no generative AI cloud imagery, fully versioned changes. No species currently has verified photographic acceptance in this resumed run.
