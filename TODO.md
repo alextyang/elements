@@ -59,17 +59,60 @@ The user reports radial/perspective distortion near the top and wants a flatter 
 
 The flatter camera exposes weak three-dimensional depth and a visibly textured/tiled underlying fill. Fix the material density, not the camera or grading. Cc is naturally thin and largely unshaded; Ac/Sc must demonstrate their stronger real depth without changing species identity.
 
-**Paused at the user's request.** No density rewrite has started. Next implementation should replace `webgl-cloudlet-field.ts`'s altitude-independent cellular mask multiplied by a slab with a continuous condensation density field: vary the threshold through packet height, contract cross-sections toward both faces and add modest 3D boundary variation. Keep the shared physical density on view/light paths, existing optical targets and single production camera. Add nested-cross-section and curved-underside tests alongside existing bounds/scale checks.
+**Resumed 2026-09-29 with unified-delegation.** The first density rewrite and its two bounded corrections failed visual gate R1. Curved height-varying support is verified, but Ac remains smooth/plastic and Cc printed/torn. Close the ray-integration evidence gap before selecting the next structural hypothesis, keeping physical view/light density, species identity, optical targets and the single production camera. New validation must be real end-to-end at browser/GPU edges, not new unit tests.
 
 Measured benchmark packet/core depths: Cc 77/58.03 m, Ac 525/367.96 m, Sc 720/466.65 m. Cc's `coarse=0` disables both lower/top relief; remaining 3D density variation is at most 3.7152%. Repeated cellular frequencies reinforce the printed appearance, but an actual texture-wrap seam has not been established. Do not label this diagnosis a completed fix.
 
 1. [x] Preserve a fixed-camera baseline and audit the active Cc/Ac/Sc field, noise frequencies, packet thickness and light paths.
 2. [ ] Replace the planar threshold/extruded-cutout appearance with connected, height-varying condensate and rounded optical boundaries; remove visible repeated texture motifs.
-3. [ ] Verify physical scale, vertical-aspect sensitivity, open/closed-cell behavior, continuity, material bounds and absence of repeating horizontal fill numerically.
+3. [ ] Exercise physical scale, vertical-aspect sensitivity, open/closed-cell behavior, continuity and repeated-fill failure modes through real browser/GPU controls and completed captures; include negative controls and restore the baseline.
 4. [ ] Compare native-GPU Cc and Ac/Sc images at unchanged camera/light; review genuine volume, depth overlap, soft edges and self-shadowing. Do not use false dark shading to make Cc appear more dimensional.
 5. [ ] Validate integrated tests, record remaining visual gaps, commit and push the complete history.
 
 ## EVIDENCE-LOG
+
+### 2026-09-29 — resumed cloud-volume outcome
+
+1. [x] Recover clean checkpoint `b5b16711ef668c2b771c5b0674a15676bcab0b3e` and current user instructions. Prior `/tmp/elements-cloud-depth-b2sM2f/` images are no longer present; historical image claims are not fresh acceptance evidence.
+2. [x] Obtain source-grounded cloud-volume outcome phases and a complete implementation contract through unified-delegation; one owner, an early real-GPU visual oracle, then coherent evidence batches. Design delivered; implementation and native acceptance remain open.
+3. [ ] Implement and validate the Cc/Ac/Sc depth and pattern correction before expanding across remaining species families. Preserve differentiated anatomy and report remaining all-species gaps.
+4. [ ] Review the actual integrated candidate and end-to-end evidence, update this roadmap, commit coherent changes and push the authorised branch history.
+
+- Routing request `elements-cloud-depth-20260929-b5b1671-v1`: GPT-6 Pro, read-only diagnosis/design, inline output, attached committed sky source ZIP. Operational skill SHA-256 `fe682b5f18db71b050b5ef12359cf509e7cfffc82e34232ca00557ec5eebc996`. Initial preview rejected the temporary file location before enqueueing; identical source bytes were restaged inside the repository's Git metadata and preview retried. No submission or remote result is claimed yet.
+- Accepted preview and submitted exact request: `program-80e694255e749f4f9fd7e7f413adbbca`, `turn-ea3ab2db26ad80b21f17d350ed258f5f`, queued at receipt, conversation not yet assigned. Request SHA-256 `0f76b0c193161abf3d13bc66f139f26aab4da46f75391094012ae57211103055`; immutable source ZIP SHA-256 `67967358ad05eced66f6b34d2eb9964a3ae6f4da33abb8e495f29c202d020090`. This is blocking design input; no speculative parallel implementation.
+- Exact owner wait/reentry: `/Users/alexyang/Developer/genre-workspace/handoff-automation/.venv312/bin/python /Users/alexyang/.codex/skills/remote-delegation/scripts/desktop_wait.py run --thread-id "$CODEX_THREAD_ID" --program-id program-80e694255e749f4f9fd7e7f413adbbca` (working directory `/Users/alexyang`). Run the same command first on blank resumption, preserving the shared wait/cache budget.
+- Updated authority: no new unit tests; required AGENTS/TODO only, no speculative documentation/compatibility/migrations/legacy maintenance absent deployed-production evidence. No credentials are involved or recorded in repository instructions.
+- Remote design completed and delivered: conversation `6abb63d5-8120-83e8-959a-e4d2cf18ccdf`, answer SHA-256 `055ea31664fdd279bb0e878f1f95662b10d37c79bacf7ba755c1d52468cf5a7c`, canonical answer `/Users/alexyang/.codex/artifacts/remote-delegation/055ea31664fdd279bb0e878f1f95662b10d37c79bacf7ba755c1d52468cf5a7c/response.md`. Retained waiter result `/Users/alexyang/.codex/remote-delegation-waits/7dc9a2be4d158277b1180e0b3c9d637a723ba8ff12fab08f9759893a91e03c52.result.json`. No further remote wait is required for this completed request. Remote mathematical/source probes are not native-GPU evidence.
+
+#### EXECUTION-20260929 — one implementation owner, sequential outcome gates
+
+1. [~] **P0/T0: trustworthy real capture edge.** Bound branch/HEAD/source packet exactly at `clouds/volumetric` / `b5b16711ef668c2b771c5b0674a15676bcab0b3e` / `67967358ad05eced66f6b34d2eb9964a3ae6f4da33abb8e495f29c202d020090`; Apple M4 Max Metal 4 is present. Browser plugin is unavailable, so pinned `@playwright/cli` 0.1.21 and the repository native-Metal path are the recorded fallback. Fresh Cc/Ac baselines completed; Sc completed at the GPU edge but failed the unchanged artifact gate. The new capture-only float edge proves source-off, absent-cloud, exact restoration and spherical density slices without POST or live publication. Arbitrary ray-column convergence is explicitly rejected as `UNSUPPORTED_READBACK` and remains the P0 gap; no numerical-completeness claim is made.
+2. [!] **P1/T1: cloud-volume oracle — R1 failed, parent decision required.** Implemented one CPU-resolved packet depth shared by density/bounds/extinction and a curved height-varying body. Initial candidate plus the two permitted causal corrections all completed on native Metal. Raw cuts prove genuinely changing vertical support, but final images remain unaccepted: Ac has broad plastic/smooth undersides with insufficient medium breakup; Cc remains a conspicuously printed/torn granular sheet. Do not expand P2. Retain the best coherent implementation and evidence for root review.
+3. [ ] **P2/T2: three-species milestone.** After R1, finish useful control semantics and stable sampling phases; validate Sc, five lighting environments, declared seed variants and actual control/motion/restore effects. Root reviews R2. This does not accept other species.
+4. [ ] **P3a/T3: seven ice recipes.** Source-connected fibres/hooks/fallstreaks and distinct veils; representative real oracle before expanding lighting cases.
+5. [ ] **P3b/T4: five finite wave recipes.** Integrate finite lenses/rolls with stable world centres and useful controls; gate before family expansion.
+6. [ ] **P3c/T5: six castellanus/floccus recipes.** Distinguish irregular towers on common bases from detached ragged tufts through real density, not stamps.
+7. [ ] **P3d/T6: four sheet/fragment recipes.** Distinct As/Ns/St structures and real openings; precipitation is incomplete without a physical source-to-fall-field edge.
+8. [ ] **P4/T7: seven convection/storm recipes.** Lifecycle, connected storm anatomy, world-owner overlap and mutual extinction; representative group oracle first.
+9. [ ] **P5/T8: dynamic rich-sky closure.** Verify celestial occlusion, mixtures, live changes and cancellation/resize/visibility; reconcile 32 benchmark recipes × five environments. Captured frames are not automatically photographic acceptance.
+
+The complete source-grounded contract is the retained answer above (C0–C7). One native Sol-medium owner executes coupled work, with root retaining visual acceptance and commit/push. No user-owned app task is authorised. Parent will not concurrently edit implementation files. Local preview-server start is a normal authorised development step, not permission to change production or remote-delegation services. Latest real-E2E-only user policy overrides the contract's suggestion to rerun the old unit/source suite. No speculative docs or legacy maintenance.
+
+#### R1-20260929 — bounded oracle receipt
+
+- Evidence root: `/tmp/elements-cloud-depth-r1-vx6WvO/`. Baseline Ac/Cc completed under shader `cc9bef70…61c4`; baseline Sc is preserved as an unchanged-qualifier rejection. Initial, correction-1 and correction-2 Ac/Cc images and per-frame metrics are separated by directory. Final shader identity is `532eb083…3dda` at the fixed `rectilinear-v1|55|27|64|43.52|0.02|natural|auto` camera.
+- Candidate-0 source-off radiance preserved depth while mean RGB fell from approximately `0.456/0.443/0.428` to `0.024/0.035/0.046`. Every absent-cloud transmittance pixel is exactly RGB `1` with depth `140 km`; before/restored planes are byte-identical in every candidate batch.
+- Candidate-0 Ac density cuts: lower occupancy `69.83%`, mean `0.167`; middle `82.51%`, mean `0.633`; upper `0%`; vertical occupancy `29.16%`. Correction-1 only reduced occupancy and did not fix appearance. Correction-2 restored the population and extended subtractive boundary erosion; lower/middle/vertical occupancy is `69.51% / 82.29% / 28.84%`, but actual images still show little useful medium-scale breakup.
+- Invalid `solarSourceScale=0.5` rejected with `INVALID_INPUT` before readback; the same Ac scene then completed again with no frame failure, proving queue/frame preservation. Diagnostics are capture-context gated and reject malformed modes, slice kinds, finite structure, and cloned scene shape before allocation.
+- Static TypeScript, shell syntax, helper syntax and `git diff --check` pass. No unit/source suite was added or run. No commit, push, production publication or P2 expansion occurred. Remaining P0 numerical gap: independent ray columns/convergence and interval-budget telemetry.
+
+#### R1-DIAG — parent decision after failed visual oracle
+
+1. [x] Root inspected final Ac and Cc frames and confirms R1 failed. Independently checked candidate-0 absent components and byte-exact restoration. Correct GPU controls are accepted only as diagnostic evidence, not photorealism.
+2. [~] Preserve this coherent experimental checkpoint in full branch history; no production acceptance or deployment.
+3. [ ] Same implementation owner completes the existing capture-only ray-column/convergence and interval-budget evidence edge. Use actual production density and extinction, fixed scene/camera/quality, representative occupied/edge/clear rays, independent denser integrations, and negative/restoration controls. No unit tests, new service, dependencies, or family expansion.
+4. [ ] Measure corresponding per-height medium-scale density correlation and determine whether missing structure comes from density, saturated optical depth, integration resolution, or their combination. Keep actual measured results distinct from hypotheses.
+5. [ ] Return a coherent diagnostic batch and one evidence-backed next field hypothesis to root before more density tuning. Root chooses the revised structural experiment; P2 remains blocked.
 
 ### 2026-09-20 — recovered WebGL integration and sampling investigation
 

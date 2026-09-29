@@ -118,9 +118,9 @@ export function packCloudLayers(
         const cloudletField = controlledMorphology.topology[offset] === 3;
         const opticalDepthScale = fibrousIce ? 6 : cloudletField ? 32 :
             granularIce ? 12 : 110;
-        const materialThickness = cloudletField ? thickness * Math.max(0.035,
-            Math.min(0.8, controlledMorphology.topology[offset + 2] * 1000 *
-                controlledMorphology.topology[offset + 3] / thickness)) : thickness;
+        const materialThickness = cloudletField
+            ? controlledMorphology.microstructure[offset + 3]
+            : thickness;
         geometry[offset + 3] = Math.max(
             0,
             Math.min(0.12, (layer.opticalDepth ** 2 * opticalDepthScale) /
@@ -247,7 +247,7 @@ uniform vec4 u_layer_topology[3];  // macro topology, material, element km, vert
 uniform vec4 u_layer_anatomy[3];   // support band, erosion, lineage depth, macro count
 uniform vec4 u_layer_dynamics[3];  // branch count, shear, sedimentation, cellular closure
 uniform vec4 u_layer_formation[3]; // anisotropy, base connectivity, crown expansion, fragmentation
-uniform vec4 u_layer_microstructure[3];// fibre curl, wave amplitude, powder, reserved
+uniform vec4 u_layer_microstructure[3];// fibre curl, wave amplitude, powder, packet depth m
 uniform vec4 u_layer_optics[3];    // SSA, liquid g, ice g, Draine alpha
 uniform vec4 u_layer_lighting[3];  // multi extinction/strength, sky/ground fill
 uniform vec4 u_cloud_scene;        // convection, instability, humidity, total coverage
@@ -263,6 +263,8 @@ uniform vec3 u_cloud_offline_sample;// subpixel x/y and depth phase
 uniform float u_cloud_time;
 uniform float u_cloud_fog;
 uniform float u_cloud_noctilucent;
+uniform vec4 u_cloud_evidence_slice_bounds;
+uniform vec4 u_cloud_evidence_slice_params;
 `;
 
 export const CLOUD_FUNCTIONS = `
@@ -415,6 +417,7 @@ struct CloudLayer {
     float fibreCurl;
     float waveAmplitude;
     float powderStrength;
+    float packetDepthM;
     float singleScatteringAlbedo;
     float liquidAsymmetry;
     float iceAsymmetry;
@@ -460,8 +463,10 @@ vec2 cloud_ray_sphere(vec3 origin, vec3 direction, float radius) {
 // range in which that species can occur. Share this bound with view and light
 // quadrature so empty kilometre-scale padding cannot consume their samples.
 float cloud_packet_depth(CloudLayer layer) {
-    return clamp(layer.elementScaleKm * 1000.0 * layer.verticalAspect /
-        max(1.0, layer.thickness), 0.035, 0.8);
+    return layer.packetDepthM > 0.0
+        ? layer.packetDepthM / max(1.0, layer.thickness)
+        : clamp(layer.elementScaleKm * 1000.0 * layer.verticalAspect /
+            max(1.0, layer.thickness), 0.035, 0.8);
 }
 
 vec2 cloud_material_bounds(CloudLayer layer, float base_radius, float top_radius) {
@@ -1683,7 +1688,7 @@ CloudLayer cloud_layer_from_uniforms(int index) {
         anatomy.x, anatomy.y, anatomy.z, anatomy.w,
         dynamics.x, dynamics.y, dynamics.z, dynamics.w,
         formation.x, formation.y, formation.z, formation.w,
-        microstructure.x, microstructure.y, microstructure.z,
+        microstructure.x, microstructure.y, microstructure.z, microstructure.w,
         optics.x, optics.y, optics.z, optics.w,
         lighting.x, lighting.y, lighting.z, lighting.w,
         motion.xy, motion.z, motion.w,
@@ -1783,6 +1788,56 @@ vec3 cloud_noctilucent(vec3 direction, vec3 sun_direction) {
 
 /** Injected at the composition point inside `main()`. */
 export const CLOUD_COMPOSITE = `
+    if (abs(u_cloud_output_mode - 6.0) < 0.25) {
+        vec2 slice_uv = gl_FragCoord.xy / u_resolution;
+        float slice_kind = u_cloud_evidence_slice_params.y;
+        int slice_layer_index = int(clamp(
+            floor(u_cloud_evidence_slice_params.z + 0.5), 0.0, 2.0));
+        CloudLayer slice_layer = cloud_layer_from_uniforms(slice_layer_index);
+        float slice_a = mix(u_cloud_evidence_slice_bounds.x,
+            u_cloud_evidence_slice_bounds.y, slice_uv.x);
+        float slice_b = mix(u_cloud_evidence_slice_bounds.z,
+            u_cloud_evidence_slice_bounds.w, slice_uv.y);
+        float slice_x;
+        float slice_z;
+        float slice_altitude;
+        if (slice_kind < 0.5) {
+            slice_x = slice_a;
+            slice_z = slice_b;
+            slice_altitude = u_cloud_evidence_slice_params.x;
+        } else {
+            vec2 slice_wind = slice_layer.wind + vec2(0.173, 0.271);
+            vec2 slice_axis = length(slice_wind) > 0.0001
+                ? normalize(slice_wind) : vec2(1.0, 0.0);
+            vec2 slice_cross = vec2(-slice_axis.y, slice_axis.x);
+            vec2 slice_horizontal = slice_axis * slice_a + slice_cross *
+                u_cloud_evidence_slice_params.w;
+            slice_x = slice_horizontal.x;
+            slice_z = slice_horizontal.y;
+            slice_altitude = slice_b;
+        }
+        float slice_radius = PLANET_RADIUS + slice_altitude;
+        float slice_y_squared = slice_radius * slice_radius -
+            slice_x * slice_x - slice_z * slice_z;
+        float slice_density = 0.0;
+        if (slice_y_squared >= 0.0) {
+            vec3 slice_position = vec3(
+                slice_x, sqrt(slice_y_squared), slice_z);
+            for (int slice_index = 0; slice_index < 3; slice_index++) {
+                CloudLayer density_layer = cloud_layer_from_uniforms(slice_index);
+                float density_altitude = length(slice_position) - PLANET_RADIUS;
+                float density_h = (density_altitude - density_layer.baseAltitude) /
+                    max(1.0, density_layer.thickness);
+                if (density_layer.present > 0.5 && density_h >= 0.0 && density_h <= 1.0) {
+                    slice_density = max(slice_density,
+                        cloud_density(slice_position, density_layer, density_h));
+                }
+            }
+        }
+        out_color = vec4(vec3(saturate(slice_density)), 1.0);
+        return;
+    }
+
     // Volumetric cloud transport. Radiance already holds the clear-sky and
     // celestial contribution for this direction, so the clouds extinguish it
     // and add their own in-scatter in the same scene-linear space.

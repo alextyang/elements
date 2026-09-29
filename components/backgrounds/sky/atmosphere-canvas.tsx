@@ -11,7 +11,11 @@ import {
 import { createCloudNoise } from "./webgl-cloud-noise";
 import { createWebGlCloudLighting } from "./webgl-cloud-lighting";
 import { cloudSourceFloat16Bits } from "./cloud-fibratus-source-field";
-import type { CloudScene } from "./cloud-scene";
+import {
+    CLOUD_GENERA,
+    CLOUD_SPECIES_CODE,
+    type CloudScene,
+} from "./cloud-scene";
 import { CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION } from "./cloud-plate-scene";
 import type { HydrometeorSceneOverrides } from "./hydrometeor-system";
 import type { GroundAlbedoRgb } from "./atmospheric-composition";
@@ -670,11 +674,46 @@ interface WebGlCloudPlateCaptureResult {
     }[];
 }
 
+interface WebGlCloudDensitySliceSpec {
+    kind: "xz" | "vertical-wind";
+    width: number;
+    height: number;
+    layerIndex: 0 | 1 | 2;
+    bounds: readonly [number, number, number, number];
+    radialAltitudeM?: number;
+    crossWindM?: number;
+}
+
+interface WebGlCloudEvidenceRequest {
+    version: 1;
+    expectedSceneKey: string;
+    expectedShaderHash: string;
+    mode: "radiance" | "transmittance" | "density-slice" | "ray-columns";
+    cloudScene?: CloudScene;
+    cloudTimeOffsetSeconds?: number;
+    slice?: WebGlCloudDensitySliceSpec;
+    rays?: readonly unknown[];
+    solarSourceScale?: 0 | 1;
+}
+
+interface WebGlCloudEvidenceResult {
+    mode: Exclude<WebGlCloudEvidenceRequest["mode"], "ray-columns">;
+    sceneKey: string;
+    shaderHash: string;
+    width: number;
+    height: number;
+    values: Float32Array;
+}
+
 type WebGlCloudPlateCaptureCanvas = HTMLCanvasElement & {
     __elementsWebGlFrameComplete?: () => Promise<void>;
     __elementsCloudPlateCapture?: (
         request: WebGlCloudPlateCaptureRequest,
     ) => Promise<WebGlCloudPlateCaptureResult>;
+    __elementsWebGlCloudEvidence?: (
+        request: WebGlCloudEvidenceRequest,
+    ) => Promise<WebGlCloudEvidenceResult>;
+    __elementsWebGlCloudEvidenceCurrentScene?: () => CloudScene;
 };
 
 const packFloat32PlaneAsLittleEndianFloat16 = (
@@ -733,6 +772,12 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
         const canvas = canvasRef.current;
         if (!canvas) return undefined;
         const captureCanvas = canvas as WebGlCloudPlateCaptureCanvas;
+        const isCloudEvidenceCaptureContext = () => {
+            const parameters = new URLSearchParams(window.location.search);
+            return parameters.get("capture") === "render" &&
+                parameters.get("rendererPreference") === "webgl2" &&
+                Boolean(canvas.closest("[data-benchmark-render]"));
+        };
         const diagnostic = captureCanvas.dataset;
         diagnostic.cloudWebglFrameState = "initializing";
         diagnostic.cloudWebglProgramState = "compiling";
@@ -886,6 +931,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             outputMode: number,
             framebuffer: WebGLFramebuffer,
             offlineSample: readonly [number, number, number],
+            evidenceSlice?: WebGlCloudDensitySliceSpec,
         ) => {
             gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
             gl.viewport(0, 0, width, height);
@@ -1013,6 +1059,18 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 uniform("u_cloud_noctilucent"),
                 current.cloudScene.noctilucent,
             );
+            const sliceBounds = evidenceSlice?.bounds ?? [0, 0, 0, 0];
+            gl.uniform4f(
+                uniform("u_cloud_evidence_slice_bounds"),
+                sliceBounds[0], sliceBounds[1], sliceBounds[2], sliceBounds[3],
+            );
+            gl.uniform4f(
+                uniform("u_cloud_evidence_slice_params"),
+                evidenceSlice?.radialAltitudeM ?? 0,
+                evidenceSlice?.kind === "vertical-wind" ? 1 : 0,
+                evidenceSlice?.layerIndex ?? 0,
+                evidenceSlice?.crossWindM ?? 0,
+            );
 
             if (cloudNoise) {
                 gl.activeTexture(gl.TEXTURE0);
@@ -1105,9 +1163,10 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             framebuffer: WebGLFramebuffer,
             outputMode: number,
             offlineSample: readonly [number, number, number] = [0, 0, 0.5],
+            evidenceSlice?: WebGlCloudDensitySliceSpec,
         ) => {
             assertDrawActive(snapshot);
-            bindDraw(snapshot, outputMode, framebuffer, offlineSample);
+            bindDraw(snapshot, outputMode, framebuffer, offlineSample, evidenceSlice);
             gl.disable(gl.SCISSOR_TEST);
             gl.clearBufferfv(gl.COLOR, 0, new Float32Array(
                 [0, 0, 0, outputMode === 0 ? 0 : -1]));
@@ -1351,14 +1410,16 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 return {
                     dispose,
                     read: async (
-                        outputMode: 1 | 2 | 3 | 4 | 5,
+                        outputMode: 1 | 2 | 3 | 4 | 5 | 6,
                         offlineSample: readonly [number, number, number],
+                        evidenceSlice?: WebGlCloudDensitySliceSpec,
                     ) => {
                         await drawTiles(
                             snapshot,
                             framebuffer,
                             outputMode,
                             offlineSample,
+                            evidenceSlice,
                         );
                         assertDrawActive(snapshot);
                         gl.readPixels(
@@ -1376,8 +1437,11 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                                 `WebGL cloud plate readback failed with ${error}.`,
                             );
                         }
-                        for (let offset = 3; offset < values.length; offset += 4) {
-                            if (!(values[offset] >= 0)) {
+                        for (let offset = 0; offset < values.length; offset += 1) {
+                            if (!Number.isFinite(values[offset])) {
+                                throw new Error("WebGL cloud plate contains a non-finite component.");
+                            }
+                            if (offset % 4 === 3 && !(values[offset] >= 0)) {
                                 throw new Error("WebGL cloud plate incomplete: an output pixel was not rendered.");
                             }
                         }
@@ -1559,6 +1623,157 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 responseConvention: CLOUD_PLATE_FIXED_LIGHTING_RESPONSE_CONVENTION,
             };
         };
+        const validateEvidenceScene = (candidate: unknown): candidate is CloudScene => {
+            const visited = new WeakSet<object>();
+            const finiteClone = (value: unknown): boolean => {
+                if (typeof value === "number") return Number.isFinite(value);
+                if (value === null || typeof value === "string" ||
+                    typeof value === "boolean" || value === undefined) return true;
+                if (typeof value !== "object" || visited.has(value)) return false;
+                visited.add(value);
+                return Array.isArray(value)
+                    ? value.every(finiteClone)
+                    : Object.values(value as Record<string, unknown>).every(finiteClone);
+            };
+            if (!finiteClone(candidate) || !candidate || typeof candidate !== "object") {
+                return false;
+            }
+            const value = candidate as Partial<CloudScene>;
+            if (!Array.isArray(value.layers) || value.layers.length !== 3 ||
+                !Array.isArray(value.seed) || value.seed.length !== 4 ||
+                !value.seed.every(Number.isFinite)) return false;
+            const sceneScalars = ["totalOktas", "convection", "instability",
+                "humidity", "fog", "noctilucent"] as const;
+            if (!sceneScalars.every((key) => Number.isFinite(value[key]))) return false;
+            const layerScalars = ["baseAltitude", "thickness", "coverage", "oktas",
+                "opticalDepth", "stratusBlend", "towerAmount", "anvilAmount",
+                "iceFraction", "detailStrength", "windSpeed", "windDirection",
+                "shear", "turbulence", "precipitation", "lifecycle",
+                "organizationStrength"] as const;
+            return value.layers.every((layer) => Boolean(layer) &&
+                typeof layer.present === "boolean" &&
+                CLOUD_GENERA.includes(layer.genus) &&
+                Object.hasOwn(CLOUD_SPECIES_CODE, layer.species) &&
+                ["unorganized", "isolated", "streets", "open-cell", "closed-cell",
+                    "frontal", "banded"].includes(layer.organization) &&
+                layerScalars.every((key) => Number.isFinite(layer[key])));
+        };
+        captureCanvas.__elementsWebGlCloudEvidence = async (request) => {
+            assertCaptureActive();
+            const liveSnapshot = snapshotDraw();
+            if (!isCloudEvidenceCaptureContext() || request.version !== 1 ||
+                request.expectedSceneKey !== liveSnapshot.sceneKey ||
+                !["radiance", "transmittance", "density-slice", "ray-columns"]
+                    .includes(request.mode)) {
+                throw new Error("INVALID_INPUT: invalid evidence request or scene owner.");
+            }
+            if (request.mode === "ray-columns") {
+                throw new Error(
+                    "UNSUPPORTED_READBACK: ray-column convergence readback is not implemented.",
+                );
+            }
+            const densityMode = request.mode === "density-slice";
+            if (densityMode !== Boolean(request.slice) ||
+                (request.mode !== "radiance" && request.solarSourceScale !== undefined) ||
+                (request.solarSourceScale !== undefined &&
+                    request.solarSourceScale !== 0 && request.solarSourceScale !== 1) ||
+                request.rays !== undefined) {
+                throw new Error("INVALID_INPUT: evidence arguments do not match the mode.");
+            }
+            const slice = request.slice;
+            if (slice && (
+                !["xz", "vertical-wind"].includes(slice.kind) ||
+                !Number.isSafeInteger(slice.width) || slice.width < 1 || slice.width > 256 ||
+                !Number.isSafeInteger(slice.height) || slice.height < 1 || slice.height > 256 ||
+                slice.bounds.length !== 4 || !slice.bounds.every(Number.isFinite) ||
+                !(slice.bounds[1] > slice.bounds[0]) ||
+                !(slice.bounds[3] > slice.bounds[2]) ||
+                ![0, 1, 2].includes(slice.layerIndex) ||
+                (slice.kind === "xz" && !Number.isFinite(slice.radialAltitudeM)) ||
+                (slice.kind === "vertical-wind" && !Number.isFinite(slice.crossWindM))
+            )) {
+                throw new Error("INVALID_INPUT: invalid density slice.");
+            }
+            if (request.cloudScene !== undefined &&
+                !validateEvidenceScene(request.cloudScene)) {
+                throw new Error("INVALID_INPUT: invalid cloned cloud scene.");
+            }
+            const shaderDigest = await crypto.subtle.digest("SHA-256",
+                new TextEncoder().encode(VERTEX_SHADER + "\0" + FRAGMENT_SHADER));
+            const shaderHash = [...new Uint8Array(shaderDigest)]
+                .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+            if (request.expectedShaderHash !== shaderHash) {
+                throw new Error("SUPERSEDED: shader source identity changed.");
+            }
+            const timeOffset = request.cloudTimeOffsetSeconds ??
+                liveSnapshot.current.cloudTimeOffset;
+            if (!Number.isFinite(timeOffset)) {
+                throw new Error("INVALID_INPUT: cloud time offset must be finite.");
+            }
+            const solarScale = request.solarSourceScale ?? 1;
+            const solar = liveSnapshot.current.solarTopOfAtmosphereIrradiance;
+            const evidenceCurrent: SkyRadianceScene = {
+                ...liveSnapshot.current,
+                cloudScene: structuredClone(
+                    request.cloudScene ?? liveSnapshot.current.cloudScene,
+                ),
+                cloudTimeOffset: timeOffset,
+                solarTopOfAtmosphereIrradiance: [
+                    solar[0] * solarScale,
+                    solar[1] * solarScale,
+                    solar[2] * solarScale,
+                ],
+            };
+            // Compile and validate the cloned scene before taking the GPU queue.
+            packCloudLayers(
+                evidenceCurrent.cloudScene,
+                evidenceCurrent.cloudTime + evidenceCurrent.cloudTimeOffset,
+            );
+            const evidenceSnapshot: DrawSnapshot = {
+                ...liveSnapshot,
+                current: evidenceCurrent,
+                width: slice?.width ?? liveSnapshot.width,
+                height: slice?.height ?? liveSnapshot.height,
+            };
+            try {
+                const values = await enqueue(async () => {
+                    assertCurrentScene(liveSnapshot);
+                    const readback = createCloudPlateReadback(evidenceSnapshot);
+                    try {
+                        const outputMode = request.mode === "radiance" ? 1 :
+                            request.mode === "transmittance" ? 2 : 6;
+                        return (await readback.read(
+                            outputMode,
+                            [0, 0, 0.5],
+                            slice,
+                        )).slice();
+                    } finally {
+                        readback.dispose();
+                    }
+                });
+                assertCurrentScene(liveSnapshot);
+                return {
+                    mode: request.mode,
+                    sceneKey: liveSnapshot.sceneKey,
+                    shaderHash,
+                    width: evidenceSnapshot.width,
+                    height: evidenceSnapshot.height,
+                    values,
+                };
+            } finally {
+                requestLive();
+            }
+        };
+        captureCanvas.__elementsWebGlCloudEvidenceCurrentScene = () => {
+            if (!isCloudEvidenceCaptureContext()) {
+                throw new Error("INVALID_INPUT: cloud evidence requires capture context.");
+            }
+            return structuredClone(sceneRef.current.cloudScene);
+        };
+        if (!isCloudEvidenceCaptureContext()) {
+            delete captureCanvas.__elementsWebGlCloudEvidence;
+            delete captureCanvas.__elementsWebGlCloudEvidenceCurrentScene;
+        }
         captureCanvas.dataset.cloudPlateExport = "available";
 
         drawRef.current = requestLive;
@@ -1583,6 +1798,8 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             drawRef.current = null;
             delete captureCanvas.__elementsWebGlFrameComplete;
             delete captureCanvas.__elementsCloudPlateCapture;
+            delete captureCanvas.__elementsWebGlCloudEvidence;
+            delete captureCanvas.__elementsWebGlCloudEvidenceCurrentScene;
             delete captureCanvas.dataset.cloudPlateExport;
             resizeObserver.disconnect();
             document.removeEventListener("visibilitychange", visibilityHandler);

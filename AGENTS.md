@@ -4,7 +4,7 @@
 
 Elements is a Next.js 15 / React 19 application with a dynamic astronomical sky and meteorological cloud renderer. Run `npm install` when dependencies are missing, then `npm run dev -- --hostname 127.0.0.1 --port 3000`. `/sky-lab` exposes the environment controls; `/cloud-photographs` provides cloud reference comparisons; `/cloud-preview-matrix` shows the capture catalogue.
 
-Use `npm run typecheck` for TypeScript validation. Focused renderer checks are `node --test scripts/test-webgl-cloud-renderer.mjs scripts/test-cloud-plate-pipeline.mjs scripts/test-cloud-system-runtime.mjs`. Rebuild authored volume assets with `npm run sky:cloud-atlas` only when the atlas generator changes.
+Use `npm run typecheck` for static TypeScript validation. Validate renderer changes at the real browser/GPU edge with `scripts/capture-cloud-preview.sh`, using native-Metal WebGL2, the fixed production camera, and actual completed frames. Rebuild authored volume assets with `npm run sky:cloud-atlas` only when the atlas generator changes.
 
 ## Goals and non-goals
 
@@ -21,15 +21,18 @@ Use `npm run typecheck` for TypeScript validation. Focused renderer checks are `
 ## Rules
 
 - Maintain this file and `TODO.md` at large phase boundaries and before the end of a turn. Store plans, remaining work, and verification in the roadmap.
+- Do not add unit tests. Exercise changed modules through real end-to-end tests at their actual boundaries, including rendered effects, negative controls and restoration where applicable.
+- No deployed-production state is established for this development branch. Beyond these required root instruction/roadmap files, do not add documentation, compatibility layers, migration options or legacy maintenance without an actual deployed-production requirement. This is not permission to delete unrelated existing work.
 - Preserve existing user changes. Keep coherent commits and push the authorised branch with the full history; do not rewrite history.
 - Keep generator source, binary assets, and manifest consistent. Do not relax qualification thresholds just to pass a candidate.
 - Keep temporary captures and diagnostic outputs outside committed source. Remove temporary test instrumentation before committing.
 - GPU fences and GL error 0 are not sufficient completeness evidence: verify the actual final frame, especially after heavy cloud draws. Keep shader versions fixed during controlled GPU comparisons.
-- Current user routing is native GPT-6 Astra ultra orchestration only. Do not use the local-orchestration or remote-delegation skills, or sol-advisor. The primary task owns integration and visual acceptance.
+- The 2026-09-29 Ac/Cc body experiment failed visual gate R1 despite correct negative controls and restoration. Do not expand cloud families or equate curved density support with realism. Close the ray-integration evidence gap before the next structural hypothesis.
+- Current user routing is `unified-delegation` (2026-09-29), replacing the prior native-Astra-only choice. Follow its current routing and ownership rules; the primary task retains integration and real visual acceptance. Do not create user-owned app tasks without explicit authorization.
 - The obsolete TextEdit/continuous-execution hook workflow is permanently disabled. Do not open steering files, poll for text-file answers, or recreate that workflow; communicate in the conversation and end completed turns normally.
 
 ## Intended architecture
 
-`Sky` assembles astronomy, atmospheric composition, weather, and a `CloudScene`. The scene's species recipes and morphology/optics controls drive the WebGL cloud shader through `AtmosphereCanvas`. Finite world-space density fields provide the cloud shapes; radiative transport produces cloud radiance and transmittance for compositing with the sky. The WebGPU renderer and atlas path remain existing integration surfaces whose contracts must be preserved while the requested WebGL path is developed.
+`Sky` assembles astronomy, atmospheric composition, weather, and a `CloudScene`. The scene's species recipes and morphology/optics controls drive the WebGL cloud shader through `AtmosphereCanvas`. Finite world-space density fields provide the cloud shapes; radiative transport produces cloud radiance and transmittance for compositing with the sky. The WebGPU renderer and atlas path exist in the repository; do not expand compatibility work on those paths without a current requirement.
 
 The plate pipeline exports linear radiance/transmittance and optional direct, sky, and ground response bases. Legacy compatible bases support live source coefficients. New atmosphere-baked WebGL plates are explicitly fixed-lighting and require recapture for changed lighting. Their diagnostic bases must not be treated as arbitrary Sun/Moon relighting operators. Their compatibility-domain radiance must not enter the physical WebGPU compositor without an established radiometric/foreground-air conversion; this integration remains blocked, as recorded in `TODO.md`. Live WebGL uses the current sky's physical atmospheric medium at cloud sample positions. Reference photographs and production-frame captures form the visual acceptance evidence.

@@ -105,7 +105,17 @@ const override = (
     fallback: number,
     low: number,
     high: number,
-) => clamp(controls?.[key] ?? fallback, low, high);
+) => {
+    const requested = controls?.[key];
+    if (requested === undefined) return clamp(fallback, low, high);
+    if (!Number.isFinite(requested) || requested < low || requested > high) {
+        throw new RangeError(
+            `Cloud morphology ${String(key)}=${String(requested)} is outside ` +
+            `the supported interval [${low}, ${high}].`,
+        );
+    }
+    return requested;
+};
 
 const stableExemplarOrdinal = (
     scene: CloudScene,
@@ -139,6 +149,7 @@ export interface WebGlCloudMorphologyProfile {
     fragmentation: number;
     fibreCurl: number;
     waveAmplitude: number;
+    packetDepthM: number;
 }
 
 export const compileWebGlCloudMorphology = (
@@ -165,17 +176,45 @@ export const compileWebGlCloudMorphology = (
         Math.max(0.08, layer.thickness * 0.001 *
             (topology === "layered-veil" || topology === "precipitating-sheet"
                 ? 18 : 0.9));
-    const verticalAspect = explicit ? midpoint(explicit.verticalAspect) :
+    const recipeVerticalAspect = explicit ? midpoint(explicit.verticalAspect) :
         clamp(layer.thickness * 0.001 / elementScaleKm, 0.002, 5);
     const supportBand = explicit ? midpoint(explicit.boundarySupport) :
         topology === "layered-veil" || topology === "boundary-layer-sheet"
             ? 0.12 : 0.42;
 
+    const requestedElementScaleKm = override(
+        controls, "elementScaleKm", elementScaleKm, 0.05, 300,
+    );
+    const cloudletTopology = topology === "cellular-cloudlet-field";
+    const nominalPacketDepthM = cloudletTopology
+        ? layer.thickness * clamp(
+            elementScaleKm * 1000 * recipeVerticalAspect / layer.thickness,
+            0.035,
+            0.8,
+        )
+        : layer.thickness;
+    const defaultVerticalAspect = cloudletTopology
+        ? nominalPacketDepthM / (elementScaleKm * 1000)
+        : recipeVerticalAspect;
+    const requestedVerticalAspect = override(
+        controls, "verticalAspect", defaultVerticalAspect, 0.002, 5,
+    );
+    const packetDepthM = cloudletTopology
+        ? requestedElementScaleKm * 1000 * requestedVerticalAspect
+        : layer.thickness;
+    if (cloudletTopology && (!Number.isFinite(packetDepthM) || packetDepthM <= 0 ||
+        packetDepthM > layer.thickness * 0.8)) {
+        throw new RangeError(
+            `Cloud morphology packet depth ${packetDepthM}m for ${layer.species} ` +
+            `must be finite, positive, and at most ${layer.thickness * 0.8}m.`,
+        );
+    }
+
     return {
         topology,
         material,
-        elementScaleKm: override(controls, "elementScaleKm", elementScaleKm, 0.05, 300),
-        verticalAspect: override(controls, "verticalAspect", verticalAspect, 0.002, 5),
+        elementScaleKm: requestedElementScaleKm,
+        verticalAspect: requestedVerticalAspect,
         supportBand: override(controls, "supportBand", supportBand, 0.02, 0.8),
         erosionStrength: override(controls, "erosionStrength", layer.detailStrength, 0, 1),
         lineageDepth: override(controls, "lineageDepth", construction ? midpoint(construction.lineageDepth) : 3, 1, 16),
@@ -194,6 +233,7 @@ export const compileWebGlCloudMorphology = (
         fragmentation: override(controls, "fragmentation", defaults.fragmentation, 0, 1),
         fibreCurl: override(controls, "fibreCurl", defaults.fibreCurl, 0, 1),
         waveAmplitude: override(controls, "waveAmplitude", defaults.waveAmplitude, 0, 1),
+        packetDepthM,
     };
 };
 
@@ -248,7 +288,7 @@ export const packWebGlCloudMorphology = (
             profile.fibreCurl,
             profile.waveAmplitude,
             clamp(layer.optics?.powderStrength ?? 1, 0, 2),
-            0,
+            profile.packetDepthM,
         ], offset);
         optics.set([
             clamp(layer.optics?.singleScatteringAlbedo ??

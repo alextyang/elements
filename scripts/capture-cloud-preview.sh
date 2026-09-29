@@ -18,6 +18,8 @@ capture_skip_qualification="${CLOUD_PREVIEW_SKIP_IMAGE_QUALIFICATION:-0}"
 capture_immutable_output="${CLOUD_PREVIEW_IMMUTABLE_OUTPUT:-0}"
 capture_disable_case_switch="${CLOUD_PREVIEW_DISABLE_CASE_SWITCH:-0}"
 capture_metrics_path="${CLOUD_PREVIEW_CAPTURE_METRICS_PATH:-}"
+capture_evidence_request_path="${CLOUD_PREVIEW_EVIDENCE_REQUEST_PATH:-}"
+capture_evidence_output_dir="${CLOUD_PREVIEW_EVIDENCE_OUTPUT_DIR:-}"
 capture_cloud_time_offset="${CLOUD_PLATE_TIME_OFFSET_SECONDS:-0}"
 capture_plate_scene="${CLOUD_PLATE_SCENE_ID:-}"
 capture_plate_frame="${CLOUD_PLATE_FRAME_INDEX:-}"
@@ -29,6 +31,7 @@ capture_native_config="$capture_root/scripts/config/cloud-preview-native-playwri
 capture_native_headless_config="$capture_root/scripts/config/cloud-preview-native-headless-playwright.json"
 capture_adapter_policy="$capture_root/components/backgrounds/sky/cloud-transport-adapter-policy.mjs"
 capture_webgl_readiness_policy="$capture_root/scripts/lib/cloud-preview-webgl-readiness.mjs"
+capture_evidence_request_helper="$capture_root/scripts/lib/cloud-preview-evidence-request.mjs"
 capture_adapter_probe_url="$capture_base_url/cloud-preview-adapter-probe.html"
 capture_persistent_session="${CLOUD_PREVIEW_PERSISTENT_SESSION:-}"
 capture_session="${capture_persistent_session:-cloud-preview-${$}-$(date +%s)}"
@@ -57,6 +60,18 @@ if [[ -n "$capture_renderer_preference" &&
     "$capture_renderer_preference" != "webgl2" &&
     "$capture_renderer_preference" != "fallback" ]]; then
     echo "CLOUD_PREVIEW_RENDERER_PREFERENCE is invalid." >&2
+    exit 2
+fi
+if { [[ -n "$capture_evidence_request_path" ]] &&
+    [[ -z "$capture_evidence_output_dir" ]]; } ||
+    { [[ -z "$capture_evidence_request_path" ]] &&
+    [[ -n "$capture_evidence_output_dir" ]]; }; then
+    echo "CLOUD_PREVIEW_EVIDENCE_REQUEST_PATH and CLOUD_PREVIEW_EVIDENCE_OUTPUT_DIR must be set together." >&2
+    exit 2
+fi
+if [[ -n "$capture_evidence_request_path" &&
+    "$capture_renderer_preference" != "webgl2" ]]; then
+    echo "Cloud evidence capture requires the WebGL2 renderer." >&2
     exit 2
 fi
 case "$capture_debug" in
@@ -128,6 +143,12 @@ if (( capture_diagnostic_reserve_ms >= capture_timeout_ms )); then
 fi
 
 mkdir -p "$capture_diagnostic_root"
+capture_evidence_bundle='{"requests":[],"outputDirectory":""}'
+if [[ -n "$capture_evidence_request_path" ]]; then
+    capture_evidence_bundle="$(node "$capture_evidence_request_helper" \
+        "$capture_evidence_request_path" "$capture_evidence_output_dir")"
+    mkdir -p "$capture_evidence_output_dir"
+fi
 # Public preview generation deliberately replaces its transient raw path on a
 # failed retry. Diagnostic callers opt into immutable output paths instead;
 # never replace a frame or metrics record that already belongs to a revision.
@@ -635,6 +656,135 @@ capture_run_output="$(
             }
             if (!assessment.ready) throw new Error(
                 'WebGL completed-frame gate: ' + JSON.stringify({ assessment, state }));
+            const evidenceBundle = JSON.parse(
+                $(node -p 'JSON.stringify(process.argv[1])' "$capture_evidence_bundle")
+            );
+            const saveEvidenceMetadata = async (label, metadata) => {
+                const metadataDownloadPromise = page.waitForEvent('download', {
+                    timeout: remaining(),
+                });
+                await page.evaluate(({ label, metadata }) => {
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(new Blob([
+                        JSON.stringify(metadata, null, 2) + '\n',
+                    ], { type: 'application/json' }));
+                    link.href = url;
+                    link.download = label + '.json';
+                    document.body.append(link);
+                    link.click();
+                    link.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 0);
+                }, { label, metadata });
+                const metadataDownload = await metadataDownloadPromise;
+                await metadataDownload.saveAs(
+                    evidenceBundle.outputDirectory + '/' + label + '.json'
+                );
+            };
+            for (const specification of evidenceBundle.requests) {
+                if (specification.expectError) {
+                    const rejection = await page.evaluate(async ({ specification, state }) => {
+                        const canvas = document.querySelector(
+                            '[data-benchmark-render] canvas[data-sky-renderer="webgl2"]'
+                        );
+                        const before = {
+                            frameState: canvas?.getAttribute('data-cloud-webgl-frame-state'),
+                            sceneKey: canvas?.getAttribute('data-cloud-scene-key'),
+                            completedFrames: canvas?.getAttribute(
+                                'data-cloud-webgl-completed-frames'),
+                        };
+                        const request = { ...specification };
+                        delete request.label;
+                        delete request.variant;
+                        delete request.absentLayerIndex;
+                        delete request.expectError;
+                        request.version = 1;
+                        request.expectedSceneKey = state.sceneKey;
+                        request.expectedShaderHash = state.shaderSourceHash;
+                        let message = '';
+                        try {
+                            await canvas.__elementsWebGlCloudEvidence(request);
+                        } catch (error) {
+                            message = String(error);
+                        }
+                        if (!message.includes(specification.expectError)) {
+                            throw new Error('Evidence rejection mismatch: ' + message);
+                        }
+                        await canvas.__elementsWebGlFrameComplete();
+                        const after = {
+                            frameState: canvas?.getAttribute('data-cloud-webgl-frame-state'),
+                            sceneKey: canvas?.getAttribute('data-cloud-scene-key'),
+                            completedFrames: canvas?.getAttribute(
+                                'data-cloud-webgl-completed-frames'),
+                            frameFailure: canvas?.getAttribute('data-cloud-webgl-frame-failure'),
+                        };
+                        return { label: specification.label, request: specification,
+                            message, before, after };
+                    }, { specification, state });
+                    await saveEvidenceMetadata(specification.label, rejection);
+                    continue;
+                }
+                const binaryDownloadPromise = page.waitForEvent('download', {
+                    timeout: remaining(),
+                });
+                const metadataPromise = page.evaluate(async ({ specification, state }) => {
+                    const canvas = document.querySelector(
+                        '[data-benchmark-render] canvas[data-sky-renderer="webgl2"]'
+                    );
+                    if (typeof canvas?.__elementsWebGlCloudEvidence !== 'function' ||
+                        typeof canvas?.__elementsWebGlCloudEvidenceCurrentScene !== 'function') {
+                        throw new Error('WebGL cloud evidence hook is unavailable.');
+                    }
+                    const request = { ...specification };
+                    delete request.label;
+                    delete request.variant;
+                    delete request.absentLayerIndex;
+                    request.version = 1;
+                    request.expectedSceneKey = state.sceneKey;
+                    request.expectedShaderHash = state.shaderSourceHash;
+                    if (specification.variant === 'absent-layer') {
+                        const cloudScene = canvas.__elementsWebGlCloudEvidenceCurrentScene();
+                        cloudScene.layers[specification.absentLayerIndex].present = false;
+                        request.cloudScene = cloudScene;
+                    }
+                    const result = await canvas.__elementsWebGlCloudEvidence(request);
+                    let minimum = Infinity;
+                    let maximum = -Infinity;
+                    for (const value of result.values) {
+                        minimum = Math.min(minimum, value);
+                        maximum = Math.max(maximum, value);
+                    }
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(new Blob([result.values], {
+                        type: 'application/octet-stream',
+                    }));
+                    link.href = url;
+                    link.download = specification.label + '.f32';
+                    document.body.append(link);
+                    link.click();
+                    link.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 0);
+                    return {
+                        label: specification.label,
+                        request: specification,
+                        mode: result.mode,
+                        sceneKey: result.sceneKey,
+                        shaderHash: result.shaderHash,
+                        width: result.width,
+                        height: result.height,
+                        byteLength: result.values.byteLength,
+                        minimum,
+                        maximum,
+                    };
+                }, { specification, state });
+                const [binaryDownload, metadata] = await Promise.all([
+                    binaryDownloadPromise,
+                    metadataPromise,
+                ]);
+                await binaryDownload.saveAs(
+                    evidenceBundle.outputDirectory + '/' + specification.label + '.f32'
+                );
+                await saveEvidenceMetadata(specification.label, metadata);
+            }
             if (pageErrors.length) throw new Error(
                 'WebGL capture page errors: ' + JSON.stringify(pageErrors));
             await page.locator('[data-benchmark-render]').screenshot({
