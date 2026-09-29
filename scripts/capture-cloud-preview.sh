@@ -746,6 +746,19 @@ capture_run_output="$(
                         cloudScene.layers[specification.absentLayerIndex].present = false;
                         request.cloudScene = cloudScene;
                     }
+                    if (specification.mode === 'ray-columns') {
+                        const frame = canvas.__elementsWebGlCloudEvidenceCurrentFrame();
+                        request.rays = specification.rays.map((ray) => {
+                            const resolved = { ...ray };
+                            resolved.origin = ray.origin === 'observer'
+                                ? frame.observerOrigin : ray.origin;
+                            resolved.direction = ray.direction === 'sun'
+                                ? frame.sunDirection
+                                : ray.uv ? frame.viewRay(ray.uv) : ray.direction;
+                            delete resolved.uv;
+                            return resolved;
+                        });
+                    }
                     const result = await canvas.__elementsWebGlCloudEvidence(request);
                     let minimum = Infinity;
                     let maximum = -Infinity;
@@ -766,6 +779,7 @@ capture_run_output="$(
                     return {
                         label: specification.label,
                         request: specification,
+                        resolvedRequest: request,
                         mode: result.mode,
                         sceneKey: result.sceneKey,
                         shaderHash: result.shaderHash,

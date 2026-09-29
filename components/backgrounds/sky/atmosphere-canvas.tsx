@@ -26,6 +26,7 @@ import {
     cameraYawRadiansFromViewAzimuth,
     resolveSkyCamera,
     rotateDirectionByCameraYaw,
+    skyCameraRayDirection,
 } from "./camera-contract";
 import styles from "./sky.module.css";
 
@@ -692,17 +693,27 @@ interface WebGlCloudEvidenceRequest {
     cloudScene?: CloudScene;
     cloudTimeOffsetSeconds?: number;
     slice?: WebGlCloudDensitySliceSpec;
-    rays?: readonly unknown[];
+    rays?: readonly WebGlCloudWorldRaySpec[];
     solarSourceScale?: 0 | 1;
 }
 
 interface WebGlCloudEvidenceResult {
-    mode: Exclude<WebGlCloudEvidenceRequest["mode"], "ray-columns">;
+    mode: WebGlCloudEvidenceRequest["mode"];
     sceneKey: string;
     shaderHash: string;
     width: number;
     height: number;
     values: Float32Array;
+}
+
+interface WebGlCloudWorldRaySpec {
+    label: string;
+    origin: readonly [number, number, number];
+    direction: readonly [number, number, number];
+    lengthM: number;
+    layerIndex: 0 | 1 | 2;
+    kind: "view" | "sun";
+    referenceSampleCount: 256 | 512 | 1024;
 }
 
 type WebGlCloudPlateCaptureCanvas = HTMLCanvasElement & {
@@ -714,6 +725,11 @@ type WebGlCloudPlateCaptureCanvas = HTMLCanvasElement & {
         request: WebGlCloudEvidenceRequest,
     ) => Promise<WebGlCloudEvidenceResult>;
     __elementsWebGlCloudEvidenceCurrentScene?: () => CloudScene;
+    __elementsWebGlCloudEvidenceCurrentFrame?: () => {
+        observerOrigin: [number, number, number];
+        sunDirection: [number, number, number];
+        viewRay: (uv: readonly [number, number]) => [number, number, number];
+    };
 };
 
 const packFloat32PlaneAsLittleEndianFloat16 = (
@@ -932,6 +948,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             framebuffer: WebGLFramebuffer,
             offlineSample: readonly [number, number, number],
             evidenceSlice?: WebGlCloudDensitySliceSpec,
+            evidenceRays?: readonly WebGlCloudWorldRaySpec[],
         ) => {
             gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
             gl.viewport(0, 0, width, height);
@@ -1071,6 +1088,26 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 evidenceSlice?.layerIndex ?? 0,
                 evidenceSlice?.crossWindM ?? 0,
             );
+            const rayOrigins = new Float32Array(32 * 4);
+            const rayDirections = new Float32Array(32 * 4);
+            const rayMeta = new Float32Array(32 * 4);
+            evidenceRays?.forEach((ray, index) => {
+                const offset = index * 4;
+                rayOrigins.set([...ray.origin, 0], offset);
+                rayDirections.set([...ray.direction, 0], offset);
+                rayMeta.set([
+                    ray.lengthM,
+                    ray.layerIndex,
+                    ray.kind === "sun" ? 1 : 0,
+                    ray.referenceSampleCount,
+                ], offset);
+            });
+            gl.uniform4fv(uniform("u_cloud_evidence_ray_origins"), rayOrigins);
+            gl.uniform4fv(uniform("u_cloud_evidence_ray_directions"), rayDirections);
+            gl.uniform4fv(uniform("u_cloud_evidence_ray_meta"), rayMeta);
+            gl.uniform1f(
+                uniform("u_cloud_evidence_ray_count"), evidenceRays?.length ?? 0,
+            );
 
             if (cloudNoise) {
                 gl.activeTexture(gl.TEXTURE0);
@@ -1164,9 +1201,13 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             outputMode: number,
             offlineSample: readonly [number, number, number] = [0, 0, 0.5],
             evidenceSlice?: WebGlCloudDensitySliceSpec,
+            evidenceRays?: readonly WebGlCloudWorldRaySpec[],
         ) => {
             assertDrawActive(snapshot);
-            bindDraw(snapshot, outputMode, framebuffer, offlineSample, evidenceSlice);
+            bindDraw(
+                snapshot, outputMode, framebuffer, offlineSample,
+                evidenceSlice, evidenceRays,
+            );
             gl.disable(gl.SCISSOR_TEST);
             gl.clearBufferfv(gl.COLOR, 0, new Float32Array(
                 [0, 0, 0, outputMode === 0 ? 0 : -1]));
@@ -1410,9 +1451,10 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 return {
                     dispose,
                     read: async (
-                        outputMode: 1 | 2 | 3 | 4 | 5 | 6,
+                        outputMode: 1 | 2 | 3 | 4 | 5 | 6 | 7,
                         offlineSample: readonly [number, number, number],
                         evidenceSlice?: WebGlCloudDensitySliceSpec,
+                        evidenceRays?: readonly WebGlCloudWorldRaySpec[],
                     ) => {
                         await drawTiles(
                             snapshot,
@@ -1420,6 +1462,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                             outputMode,
                             offlineSample,
                             evidenceSlice,
+                            evidenceRays,
                         );
                         assertDrawActive(snapshot);
                         gl.readPixels(
@@ -1667,17 +1710,13 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     .includes(request.mode)) {
                 throw new Error("INVALID_INPUT: invalid evidence request or scene owner.");
             }
-            if (request.mode === "ray-columns") {
-                throw new Error(
-                    "UNSUPPORTED_READBACK: ray-column convergence readback is not implemented.",
-                );
-            }
             const densityMode = request.mode === "density-slice";
+            const rayMode = request.mode === "ray-columns";
             if (densityMode !== Boolean(request.slice) ||
+                rayMode !== Boolean(request.rays) ||
                 (request.mode !== "radiance" && request.solarSourceScale !== undefined) ||
                 (request.solarSourceScale !== undefined &&
-                    request.solarSourceScale !== 0 && request.solarSourceScale !== 1) ||
-                request.rays !== undefined) {
+                    request.solarSourceScale !== 0 && request.solarSourceScale !== 1)) {
                 throw new Error("INVALID_INPUT: evidence arguments do not match the mode.");
             }
             const slice = request.slice;
@@ -1693,6 +1732,19 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                 (slice.kind === "vertical-wind" && !Number.isFinite(slice.crossWindM))
             )) {
                 throw new Error("INVALID_INPUT: invalid density slice.");
+            }
+            const rays = request.rays;
+            if (rays && (rays.length < 1 || rays.length > 32 || rays.some((ray) => {
+                const length = Math.hypot(...ray.direction);
+                return !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(ray.label) ||
+                    ray.origin.length !== 3 || !ray.origin.every(Number.isFinite) ||
+                    ray.direction.length !== 3 || !ray.direction.every(Number.isFinite) ||
+                    Math.abs(length - 1) > 1e-4 || !Number.isFinite(ray.lengthM) ||
+                    ray.lengthM <= 0 || ![0, 1, 2].includes(ray.layerIndex) ||
+                    !["view", "sun"].includes(ray.kind) ||
+                    ![256, 512, 1024].includes(ray.referenceSampleCount);
+            }))) {
+                throw new Error("INVALID_INPUT: invalid world ray specification.");
             }
             if (request.cloudScene !== undefined &&
                 !validateEvidenceScene(request.cloudScene)) {
@@ -1732,8 +1784,8 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             const evidenceSnapshot: DrawSnapshot = {
                 ...liveSnapshot,
                 current: evidenceCurrent,
-                width: slice?.width ?? liveSnapshot.width,
-                height: slice?.height ?? liveSnapshot.height,
+                width: rays?.length ?? slice?.width ?? liveSnapshot.width,
+                height: rays ? 4 : slice?.height ?? liveSnapshot.height,
             };
             try {
                 const values = await enqueue(async () => {
@@ -1741,11 +1793,13 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
                     const readback = createCloudPlateReadback(evidenceSnapshot);
                     try {
                         const outputMode = request.mode === "radiance" ? 1 :
-                            request.mode === "transmittance" ? 2 : 6;
+                            request.mode === "transmittance" ? 2 :
+                                request.mode === "density-slice" ? 6 : 7;
                         return (await readback.read(
                             outputMode,
                             [0, 0, 0.5],
                             slice,
+                            rays,
                         )).slice();
                     } finally {
                         readback.dispose();
@@ -1770,9 +1824,30 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             }
             return structuredClone(sceneRef.current.cloudScene);
         };
+        captureCanvas.__elementsWebGlCloudEvidenceCurrentFrame = () => {
+            if (!isCloudEvidenceCaptureContext()) {
+                throw new Error("INVALID_INPUT: cloud evidence requires capture context.");
+            }
+            const current = sceneRef.current;
+            const camera = resolveSkyCamera(current);
+            const cameraYaw = cameraYawRadiansFromViewAzimuth(camera.viewAzimuth);
+            return {
+                observerOrigin: [
+                    0,
+                    6_371_000 + current.observerAltitude * 2500,
+                    0,
+                ],
+                sunDirection: rotateDirectionByCameraYaw(
+                    current.sunDirection, cameraYaw,
+                ),
+                viewRay: (uv: readonly [number, number]) =>
+                    skyCameraRayDirection(uv, camera),
+            };
+        };
         if (!isCloudEvidenceCaptureContext()) {
             delete captureCanvas.__elementsWebGlCloudEvidence;
             delete captureCanvas.__elementsWebGlCloudEvidenceCurrentScene;
+            delete captureCanvas.__elementsWebGlCloudEvidenceCurrentFrame;
         }
         captureCanvas.dataset.cloudPlateExport = "available";
 
@@ -1800,6 +1875,7 @@ export function AtmosphereCanvas({ scene, sceneKey }: AtmosphereCanvasProps) {
             delete captureCanvas.__elementsCloudPlateCapture;
             delete captureCanvas.__elementsWebGlCloudEvidence;
             delete captureCanvas.__elementsWebGlCloudEvidenceCurrentScene;
+            delete captureCanvas.__elementsWebGlCloudEvidenceCurrentFrame;
             delete captureCanvas.dataset.cloudPlateExport;
             resizeObserver.disconnect();
             document.removeEventListener("visibilitychange", visibilityHandler);

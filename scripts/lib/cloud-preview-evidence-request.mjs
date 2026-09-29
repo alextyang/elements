@@ -18,11 +18,17 @@ for (const request of document.requests) {
         throw new Error("Evidence request labels must be unique safe slugs.");
     }
     labels.add(request.label);
-    if (!["radiance", "transmittance", "density-slice"].includes(request.mode) ||
+    if (!["radiance", "transmittance", "density-slice", "ray-columns"]
+        .includes(request.mode) ||
         ![undefined, "live", "absent-layer"].includes(request.variant) ||
         (request.variant === "absent-layer" &&
             ![0, 1, 2].includes(request.absentLayerIndex))) {
         throw new Error(`Invalid evidence request ${request.label}.`);
+    }
+    if (request.mode === "ray-columns" &&
+        (!Array.isArray(request.rays) || request.rays.length < 1 ||
+            request.rays.length > 32)) {
+        throw new Error(`Ray evidence ${request.label} requires 1..32 rays.`);
     }
     if (request.expectError !== undefined &&
         !/^[A-Z_]+$/.test(request.expectError)) {

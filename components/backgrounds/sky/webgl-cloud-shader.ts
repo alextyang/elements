@@ -265,6 +265,10 @@ uniform float u_cloud_fog;
 uniform float u_cloud_noctilucent;
 uniform vec4 u_cloud_evidence_slice_bounds;
 uniform vec4 u_cloud_evidence_slice_params;
+uniform vec4 u_cloud_evidence_ray_origins[32];
+uniform vec4 u_cloud_evidence_ray_directions[32];
+uniform vec4 u_cloud_evidence_ray_meta[32];
+uniform float u_cloud_evidence_ray_count;
 `;
 
 export const CLOUD_FUNCTIONS = `
@@ -1331,6 +1335,193 @@ float cloud_density(vec3 position, CloudLayer layer, float altitude_fraction) {
     return density;
 }
 
+CloudLayer cloud_layer_from_uniforms(int index);
+
+float cloud_evidence_reference_column(
+    vec3 origin,
+    vec3 direction,
+    CloudLayer layer,
+    float start_distance,
+    float end_distance,
+    int sample_count
+) {
+    float column = 0.0;
+    float interval = max(0.0, end_distance - start_distance);
+    float step_length = interval / float(max(sample_count, 1));
+    float base_radius = PLANET_RADIUS + layer.baseAltitude;
+    float top_radius = base_radius + layer.thickness;
+    for (int index = 0; index < 1024; index++) {
+        if (index >= sample_count) break;
+        float distance = start_distance + (float(index) + 0.5) * step_length;
+        vec3 point = origin + direction * distance;
+        float altitude_fraction = (length(point) - base_radius) /
+            max(1.0, top_radius - base_radius);
+        if (altitude_fraction >= 0.0 && altitude_fraction <= 1.0) {
+            column += cloud_density(point, layer, altitude_fraction) * step_length;
+        }
+    }
+    return column;
+}
+
+vec2 cloud_evidence_material_interval(
+    vec3 origin,
+    vec3 direction,
+    CloudLayer layer,
+    float requested_length,
+    bool light_ray
+) {
+    if (layer.present < 0.5) return vec2(-1.0);
+    float base_radius = PLANET_RADIUS + layer.baseAltitude;
+    float top_radius = base_radius + layer.thickness;
+    vec2 material_bounds = cloud_material_bounds(layer, base_radius, top_radius);
+    vec2 outer = cloud_ray_sphere(origin, direction, material_bounds.y);
+    vec2 inner = cloud_ray_sphere(origin, direction, material_bounds.x);
+    if (light_ray) {
+        float exit_distance = outer.y;
+        if (inner.x > 1.0) exit_distance = min(exit_distance, inner.x);
+        if (inner.y > 1.0) exit_distance = min(exit_distance, inner.y);
+        exit_distance = min(exit_distance, layer.thickness * 8.0);
+        exit_distance = min(exit_distance, requested_length);
+        return exit_distance > 0.0 ? vec2(0.0, exit_distance) : vec2(-1.0);
+    }
+    vec2 planet = cloud_ray_sphere(origin, direction, PLANET_RADIUS);
+    if (planet.x > 0.0 || outer.y < 0.0) return vec2(-1.0);
+    float near_distance = inner.y > 0.0 ? inner.y : max(0.0, outer.x);
+    float far_distance = min(min(outer.y, CLOUD_MAX_DISTANCE), requested_length);
+    return far_distance > near_distance
+        ? vec2(near_distance, far_distance) : vec2(-1.0);
+}
+
+void cloud_evidence_production_column(
+    vec3 origin,
+    vec3 direction,
+    CloudLayer layer,
+    vec2 interval,
+    bool light_ray,
+    out float column,
+    out float integrated_distance,
+    out float remaining_distance,
+    out float termination,
+    out float nominal_step,
+    out float nominal_steps
+) {
+    column = 0.0;
+    integrated_distance = 0.0;
+    remaining_distance = max(0.0, interval.y - interval.x);
+    termination = interval.x < 0.0 ? 3.0 : 0.0;
+    nominal_step = 0.0;
+    nominal_steps = 0.0;
+    if (interval.x < 0.0) return;
+    float base_radius = PLANET_RADIUS + layer.baseAltitude;
+    float top_radius = base_radius + layer.thickness;
+    float span = interval.y - interval.x;
+    if (light_ray) {
+        int light_steps = int(u_cloud_quality.y);
+        nominal_steps = float(light_steps);
+        nominal_step = span / float(max(light_steps, 1));
+        for (int index = 0; index < 32; index++) {
+            if (index >= light_steps) break;
+            float a = float(index) / float(max(light_steps, 1));
+            float b = float(index + 1) / float(max(light_steps, 1));
+            float start = span * a * a;
+            float end = span * b * b;
+            float step_length = end - start;
+            vec3 point = origin + direction * mix(start, end, 0.5);
+            float altitude_fraction = (length(point) - base_radius) /
+                max(1.0, top_radius - base_radius);
+            if (altitude_fraction >= 0.0 && altitude_fraction <= 1.0) {
+                column += cloud_density(point, layer, altitude_fraction) * step_length;
+            }
+        }
+        integrated_distance = span;
+        remaining_distance = 0.0;
+        return;
+    }
+
+    float view_budget = layer.materialModel < 2.5
+        ? min(u_cloud_quality.x, 384.0) : u_cloud_quality.x;
+    int steps = int(mix(view_budget, view_budget * 0.5, abs(direction.y)));
+    steps = clamp(steps, 8, 1536);
+    float step_length = abs(layer.species - 19.0) < 0.5
+        ? min(span / float(steps), 25.0)
+        : min(span / float(steps), layer.thickness * 0.16);
+    nominal_step = step_length;
+    nominal_steps = float(steps);
+    // Final production frames use deterministic midpoint quadrature (0.5).
+    // Keep this diagnostic copy explicitly tied to that production budget.
+    float travelled = interval.x + step_length * 0.5;
+    int executed_steps = 0;
+    float transmittance = 1.0;
+    for (int index = 0; index < 1536; index++) {
+        if (index >= steps || transmittance < 0.005) break;
+        executed_steps += 1;
+        vec3 point = origin + direction * travelled;
+        float altitude_fraction = (length(point) - base_radius) /
+            max(1.0, top_radius - base_radius);
+        if (altitude_fraction >= 0.0 && altitude_fraction <= 1.0) {
+            float density = cloud_density(point, layer, altitude_fraction);
+            if (density >= 1e-4) {
+                column += density * step_length;
+                transmittance *= exp(-density * layer.extinction * step_length);
+            }
+        }
+        travelled += step_length;
+    }
+    // Each midpoint represents one complete interval. Counting executed
+    // intervals avoids attributing the initial half-step twice.
+    integrated_distance = min(span, float(executed_steps) * step_length);
+    remaining_distance = max(0.0, span - integrated_distance);
+    termination = transmittance < 0.005 && remaining_distance > 1e-3
+        ? 2.0 : remaining_distance > 1e-3 ? 1.0 : 0.0;
+}
+
+vec4 cloud_evidence_ray_column(int ray_index, int row_index) {
+    vec4 packed_origin = u_cloud_evidence_ray_origins[ray_index];
+    vec4 packed_direction = u_cloud_evidence_ray_directions[ray_index];
+    vec4 packed_meta = u_cloud_evidence_ray_meta[ray_index];
+    vec3 origin = packed_origin.xyz;
+    vec3 direction = normalize(packed_direction.xyz);
+    CloudLayer layer = cloud_layer_from_uniforms(int(packed_meta.y));
+    bool light_ray = packed_meta.z > 0.5;
+    vec2 interval = cloud_evidence_material_interval(
+        origin, direction, layer, packed_meta.x, light_ray);
+    float production_column;
+    float integrated_distance;
+    float remaining_distance;
+    float termination;
+    float nominal_step;
+    float nominal_steps;
+    cloud_evidence_production_column(
+        origin, direction, layer, interval, light_ray,
+        production_column, integrated_distance, remaining_distance,
+        termination, nominal_step, nominal_steps);
+    float reference_256 = interval.x >= 0.0
+        ? cloud_evidence_reference_column(
+            origin, direction, layer, interval.x, interval.y, 256) : 0.0;
+    float reference_512 = interval.x >= 0.0
+        ? cloud_evidence_reference_column(
+            origin, direction, layer, interval.x, interval.y, 512) : 0.0;
+    float reference_1024 = interval.x >= 0.0
+        ? cloud_evidence_reference_column(
+            origin, direction, layer, interval.x, interval.y, 1024) : 0.0;
+    float production_t = exp(-layer.extinction * production_column);
+    float reference_t = exp(-layer.extinction * reference_1024);
+    if (row_index == 0) {
+        return vec4(production_column, production_t, reference_1024, reference_t);
+    }
+    if (row_index == 1) {
+        return vec4(max(0.0, interval.y - interval.x), integrated_distance,
+            remaining_distance, termination);
+    }
+    if (row_index == 2) {
+        float t256 = exp(-layer.extinction * reference_256);
+        float t512 = exp(-layer.extinction * reference_512);
+        float t1024 = reference_t;
+        return vec4(t256, t512, t1024, abs(t512 - t1024));
+    }
+    return vec4(interval.x, interval.y, nominal_step, nominal_steps);
+}
+
 /** Optical depth from a sample toward a light source, with growing steps. */
 float cloud_optical_depth(
     vec3 ray_origin,
@@ -1788,6 +1979,16 @@ vec3 cloud_noctilucent(vec3 direction, vec3 sun_direction) {
 
 /** Injected at the composition point inside `main()`. */
 export const CLOUD_COMPOSITE = `
+    if (abs(u_cloud_output_mode - 7.0) < 0.25) {
+        int ray_index = int(floor(gl_FragCoord.x));
+        int row_index = int(floor(gl_FragCoord.y));
+        out_color = ray_index >= 0 &&
+            float(ray_index) < u_cloud_evidence_ray_count
+            ? cloud_evidence_ray_column(ray_index, row_index)
+            : vec4(0.0);
+        return;
+    }
+
     if (abs(u_cloud_output_mode - 6.0) < 0.25) {
         vec2 slice_uv = gl_FragCoord.xy / u_resolution;
         float slice_kind = u_cloud_evidence_slice_params.y;
